@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit - Relationship Intelligence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-card: #1a1a2e;
+    --bg-card-hover: #222240;
+    --accent: #6c5ce7;
+    --accent-light: #a29bfe;
+    --accent-glow: rgba(108, 92, 231, 0.3);
+    --success: #00cec9;
+    --warning: #fdcb6e;
+    --danger: #ff6b6b;
+    --text-primary: #f0f0f5;
+    --text-secondary: #8888a0;
+    --text-muted: #55556a;
+    --border: rgba(255,255,255,0.06);
+    --glass: rgba(255,255,255,0.03);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient Background */
+  .ambient {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  }
+  .ambient-orb {
+    position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.15;
+  }
+  .ambient-orb:nth-child(1) {
+    width: 600px; height: 600px; background: #6c5ce7; top: -200px; right: -100px;
+    animation: float1 20s ease-in-out infinite;
+  }
+  .ambient-orb:nth-child(2) {
+    width: 500px; height: 500px; background: #00cec9; bottom: -200px; left: -100px;
+    animation: float2 25s ease-in-out infinite;
+  }
+  .ambient-orb:nth-child(3) {
+    width: 400px; height: 400px; background: #fd79a8; top: 50%; left: 50%;
+    animation: float3 30s ease-in-out infinite;
+  }
+  @keyframes float1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-80px,60px)} }
+  @keyframes float2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(60px,-80px)} }
+  @keyframes float3 { 0%,100%{transform:translate(-50%,-50%)} 50%{transform:translate(-30%,-60%)} }
+
+  /* Layout */
+  .app { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px; background: var(--bg-secondary); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 24px 16px; flex-shrink: 0;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 32px; }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px var(--accent-glow);
+  }
+  .logo-icon svg { width: 20px; height: 20px; }
+  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent-light); }
+
+  .nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s;
+    color: var(--text-secondary); font-size: 14px; font-weight: 500;
+    border: none; background: none; text-align: left; width: 100%;
+  }
+  .nav-item:hover { background: var(--glass); color: var(--text-primary); }
+  .nav-item.active {
+    background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(108,92,231,0.05));
+    color: var(--accent-light); border: 1px solid rgba(108,92,231,0.2);
+  }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto; background: var(--danger); color: white;
+    font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+  }
+
+  .sidebar-footer {
+    padding-top: 16px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; margin-top: auto;
+  }
+  .user-avatar {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #fd79a8, #6c5ce7);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .user-info { flex: 1; }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-plan { font-size: 11px; color: var(--accent-light); }
+
+  /* Main Content */
+  .main { flex: 1; padding: 32px; max-width: 1200px; }
+
+  /* Header */
+  .header { margin-bottom: 32px; }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .header h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  .header p { color: var(--text-secondary); font-size: 14px; }
+  .header-actions { display: flex; gap: 10px; }
+
+  .btn {
+    padding: 10px 20px; border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s; border: none;
+    display: inline-flex; align-items: center; gap: 8px; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #7d6ff0);
+    color: white; box-shadow: 0 4px 20px var(--accent-glow);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--accent-glow); }
+  .btn-ghost {
+    background: var(--glass); color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* Stats Row */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    transition: all 0.3s; position: relative; overflow: hidden;
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: rgba(108,92,231,0.3); }
+  .stat-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .stat-card:hover::after { opacity: 1; }
+  .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+  .stat-change { font-size: 12px; margin-top: 6px; font-weight: 600; }
+  .stat-change.up { color: var(--success); }
+  .stat-change.down { color: var(--danger); }
+
+  /* Section Headers */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 16px; font-weight: 700; }
+  .section-link { font-size: 13px; color: var(--accent-light); cursor: pointer; text-decoration: none; }
+  .section-link:hover { text-decoration: underline; }
+
+  /* Action Cards (Nudges) */
+  .nudges { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 32px; }
+  .nudge {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; display: flex; align-items: flex-start; gap: 14px;
+    cursor: pointer; transition: all 0.3s; position: relative;
+  }
+  .nudge:hover { border-color: rgba(108,92,231,0.3); background: var(--bg-card-hover); }
+  .nudge-avatar {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px;
+  }
+  .nudge-content { flex: 1; }
+  .nudge-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .nudge-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .nudge-time { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .nudge-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .nudge-btn {
+    padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: none; font-family: inherit; transition: all 0.2s;
+  }
+  .nudge-btn.primary { background: var(--accent); color: white; }
+  .nudge-btn.primary:hover { background: #7d6ff0; }
+  .nudge-btn.ghost { background: var(--glass); color: var(--text-secondary); border: 1px solid var(--border); }
+
+  /* Priority Indicators */
+  .priority-dot {
+    position: absolute; top: 14px; right: 14px; width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .priority-high { background: var(--danger); box-shadow: 0 0 8px rgba(255,107,107,0.5); }
+  .priority-medium { background: var(--warning); }
+  .priority-low { background: var(--success); }
+
+  /* Contact Grid */
+  .contacts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+  .contact-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; cursor: pointer;
+    transition: all 0.3s; position: relative; overflow: hidden;
+  }
+  .contact-card:hover { transform: translateY(-3px); border-color: rgba(108,92,231,0.3); box-shadow: var(--shadow); }
+  .contact-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .contact-avatar {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; flex-shrink: 0;
+  }
+  .contact-info { flex: 1; }
+  .contact-name { font-size: 15px; font-weight: 700; }
+  .contact-role { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  .contact-health { margin-bottom: 12px; }
+  .health-bar-bg {
+    height: 4px; background: rgba(255,255,255,0.06); border-radius: 4px;
+    overflow: hidden; margin-top: 6px;
+  }
+  .health-bar {
+    height: 100%; border-radius: 4px; transition: width 1s ease;
+  }
+  .health-label { display: flex; justify-content: space-between; align-items: center; }
+  .health-text { font-size: 11px; color: var(--text-muted); }
+  .health-score { font-size: 12px; font-weight: 700; }
+
+  .contact-meta { display: flex; justify-content: space-between; align-items: center; }
+  .contact-last { font-size: 11px; color: var(--text-muted); }
+  .contact-tags { display: flex; gap: 4px; }
+  .tag {
+    padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 600;
+    background: rgba(108,92,231,0.15); color: var(--accent-light);
+  }
+  .tag.friend { background: rgba(0,206,201,0.15); color: var(--success); }
+  .tag.family { background: rgba(253,121,168,0.15); color: #fd79a8; }
+  .tag.work { background: rgba(253,203,110,0.15); color: var(--warning); }
+
+  /* Visual Orbit */
+  .orbit-visual {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; margin-bottom: 32px;
+    position: relative; overflow: hidden;
+  }
+  .orbit-canvas { width: 100%; height: 500px; position: relative; }
+  #orbitCanvas { width: 100%; height: 100%; }
+
+  /* Insights Panel */
+  .insights { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 32px; }
+  .insight-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .insight-icon {
+    width: 40px; height: 40px; border-radius: 12px; display: flex;
+    align-items: center; justify-content: center; margin-bottom: 12px;
+  }
+  .insight-icon svg { width: 20px; height: 20px; }
+  .insight-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .insight-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+  .streak-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .streak-item { display: flex; align-items: center; gap: 10px; }
+  .streak-avatar {
+    width: 32px; height: 32px; border-radius: 8px; display: flex;
+    align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+  }
+  .streak-info { flex: 1; }
+  .streak-name { font-size: 13px; font-weight: 600; }
+  .streak-detail { font-size: 11px; color: var(--text-muted); }
+  .streak-fire { font-size: 16px; }
+
+  /* Activity Timeline */
+  .timeline { margin-top: 12px; }
+  .timeline-item {
+    display: flex; gap: 14px; padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-dot {
+    width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+  }
+  .timeline-content { flex: 1; }
+  .timeline-action { font-size: 13px; line-height: 1.5; }
+  .timeline-action strong { color: var(--text-primary); }
+  .timeline-date { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    z-index: 100; display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .modal-overlay.active { display: flex; opacity: 1; }
+  .modal {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 20px; width: 480px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+    transform: scale(0.95); transition: transform 0.3s;
+  }
+  .modal-overlay.active .modal { transform: scale(1); }
+  .modal-header {
+    padding: 24px 24px 0; display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 18px; font-weight: 700; }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: 8px; border: none;
+    background: var(--glass); color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: all 0.2s;
+  }
+  .modal-close:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+  .modal-body { padding: 24px; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-input, .form-select {
+    width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;
+    font-family: inherit; transition: border-color 0.2s; outline: none;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text-muted); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+  .form-tag {
+    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: var(--glass);
+    color: var(--text-secondary); transition: all 0.2s;
+  }
+  .form-tag.selected { background: rgba(108,92,231,0.2); border-color: var(--accent); color: var(--accent-light); }
+  .modal-footer { padding: 0 24px 24px; display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* Toast Notifications */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow); animation: slideIn 0.3s ease;
+    min-width: 300px;
+  }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
+  /* Search Bar */
+  .search-bar { position: relative; margin-bottom: 24px; }
+  .search-input {
+    width: 100%; padding: 12px 16px 12px 44px; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text-primary); font-size: 14px; font-family: inherit;
+    outline: none; transition: all 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-icon {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted);
+  }
+  .search-icon svg { width: 16px; height: 16px; }
+  .search-shortcut {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    padding: 4px 8px; border-radius: 6px; background: var(--glass);
+    border: 1px solid var(--border); font-size: 11px; color: var(--text-muted);
+  }
+
+  /* Page transitions */
+  .page { display: none; animation: fadeIn 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Landing */
+  .landing { display: none; min-height: 100vh; position: relative; z-index: 1; }
+  .landing.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .landing-content { text-align: center; max-width: 700px; padding: 40px; }
+  .landing-badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px;
+    background: rgba(108,92,231,0.15); border: 1px solid rgba(108,92,231,0.3);
+    border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--accent-light);
+    margin-bottom: 24px;
+  }
+  .landing h1 {
+    font-size: 56px; font-weight: 900; letter-spacing: -2px;
+    line-height: 1.1; margin-bottom: 20px;
+    background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-light) 50%, var(--success) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .landing p { font-size: 18px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px; }
+  .landing-cta { display: flex; gap: 12px; justify-content: center; }
+  .btn-large { padding: 14px 32px; font-size: 15px; border-radius: 14px; }
+  .feature-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    margin-top: 60px; text-align: left;
+  }
+  .feature-item {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+  }
+  .feature-item h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; margin-top: 12px; }
+  .feature-item p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  .feature-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .feature-icon svg { width: 22px; height: 22px; }
+
+  /* Mobile bottom nav */
+  .mobile-nav {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg-secondary); border-top: 1px solid var(--border);
+    z-index: 90; padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  }
+  .mobile-nav-inner {
+    display: flex; justify-content: space-around; align-items: center;
+  }
+  .mobile-nav-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    padding: 6px 12px; font-family: inherit; transition: color 0.2s;
+    font-size: 10px; font-weight: 600;
+  }
+  .mobile-nav-btn.active { color: var(--accent-light); }
+  .mobile-nav-btn svg { width: 20px; height: 20px; }
+
+  /* Responsive — Tablet */
+  @media (max-width: 1024px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .contacts-grid { grid-template-columns: repeat(2, 1fr); }
+    .nudges { grid-template-columns: 1fr; }
+    .insights { grid-template-columns: 1fr; }
+  }
+
+  /* Responsive — Mobile */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .mobile-nav { display: block; }
+    .main { padding: 16px 14px 80px; }
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat-card { padding: 14px; }
+    .stat-value { font-size: 24px; }
+    .stat-label { font-size: 10px; }
+    .contacts-grid { grid-template-columns: 1fr; }
+    .nudges { grid-template-columns: 1fr; }
+    .header h1 { font-size: 22px; }
+    .header-top { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .header-actions { width: 100%; }
+    .header-actions .btn { flex: 1; justify-content: center; }
+    .landing h1 { font-size: 32px; letter-spacing: -1px; }
+    .landing p { font-size: 15px; }
+    .landing-content { padding: 24px 16px; }
+    .landing-cta { flex-direction: column; }
+    .btn-large { width: 100%; justify-content: center; }
+    .feature-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 36px; }
+    .feature-item { padding: 18px; }
+    .orbit-canvas { height: 320px; }
+    .modal { width: calc(100vw - 32px); max-width: 480px; border-radius: 16px; }
+    .modal-header { padding: 20px 20px 0; }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 0 20px 20px; }
+    .form-row { grid-template-columns: 1fr; }
+    .toast-container { bottom: 80px; right: 12px; left: 12px; }
+    .toast { min-width: auto; }
+    .search-shortcut { display: none; }
+    .insights { grid-template-columns: 1fr; }
+  }
+
+  /* Small phones */
+  @media (max-width: 380px) {
+    .stats { grid-template-columns: 1fr; }
+    .landing h1 { font-size: 26px; }
+  }
+
+  /* Loading skeleton */
+  .loading-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px; z-index: 10;
+  }
+  .loading-overlay.hidden { display: none; }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--accent-light); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; color: var(--text-secondary); }
+
+  /* Search results count */
+  .search-results-count {
+    font-size: 12px; color: var(--text-muted); margin-bottom: 12px; margin-top: -8px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<!-- Ambient Background -->
+<div class="ambient">
+  <div class="ambient-orb"></div>
+  <div class="ambient-orb"></div>
+  <div class="ambient-orb"></div>
+</div>
+
+<!-- LANDING PAGE -->
+<div class="landing active" id="landingPage">
+  <div class="landing-content">
+    <div class="landing-badge">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Never lose touch again
+    </div>
+    <h1>Your relationships, intelligently nurtured</h1>
+    <p>Orbit uses AI to help you maintain meaningful connections with the people who matter most. Smart reminders, relationship health tracking, and personalized conversation starters.</p>
+    <div class="landing-cta">
+      <button class="btn btn-primary btn-large" onclick="enterApp()">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Get Started Free
+      </button>
+      <button class="btn btn-ghost btn-large" onclick="enterApp()">See Demo</button>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="feature-icon" style="background:rgba(108,92,231,0.15)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#a29bfe" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </div>
+        <h3>Smart Nudges</h3>
+        <p>AI-powered reminders that know when it's time to reach out, with suggested topics based on life events.</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background:rgba(0,206,201,0.15)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00cec9" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <h3>Relationship Health</h3>
+        <p>Visual health scores for every relationship. See at a glance who needs attention and who's thriving.</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background:rgba(253,121,168,0.15)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fd79a8" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <h3>Deeper Connections</h3>
+        <p>Track birthdays, milestones, and shared memories. Never forget what matters to the people you love.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="mainApp" style="display:none">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="4 4"/></svg>
+      </div>
+      <div class="logo-text">Orb<span>it</span></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-page="contacts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        People
+      </button>
+      <button class="nav-item" data-page="orbit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>
+        Orbit View
+        <span class="nav-badge">New</span>
+      </button>
+      <button class="nav-item" data-page="insights">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Insights
+      </button>
+      <button class="nav-item" data-page="activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Activity
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-avatar">JD</div>
+      <div class="user-info">
+        <div class="user-name">Jordan Davis</div>
+        <div class="user-plan">Pro Plan</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>Good evening, Jordan</h1>
+            <p>You have 4 connections that could use some love today.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-ghost" onclick="syncData()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Sync
+            </button>
+            <button class="btn btn-primary" onclick="openModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Person
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <input type="text" class="search-input" placeholder="Search people, notes, memories..." id="searchInput" oninput="handleSearch(this.value)">
+        <span class="search-shortcut">/</span>
+      </div>
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Inner Circle</div>
+          <div class="stat-value" id="stat-inner">0</div>
+          <div class="stat-change up">+2 this month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Interactions</div>
+          <div class="stat-value" id="stat-interactions">0</div>
+          <div class="stat-change up">+18% vs last week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Health</div>
+          <div class="stat-value" id="stat-health">0%</div>
+          <div class="stat-change up">+5% improving</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Streak</div>
+          <div class="stat-value" id="stat-streak">0d</div>
+          <div class="stat-change up">Personal best!</div>
+        </div>
+      </div>
+      <div class="section-header">
+        <div class="section-title">Smart Nudges</div>
+        <a class="section-link">View all</a>
+      </div>
+      <div class="nudges" id="nudgesContainer"></div>
+      <div class="section-header">
+        <div class="section-title">Your Inner Circle</div>
+        <a class="section-link">See all people</a>
+      </div>
+      <div class="contacts-grid" id="contactsGrid"></div>
+    </div>
+
+    <!-- ORBIT VIEW PAGE -->
+    <div class="page" id="page-orbit">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>Orbit View</h1>
+            <p>Visualize your relationship universe. Closer = stronger connection.</p>
+          </div>
+        </div>
+      </div>
+      <div class="orbit-visual">
+        <div class="orbit-canvas">
+          <canvas id="orbitCanvas"></canvas>
+        </div>
+        <div id="orbitLegend" style="display:flex; gap:24px; justify-content:center; padding:16px 0 8px; flex-wrap:wrap;"></div>
+      </div>
+    </div>
+
+    <!-- CONTACTS PAGE -->
+    <div class="page" id="page-contacts">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>All People</h1>
+            <p>Manage your connections and relationship details.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" onclick="openModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Person
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <input type="text" class="search-input" placeholder="Search people..." oninput="handleSearch(this.value)">
+      </div>
+      <div class="contacts-grid" id="allContactsGrid"></div>
+    </div>
+
+    <!-- INSIGHTS PAGE -->
+    <div class="page" id="page-insights">
+      <div class="header">
+        <h1>Insights</h1>
+        <p>AI-powered analysis of your relationship patterns.</p>
+      </div>
+      <div class="insights">
+        <div class="insight-card">
+          <div class="insight-icon" style="background:rgba(108,92,231,0.15)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#a29bfe" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="insight-title">Weekly Relationship Report</div>
+          <div class="insight-text" id="weeklyReport"></div>
+          <div class="streak-list" id="streakList"></div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-icon" style="background:rgba(0,206,201,0.15)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#00cec9" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+          </div>
+          <div class="insight-title">Connection Patterns</div>
+          <div class="insight-text">
+            You tend to reach out most on <strong>Tuesdays</strong> and <strong>Thursdays</strong>. Your quietest day is Sunday.
+            <br><br>
+            Suggestion: Set aside 10 minutes on Sundays to send a quick message to someone you haven't talked to in a while.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY PAGE -->
+    <div class="page" id="page-activity">
+      <div class="header">
+        <h1>Activity</h1>
+        <p>Your recent interaction history.</p>
+      </div>
+      <div class="insight-card">
+        <div class="timeline" id="activityTimeline"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD PERSON MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add a person to your orbit</div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input type="text" class="form-input" placeholder="Jane" id="firstName">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input type="text" class="form-input" placeholder="Doe" id="lastName">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">How do you know them?</label>
+        <select class="form-select" id="relationship">
+          <option>Friend</option>
+          <option>Family</option>
+          <option>Work</option>
+          <option>Acquaintance</option>
+          <option>Mentor</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Desired Contact Frequency</label>
+        <div class="form-tags" id="frequencyTags">
+          <div class="form-tag" data-val="weekly" onclick="selectTag(this)">Weekly</div>
+          <div class="form-tag selected" data-val="biweekly" onclick="selectTag(this)">Every 2 weeks</div>
+          <div class="form-tag" data-val="monthly" onclick="selectTag(this)">Monthly</div>
+          <div class="form-tag" data-val="quarterly" onclick="selectTag(this)">Quarterly</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="form-input" placeholder="How you met, shared interests, etc." id="personNotes">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addPerson()">Add to Orbit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<nav class="mobile-nav" id="mobileNav">
+  <div class="mobile-nav-inner">
+    <button class="mobile-nav-btn active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Home
+    </button>
+    <button class="mobile-nav-btn" data-page="contacts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      People
+    </button>
+    <button class="mobile-nav-btn" data-page="orbit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>
+      Orbit
+    </button>
+    <button class="mobile-nav-btn" data-page="insights">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Insights
+    </button>
+    <button class="mobile-nav-btn" data-page="activity">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Activity
+    </button>
+  </div>
+</nav>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ═══════════ CONFIG ═══════════
+const API = '';  // same origin — served by FastAPI
+
+const COLORS = [
+  'linear-gradient(135deg, #6c5ce7, #a29bfe)',
+  'linear-gradient(135deg, #00cec9, #81ecec)',
+  'linear-gradient(135deg, #fd79a8, #fab1a0)',
+  'linear-gradient(135deg, #fdcb6e, #f8a734)',
+  'linear-gradient(135deg, #ff6b6b, #ee5a24)',
+  'linear-gradient(135deg, #4ecdc4, #44bd9e)',
+  'linear-gradient(135deg, #a29bfe, #6c5ce7)',
+  'linear-gradient(135deg, #ff9ff3, #f368e0)',
+];
+
+const TYPE_COLORS = {
+  call: '#6c5ce7', video_call: '#a29bfe', text: '#00cec9',
+  in_person: '#fd79a8', email: '#fdcb6e', social_media: '#ff9ff3',
+};
+
+// ═══════════ STATE ═══════════
+let contacts = [];      // merged contact + health data
+let dashboardData = {};  // raw API response
+let contactsRaw = [];    // raw /contacts response
+
+// ═══════════ API HELPERS ═══════════
+async function api(path, opts) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (!res.ok) throw new Error('API error: ' + res.status);
+  return res.json();
+}
+
+// ═══════════ DOM HELPERS ═══════════
+function createElement(tag, attrs, children) {
+  const el = document.createElement(tag);
+  if (attrs) {
+    Object.entries(attrs).forEach(([k, v]) => {
+      if (k === 'className') el.className = v;
+      else if (k === 'style') el.style.cssText = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+      else el.setAttribute(k, v);
+    });
+  }
+  if (children) {
+    if (typeof children === 'string') el.textContent = children;
+    else if (Array.isArray(children)) children.forEach(c => { if (c) el.appendChild(c); });
+    else el.appendChild(children);
+  }
+  return el;
+}
+
+function getHealthColor(health) {
+  if (health >= 75) return '#00cec9';
+  if (health >= 50) return '#fdcb6e';
+  return '#ff6b6b';
+}
+
+function getInitials(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function daysAgoText(days) {
+  if (days < 1) return 'Today';
+  if (days < 2) return '1 day ago';
+  return Math.round(days) + ' days ago';
+}
+
+function timeAgoText(timestamp) {
+  const diff = (Date.now() - new Date(timestamp).getTime()) / 86400000;
+  return daysAgoText(diff);
+}
+
+function formatRole(type, notes) {
+  const label = (type || 'friend').charAt(0).toUpperCase() + (type || 'friend').slice(1);
+  if (!notes) return label;
+  // Take just the first phrase (up to first comma or period), max 40 chars
+  const short = notes.split(/[,.]/)[0].trim();
+  if (short.length > 40) return label + ' - ' + short.slice(0, 37) + '...';
+  return label + ' - ' + short;
+}
+
+// ═══════════ DATA LOADING ═══════════
+async function loadDashboard() {
+  const [dash, rawContacts] = await Promise.all([
+    api('/dashboard'),
+    api('/contacts'),
+  ]);
+  dashboardData = dash;
+  contactsRaw = rawContacts;
+
+  // Build a lookup: contact_id -> raw contact details
+  const rawById = {};
+  rawContacts.forEach(c => { rawById[c.id] = c; });
+
+  // Merge health reports with contact details into the unified format the UI needs
+  contacts = dash.health_reports.map((hr, i) => {
+    const raw = rawById[hr.contact_id] || {};
+    return {
+      id: hr.contact_id,
+      name: hr.contact_name,
+      role: formatRole(raw.relationship_type, raw.notes),
+      initials: getInitials(hr.contact_name),
+      color: COLORS[hr.contact_id % COLORS.length],
+      health: hr.health,
+      lastContact: daysAgoText(hr.days_since_contact),
+      tag: raw.relationship_type || 'friend',
+      frequency: raw.target_frequency || 'biweekly',
+      notes: raw.notes || '',
+      trend: hr.trend,
+      urgency: hr.urgency,
+      suggested_action: hr.suggested_action,
+      decay_paused: hr.decay_paused,
+    };
+  });
+
+  // Sort: highest health first for inner circle display
+  contacts.sort((a, b) => b.health - a.health);
+}
+
+async function loadInteractions() {
+  return api('/interactions?limit=20');
+}
+
+// ═══════════ RENDERING ═══════════
+function buildContactCard(c) {
+  const hColor = getHealthColor(c.health);
+  const card = createElement('div', { className: 'contact-card', onClick: () => showToast('Opening ' + c.name + "'s profile...", 'contact') });
+
+  const top = createElement('div', { className: 'contact-top' });
+  const avatar = createElement('div', { className: 'contact-avatar', style: 'background:' + c.color }, c.initials);
+  const info = createElement('div', { className: 'contact-info' });
+  info.appendChild(createElement('div', { className: 'contact-name' }, c.name));
+  info.appendChild(createElement('div', { className: 'contact-role' }, c.role));
+  top.appendChild(avatar);
+  top.appendChild(info);
+  card.appendChild(top);
+
+  const healthDiv = createElement('div', { className: 'contact-health' });
+  const healthLabel = createElement('div', { className: 'health-label' });
+  healthLabel.appendChild(createElement('span', { className: 'health-text' }, 'Relationship Health'));
+  const scoreText = c.health + '%' + (c.decay_paused ? ' (paused)' : '');
+  healthLabel.appendChild(createElement('span', { className: 'health-score', style: 'color:' + hColor }, scoreText));
+  healthDiv.appendChild(healthLabel);
+  const barBg = createElement('div', { className: 'health-bar-bg' });
+  barBg.appendChild(createElement('div', { className: 'health-bar', style: 'width:' + c.health + '%;background:' + hColor }));
+  healthDiv.appendChild(barBg);
+  card.appendChild(healthDiv);
+
+  const meta = createElement('div', { className: 'contact-meta' });
+  meta.appendChild(createElement('span', { className: 'contact-last' }, 'Last: ' + c.lastContact));
+  const tags = createElement('div', { className: 'contact-tags' });
+  tags.appendChild(createElement('span', { className: 'tag ' + c.tag }, c.tag));
+  if (c.trend === 'declining') {
+    const trendTag = createElement('span', { className: 'tag', style: 'background:rgba(255,107,107,0.15);color:#ff6b6b' }, c.trend);
+    tags.appendChild(trendTag);
+  } else if (c.trend === 'improving') {
+    const trendTag = createElement('span', { className: 'tag', style: 'background:rgba(0,206,201,0.15);color:#00cec9' }, c.trend);
+    tags.appendChild(trendTag);
+  }
+  meta.appendChild(tags);
+  card.appendChild(meta);
+
+  return card;
+}
+
+function buildNudge(n) {
+  // n is a nudge from the API: { id, contact_id, contact_name, message, suggestion, priority, status }
+  const contact = contacts.find(c => c.id === n.contact_id) || {};
+  const nudge = createElement('div', { className: 'nudge' });
+
+  const priorityClass = n.priority >= 0.7 ? 'high' : n.priority >= 0.4 ? 'medium' : 'low';
+  nudge.appendChild(createElement('div', { className: 'priority-dot priority-' + priorityClass }));
+
+  nudge.appendChild(createElement('div', {
+    className: 'nudge-avatar',
+    style: 'background:' + (contact.color || COLORS[0])
+  }, contact.initials || getInitials(n.contact_name)));
+
+  const content = createElement('div', { className: 'nudge-content' });
+  content.appendChild(createElement('div', { className: 'nudge-title' }, n.message));
+  // Truncate long suggestions to keep nudge cards even
+  const shortSuggestion = n.suggestion.length > 80 ? n.suggestion.slice(0, 77) + '...' : n.suggestion;
+  content.appendChild(createElement('div', { className: 'nudge-desc' }, shortSuggestion));
+
+  const actions = createElement('div', { className: 'nudge-actions' });
+  const primaryBtn = createElement('button', {
+    className: 'nudge-btn primary',
+    onClick: (e) => { e.stopPropagation(); actOnNudge(n.id, n.contact_id, n.contact_name); }
+  }, 'Reach out');
+  const ghostBtn = createElement('button', {
+    className: 'nudge-btn ghost',
+    onClick: (e) => { e.stopPropagation(); snoozeNudge(n.id, e.target); }
+  }, 'Later');
+  actions.appendChild(primaryBtn);
+  actions.appendChild(ghostBtn);
+  content.appendChild(actions);
+  nudge.appendChild(content);
+
+  return nudge;
+}
+
+function buildTimelineItem(interaction) {
+  // interaction from API: { id, contact_id, interaction_type, duration_minutes, notes, timestamp }
+  const contact = contacts.find(c => c.id === interaction.contact_id);
+  const contactName = contact ? contact.name : 'Unknown';
+  const color = TYPE_COLORS[interaction.interaction_type] || '#6c5ce7';
+  const typeLabel = interaction.interaction_type.replace(/_/g, ' ');
+  const durText = interaction.duration_minutes > 0 ? ' for ' + interaction.duration_minutes + ' min' : '';
+  const notesText = interaction.notes ? ' - ' + interaction.notes : '';
+
+  const item = createElement('div', { className: 'timeline-item' });
+  item.appendChild(createElement('div', { className: 'timeline-dot', style: 'background:' + color }));
+  const content = createElement('div', { className: 'timeline-content' });
+  const actionEl = createElement('div', { className: 'timeline-action' });
+
+  const desc = typeLabel + durText + ' with ';
+  actionEl.appendChild(document.createTextNode(desc));
+  actionEl.appendChild(createElement('strong', null, contactName));
+  if (notesText) actionEl.appendChild(document.createTextNode(notesText));
+
+  content.appendChild(actionEl);
+  content.appendChild(createElement('div', { className: 'timeline-date' }, timeAgoText(interaction.timestamp)));
+  item.appendChild(content);
+  return item;
+}
+
+function renderInsightsReport() {
+  const report = document.getElementById('weeklyReport');
+  if (!report) return;
+  report.textContent = '';
+
+  const d = dashboardData;
+  const improving = contacts.filter(c => c.trend === 'improving');
+  const declining = contacts.filter(c => c.trend === 'declining').sort((a, b) => a.health - b.health);
+
+  const p1 = document.createTextNode('You had ');
+  const b1 = createElement('strong', null, d.interactions_this_week + ' interactions');
+  const p2 = document.createTextNode(' this week across ' + d.total_contacts + ' contacts. Average health: ');
+  const b2 = createElement('strong', null, d.avg_health + '%');
+  const p3 = document.createTextNode('.');
+  report.append(p1, b1, p2, b2, p3);
+
+  if (declining.length > 0) {
+    report.appendChild(document.createElement('br'));
+    report.appendChild(document.createElement('br'));
+    const p4 = document.createTextNode('Connections at risk: ');
+    const b3 = createElement('strong', null, declining[0].name);
+    const p5 = document.createTextNode(' (health: ' + declining[0].health + '%). ' + declining[0].suggested_action);
+    report.append(p4, b3, p5);
+  }
+
+  // Streaks — show top 3 healthiest contacts
+  const streakList = document.getElementById('streakList');
+  if (!streakList) return;
+  streakList.textContent = '';
+  const topHealthy = contacts.filter(c => c.health >= 70).slice(0, 3);
+  topHealthy.forEach(c => {
+    const item = createElement('div', { className: 'streak-item' });
+    item.appendChild(createElement('div', { className: 'streak-avatar', style: 'background:' + c.color }, c.initials));
+    const info = createElement('div', { className: 'streak-info' });
+    info.appendChild(createElement('div', { className: 'streak-name' }, c.name));
+    info.appendChild(createElement('div', { className: 'streak-detail' }, 'Health: ' + c.health + '% - ' + c.trend));
+    item.appendChild(info);
+    if (c.trend === 'improving') item.appendChild(createElement('div', { className: 'streak-fire' }, '\uD83D\uDD25'));
+    streakList.appendChild(item);
+  });
+}
+
+async function renderAll() {
+  const grid = document.getElementById('contactsGrid');
+  const allGrid = document.getElementById('allContactsGrid');
+  const nudgesEl = document.getElementById('nudgesContainer');
+  const timeline = document.getElementById('activityTimeline');
+
+  // Contacts
+  grid.textContent = '';
+  contacts.slice(0, 6).forEach(c => grid.appendChild(buildContactCard(c)));
+
+  allGrid.textContent = '';
+  contacts.forEach(c => allGrid.appendChild(buildContactCard(c)));
+
+  // Nudges from API
+  nudgesEl.textContent = '';
+  (dashboardData.top_nudges || []).forEach(n => nudgesEl.appendChild(buildNudge(n)));
+
+  // Activity timeline from API
+  try {
+    const interactions = await loadInteractions();
+    timeline.textContent = '';
+    interactions.forEach(i => timeline.appendChild(buildTimelineItem(i)));
+  } catch (e) {
+    timeline.textContent = 'Could not load activity.';
+  }
+
+  renderInsightsReport();
+}
+
+// ═══════════ NAVIGATION ═══════════
+function navigateTo(page) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  // Highlight sidebar nav
+  const sideBtn = document.querySelector('.nav-item[data-page="' + page + '"]');
+  if (sideBtn) sideBtn.classList.add('active');
+  // Highlight mobile nav
+  const mobBtn = document.querySelector('.mobile-nav-btn[data-page="' + page + '"]');
+  if (mobBtn) mobBtn.classList.add('active');
+  if (page === 'orbit') setTimeout(() => { initOrbitCanvas(); renderOrbitLegend(); }, 100);
+  // Scroll to top on page change
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+});
+document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+});
+
+// ═══════════ ORBIT CANVAS ═══════════
+let orbitAnimId = null;
+function initOrbitCanvas() {
+  if (orbitAnimId) cancelAnimationFrame(orbitAnimId);
+  const canvas = document.getElementById('orbitCanvas');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  ctx.scale(2, 2);
+  const w = rect.width, h = rect.height;
+  const cx = w / 2, cy = h / 2;
+
+  // Constrain ring radii to fit within canvas with padding
+  const maxRadius = Math.min(cx, cy) - 40;
+  const ringRadii = [
+    Math.min(90, maxRadius * 0.38),
+    Math.min(155, maxRadius * 0.65),
+    Math.min(210, maxRadius * 0.9)
+  ];
+
+  let angle = 0;
+
+  // Group contacts by ring, then evenly distribute angles within each ring
+  const rings = { 1: [], 2: [], 3: [] };
+  contacts.forEach(c => {
+    const ring = c.health >= 75 ? 1 : c.health >= 50 ? 2 : 3;
+    rings[ring].push(c);
+  });
+
+  const orbitPeople = [];
+  [1, 2, 3].forEach(ring => {
+    const people = rings[ring];
+    const baseRadius = ringRadii[ring - 1];
+    people.forEach((c, i) => {
+      orbitPeople.push({
+        ...c,
+        ring,
+        radius: baseRadius + (Math.random() - 0.5) * 15,
+        angleOffset: (i / people.length) * Math.PI * 2 + (ring * 0.7),
+        speed: 0.002 + Math.random() * 0.002,
+        size: ring === 1 ? 20 : ring === 2 ? 16 : 13,
+      });
+    });
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw ring guides
+    ringRadii.forEach((r, i) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.05 - i * 0.012) + ')';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // Ring labels positioned at consistent angles
+    ctx.font = '10px Inter';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const labelAngle = -0.35;
+    ctx.fillText('Inner Circle', cx + Math.cos(labelAngle) * (ringRadii[0] + 10), cy + Math.sin(labelAngle) * (ringRadii[0] + 10));
+    ctx.fillText('Regular', cx + Math.cos(labelAngle) * (ringRadii[1] + 10), cy + Math.sin(labelAngle) * (ringRadii[1] + 10));
+    ctx.fillText('Reconnect', cx + Math.cos(labelAngle) * (ringRadii[2] + 10), cy + Math.sin(labelAngle) * (ringRadii[2] + 10));
+
+    // Center "You" node
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 25);
+    gradient.addColorStop(0, '#a29bfe');
+    gradient.addColorStop(1, '#6c5ce7');
+    ctx.beginPath();
+    ctx.arc(cx, cy, 25, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.font = 'bold 12px Inter';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('You', cx, cy);
+
+    // Draw contacts
+    orbitPeople.forEach(p => {
+      const a = angle * p.speed * 100 + p.angleOffset;
+      let px = cx + Math.cos(a) * p.radius;
+      let py = cy + Math.sin(a) * p.radius;
+
+      // Clamp to canvas bounds with padding for labels
+      px = Math.max(p.size + 5, Math.min(w - p.size - 5, px));
+      py = Math.max(p.size + 5, Math.min(h - p.size - 20, py));
+
+      // Connection line
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(px, py);
+      ctx.strokeStyle = 'rgba(108,92,231,' + (p.health / 400) + ')';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Contact circle
+      const hColor = getHealthColor(p.health);
+      ctx.beginPath();
+      ctx.arc(px, py, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = hColor;
+      ctx.globalAlpha = 0.85;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Initials
+      ctx.font = 'bold ' + (p.size * 0.6) + 'px Inter';
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.initials, px, py);
+
+      // Name label below
+      ctx.font = '10px Inter';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText(p.name.split(' ')[0], px, py + p.size + 10);
+    });
+
+    angle += 0.01;
+    orbitAnimId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function renderOrbitLegend() {
+  const legend = document.getElementById('orbitLegend');
+  if (!legend) return;
+  legend.textContent = '';
+  const inner = contacts.filter(c => c.health >= 75).length;
+  const regular = contacts.filter(c => c.health >= 50 && c.health < 75).length;
+  const reconnect = contacts.filter(c => c.health < 50).length;
+  const items = [
+    { color: '#00cec9', label: 'Inner Circle', count: inner },
+    { color: '#fdcb6e', label: 'Regular', count: regular },
+    { color: '#ff6b6b', label: 'Reconnect', count: reconnect },
+  ];
+  items.forEach(item => {
+    const el = createElement('div', { style: 'display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)' });
+    const dot = createElement('div', { style: 'width:10px;height:10px;border-radius:50%;background:' + item.color });
+    el.appendChild(dot);
+    el.appendChild(document.createTextNode(item.label + ' (' + item.count + ')'));
+    legend.appendChild(el);
+  });
+}
+
+// ═══════════ APP ENTRY ═══════════
+async function enterApp() {
+  document.getElementById('landingPage').classList.remove('active');
+  document.getElementById('mainApp').style.display = 'flex';
+
+  // Show loading overlay
+  let overlay = document.getElementById('loadingOverlay');
+  if (!overlay) {
+    overlay = createElement('div', { className: 'loading-overlay', id: 'loadingOverlay' });
+    overlay.appendChild(createElement('div', { className: 'spinner' }));
+    overlay.appendChild(createElement('div', { className: 'loading-text' }, 'Loading your orbit...'));
+    document.querySelector('.main').appendChild(overlay);
+  }
+  overlay.classList.remove('hidden');
+
+  try {
+    await loadDashboard();
+    await renderAll();
+    animateStats();
+    overlay.classList.add('hidden');
+  } catch (e) {
+    overlay.classList.add('hidden');
+    showToast('Could not connect to backend: ' + e.message, 'info');
+  }
+}
+
+function animateStats() {
+  const d = dashboardData;
+  const targets = {
+    'stat-inner': [d.inner_circle_count || 0, ''],
+    'stat-interactions': [d.interactions_this_week || 0, ''],
+    'stat-health': [Math.round(d.avg_health) || 0, '%'],
+    'stat-streak': [d.total_contacts || 0, ''],
+  };
+  // Update the streak label to show total contacts instead
+  document.getElementById('stat-streak').parentElement.querySelector('.stat-label').textContent = 'TOTAL PEOPLE';
+  document.getElementById('stat-streak').parentElement.querySelector('.stat-change').textContent =
+    contacts.filter(c => c.trend === 'improving').length + ' improving';
+
+  Object.entries(targets).forEach(([id, [target, suffix]]) => {
+    const el = document.getElementById(id);
+    let current = 0;
+    const step = () => {
+      current += Math.ceil(target / 30) || 1;
+      if (current >= target) { el.textContent = target + suffix; return; }
+      el.textContent = current + suffix;
+      requestAnimationFrame(step);
+    };
+    step();
+  });
+
+  // Update subtitle with real data
+  const declining = contacts.filter(c => c.trend === 'declining').length;
+  document.querySelector('#page-dashboard .header p').textContent =
+    'You have ' + declining + ' connections that could use some love today.';
+}
+
+function openModal() { document.getElementById('addModal').classList.add('active'); }
+function closeModal() { document.getElementById('addModal').classList.remove('active'); }
+
+function selectTag(el) {
+  el.parentElement.querySelectorAll('.form-tag').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// ═══════════ ADD PERSON (API) ═══════════
+async function addPerson() {
+  const firstRaw = document.getElementById('firstName').value.trim();
+  const lastRaw = document.getElementById('lastName').value.trim();
+  const first = firstRaw || 'New';
+  const last = lastRaw || 'Contact';
+
+  const nameRegex = /^[a-zA-Z\s'\-]+$/;
+  if ((firstRaw && !nameRegex.test(firstRaw)) || (lastRaw && !nameRegex.test(lastRaw))) {
+    showToast('Please use only letters in names', 'info');
+    return;
+  }
+
+  const rel = document.getElementById('relationship').value.toLowerCase();
+  const freq = (document.querySelector('.form-tag.selected') || {}).dataset?.val || 'biweekly';
+  const notes = document.getElementById('personNotes').value;
+
+  try {
+    await api('/contacts', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: first + ' ' + last,
+        relationship_type: rel,
+        target_frequency: freq,
+        notes: notes,
+      }),
+    });
+
+    // Reload everything from the backend
+    await loadDashboard();
+    await renderAll();
+    closeModal();
+    showToast(first + ' ' + last + ' added to your orbit!', 'success');
+
+    document.getElementById('firstName').value = '';
+    document.getElementById('lastName').value = '';
+    document.getElementById('personNotes').value = '';
+  } catch (e) {
+    showToast('Failed to add: ' + e.message, 'info');
+  }
+}
+
+// ═══════════ LOG INTERACTION (API) ═══════════
+async function actOnNudge(nudgeId, contactId, contactName) {
+  try {
+    // Log a "call" interaction via the API (triggers weight learning!)
+    await api('/interactions', {
+      method: 'POST',
+      body: JSON.stringify({
+        contact_id: contactId,
+        interaction_type: 'call',
+        duration_minutes: 15,
+        initiated_by_user: true,
+        notes: 'Reached out via nudge',
+      }),
+    });
+
+    // Mark the nudge as acted
+    await api('/nudges/' + nudgeId + '/act', { method: 'POST' });
+
+    showToast('Logged interaction with ' + contactName + '!', 'success');
+
+    // Reload to show updated health
+    await loadDashboard();
+    await renderAll();
+    animateStats();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'info');
+  }
+}
+
+async function snoozeNudge(nudgeId, btn) {
+  const nudge = btn.closest('.nudge');
+  nudge.style.animation = 'slideOut 0.3s ease forwards';
+
+  try {
+    await api('/nudges/' + nudgeId + '/snooze', { method: 'POST' });
+    showToast('Nudge snoozed', 'snooze');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'info');
+  }
+
+  setTimeout(() => nudge.remove(), 300);
+}
+
+// ═══════════ SYNC (re-fetch from API) ═══════════
+async function syncData() {
+  showToast('Syncing...', 'sync');
+  try {
+    await loadDashboard();
+    await renderAll();
+    animateStats();
+    showToast('Synced! Health scores updated.', 'success');
+  } catch (e) {
+    showToast('Sync failed: ' + e.message, 'info');
+  }
+}
+
+// ═══════════ SEARCH (client-side on loaded data) ═══════════
+function handleSearch(query) {
+  const q = query.toLowerCase();
+  const filtered = contacts.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    c.role.toLowerCase().includes(q) ||
+    c.tag.includes(q) ||
+    (c.notes && c.notes.toLowerCase().includes(q))
+  );
+
+  // Show result count when searching
+  updateSearchCount(q, filtered.length);
+
+  const grid = document.getElementById('contactsGrid');
+  grid.textContent = '';
+  filtered.slice(0, 6).forEach(c => grid.appendChild(buildContactCard(c)));
+
+  const allGrid = document.getElementById('allContactsGrid');
+  if (allGrid) {
+    allGrid.textContent = '';
+    filtered.forEach(c => allGrid.appendChild(buildContactCard(c)));
+  }
+}
+
+function updateSearchCount(query, count) {
+  let countEl = document.getElementById('searchResultsCount');
+  if (!countEl) {
+    countEl = createElement('div', { className: 'search-results-count', id: 'searchResultsCount' });
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.parentElement) {
+      searchInput.parentElement.insertAdjacentElement('afterend', countEl);
+    }
+  }
+  if (query) {
+    countEl.textContent = count + ' result' + (count !== 1 ? 's' : '') + ' for "' + query + '"';
+    countEl.style.display = 'block';
+  } else {
+    countEl.style.display = 'none';
+  }
+}
+
+function showToast(message, type) {
+  type = type || 'info';
+  const container = document.getElementById('toastContainer');
+  const icons = { success: '\u2705', snooze: '\u23F0', contact: '\uD83D\uDC64', sync: '\uD83D\uDD04', info: '\u2139\uFE0F' };
+  const toast = createElement('div', { className: 'toast' });
+  toast.appendChild(createElement('span', { className: 'toast-icon' }, icons[type] || icons.info));
+  toast.appendChild(createElement('span', { className: 'toast-text' }, message));
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    const input = document.querySelector('.page.active .search-input');
+    if (input) input.focus();
+  }
+  if (e.key === 'Escape') closeModal();
+});
+
+document.getElementById('addModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+</script>
+</body>
+</html>
