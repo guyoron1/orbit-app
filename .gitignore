@@ -9,6 +9,7 @@ recordings/
 screenshots/
 fix-screenshots/
 .DS_Store
+.env
 package.json
 package-lock.json
 demo.mjs
