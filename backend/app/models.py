@@ -97,6 +97,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False, default="")
     name = Column(String(255), nullable=False)
     timezone = Column(String(50), default="UTC")
     plan = Column(String(20), default="free")

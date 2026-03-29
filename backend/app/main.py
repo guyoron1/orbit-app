@@ -1,29 +1,39 @@
 """
 Orbit API — Relationship Intelligence Backend
 
-Endpoints:
-  POST   /users                    Create a user
+Auth endpoints:
+  POST   /auth/signup              Create account
+  POST   /auth/login               Login, get JWT token
+
+Protected endpoints (require Bearer token):
   POST   /contacts                 Add a contact to your orbit
   GET    /contacts                 List all contacts with health scores
   POST   /interactions             Log an interaction (triggers weight learning)
-  GET    /contacts/{id}/health     Get detailed health report for a contact
+  GET    /interactions             Recent interactions timeline
+  GET    /contacts/{id}/health     Detailed health report for a contact
   GET    /contacts/{id}/weights    View learned weights (transparency)
+  GET    /contacts/{id}/starters   AI conversation starters
   POST   /life-events              Add a life event
-  GET    /dashboard                Full dashboard data (stats + nudges + health)
+  GET    /dashboard                Full dashboard data (stats + nudges + health + AI summary)
   POST   /nudges/{id}/act          Mark a nudge as acted on
   POST   /nudges/{id}/snooze       Snooze a nudge
 """
 
+import os
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from .database import Base, engine, get_db
 from .models import (
@@ -37,8 +47,16 @@ from .schemas import (
     HealthReportOut, WeightsOut,
     LifeEventCreate, LifeEventOut,
     NudgeOut, DashboardOut,
+    SignupRequest, LoginRequest, TokenResponse,
+    ConversationStartersOut, AISummaryOut,
 )
 from .decay import compute_health, update_weights_after_interaction
+from .auth import hash_password, verify_password, create_access_token, get_current_user
+from .ai import generate_conversation_starters, generate_relationship_summary
+
+
+# ── Rate limiter ──
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -50,46 +68,96 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Orbit API",
     description="Relationship Intelligence Backend",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── CORS ──
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# In a real app this comes from auth. For the prototype, we use a query param.
-def get_current_user_id() -> int:
-    return 1
+
+# ── Security headers middleware ──
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
-# ── Users ──
+# ══════════════════════════════════════════════
+# AUTH ENDPOINTS (public)
+# ══════════════════════════════════════════════
 
-@app.post("/users", response_model=UserOut)
-def create_user(data: UserCreate, db: Session = Depends(get_db)):
+@app.post("/auth/signup", response_model=TokenResponse)
+@limiter.limit("5/minute")
+def signup(request: Request, data: SignupRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(400, "Email already registered")
-    user = User(email=data.email, name=data.name, timezone=data.timezone)
+
+    user = User(
+        email=data.email,
+        password_hash=hash_password(data.password),
+        name=data.name,
+        timezone=data.timezone,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+
+    token = create_access_token(user.id, user.email)
+    return TokenResponse(
+        access_token=token,
+        user=UserOut.model_validate(user),
+    )
 
 
-# ── Contacts ──
+@app.post("/auth/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
+def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or not verify_password(data.password, user.password_hash):
+        raise HTTPException(401, "Invalid email or password")
+
+    token = create_access_token(user.id, user.email)
+    return TokenResponse(
+        access_token=token,
+        user=UserOut.model_validate(user),
+    )
+
+
+# ══════════════════════════════════════════════
+# CONTACTS (protected)
+# ══════════════════════════════════════════════
 
 @app.post("/contacts", response_model=ContactOut)
+@limiter.limit("30/minute")
 def create_contact(
+    request: Request,
     data: ContactCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
+    # Free plan limit: 25 contacts
+    count = db.query(func.count(Contact.id)).filter(Contact.user_id == user.id).scalar() or 0
+    if user.plan == "free" and count >= 25:
+        raise HTTPException(403, "Free plan limited to 25 contacts. Upgrade to Pro for unlimited.")
+
     contact = Contact(
-        user_id=user_id,
+        user_id=user.id,
         name=data.name,
         relationship_type=data.relationship_type,
         target_frequency=data.target_frequency,
@@ -99,7 +167,6 @@ def create_contact(
     db.commit()
     db.refresh(contact)
 
-    # Initialize weights with defaults
     weights = Weights(contact_id=contact.id)
     db.add(weights)
     db.commit()
@@ -110,32 +177,35 @@ def create_contact(
 @app.get("/contacts", response_model=list[ContactOut])
 def list_contacts(
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
-    return db.query(Contact).filter(Contact.user_id == user_id).all()
+    return db.query(Contact).filter(Contact.user_id == user.id).all()
 
 
-# ── Interactions ──
+# ══════════════════════════════════════════════
+# INTERACTIONS (protected)
+# ══════════════════════════════════════════════
 
 @app.post("/interactions", response_model=InteractionOut)
+@limiter.limit("60/minute")
 def log_interaction(
+    request: Request,
     data: InteractionCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
     contact = db.query(Contact).filter(
-        Contact.id == data.contact_id, Contact.user_id == user_id
+        Contact.id == data.contact_id, Contact.user_id == user.id
     ).first()
     if not contact:
         raise HTTPException(404, "Contact not found")
 
-    # Compute quality score from interaction type + duration
     depth = INTERACTION_DEPTH.get(data.interaction_type, 0.3)
     duration_factor = min(1.0, data.duration_minutes / 60.0) if data.duration_minutes > 0 else 0.5
     quality = depth * 0.6 + duration_factor * 0.4
 
     interaction = Interaction(
-        user_id=user_id,
+        user_id=user.id,
         contact_id=data.contact_id,
         interaction_type=data.interaction_type,
         duration_minutes=data.duration_minutes,
@@ -148,40 +218,38 @@ def log_interaction(
     db.commit()
     db.refresh(interaction)
 
-    # ── LEARNING STEP: update weights based on this new interaction ──
     update_weights_after_interaction(contact, interaction, db)
 
     return interaction
 
 
-# ── Recent Interactions (for activity timeline) ──
-
 @app.get("/interactions", response_model=list[InteractionOut])
 def list_interactions(
     limit: int = 20,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
-    rows = (
+    return (
         db.query(Interaction)
-        .filter(Interaction.user_id == user_id)
+        .filter(Interaction.user_id == user.id)
         .order_by(Interaction.timestamp.desc())
-        .limit(limit)
+        .limit(min(limit, 100))
         .all()
     )
-    return rows
 
 
-# ── Health ──
+# ══════════════════════════════════════════════
+# HEALTH & WEIGHTS (protected)
+# ══════════════════════════════════════════════
 
 @app.get("/contacts/{contact_id}/health", response_model=HealthReportOut)
 def get_health(
     contact_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
     contact = db.query(Contact).filter(
-        Contact.id == contact_id, Contact.user_id == user_id
+        Contact.id == contact_id, Contact.user_id == user.id
     ).first()
     if not contact:
         raise HTTPException(404, "Contact not found")
@@ -192,10 +260,10 @@ def get_health(
 def get_weights(
     contact_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
     contact = db.query(Contact).filter(
-        Contact.id == contact_id, Contact.user_id == user_id
+        Contact.id == contact_id, Contact.user_id == user.id
     ).first()
     if not contact:
         raise HTTPException(404, "Contact not found")
@@ -204,16 +272,77 @@ def get_weights(
     return contact.weights
 
 
-# ── Life Events ──
+# ══════════════════════════════════════════════
+# AI ENDPOINTS (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/contacts/{contact_id}/starters", response_model=ConversationStartersOut)
+@limiter.limit("20/minute")
+def get_conversation_starters(
+    request: Request,
+    contact_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    contact = db.query(Contact).filter(
+        Contact.id == contact_id, Contact.user_id == user.id
+    ).first()
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+
+    health_report = compute_health(contact, db)
+
+    # Get last interaction type
+    last = (
+        db.query(Interaction)
+        .filter(Interaction.contact_id == contact_id)
+        .order_by(Interaction.timestamp.desc())
+        .first()
+    )
+
+    # Build recent interactions summary
+    recent = (
+        db.query(Interaction)
+        .filter(Interaction.contact_id == contact_id)
+        .order_by(Interaction.timestamp.desc())
+        .limit(5)
+        .all()
+    )
+    summary_parts = []
+    for r in recent:
+        days_ago = (datetime.utcnow() - r.timestamp).days
+        summary_parts.append(f"{r.interaction_type.value} {days_ago} days ago")
+    recent_summary = "; ".join(summary_parts) if summary_parts else "No recent interactions"
+
+    starters = generate_conversation_starters(
+        contact_name=contact.name,
+        relationship_type=contact.relationship_type.value,
+        notes=contact.notes,
+        days_since_contact=health_report.days_since_contact,
+        last_interaction_type=last.interaction_type.value if last else None,
+        health=health_report.health,
+        recent_interactions_summary=recent_summary,
+    )
+
+    return ConversationStartersOut(
+        contact_id=contact.id,
+        contact_name=contact.name,
+        starters=starters,
+    )
+
+
+# ══════════════════════════════════════════════
+# LIFE EVENTS (protected)
+# ══════════════════════════════════════════════
 
 @app.post("/life-events", response_model=LifeEventOut)
 def create_life_event(
     data: LifeEventCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
     contact = db.query(Contact).filter(
-        Contact.id == data.contact_id, Contact.user_id == user_id
+        Contact.id == data.contact_id, Contact.user_id == user.id
     ).first()
     if not contact:
         raise HTTPException(404, "Contact not found")
@@ -231,11 +360,19 @@ def create_life_event(
     return event
 
 
-# ── Nudges ──
+# ══════════════════════════════════════════════
+# NUDGES (protected)
+# ══════════════════════════════════════════════
 
 @app.post("/nudges/{nudge_id}/act")
-def act_on_nudge(nudge_id: int, db: Session = Depends(get_db)):
-    nudge = db.query(Nudge).filter(Nudge.id == nudge_id).first()
+def act_on_nudge(
+    nudge_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    nudge = db.query(Nudge).filter(
+        Nudge.id == nudge_id, Nudge.user_id == user.id
+    ).first()
     if not nudge:
         raise HTTPException(404, "Nudge not found")
     nudge.status = NudgeStatus.acted
@@ -245,8 +382,14 @@ def act_on_nudge(nudge_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/nudges/{nudge_id}/snooze")
-def snooze_nudge(nudge_id: int, db: Session = Depends(get_db)):
-    nudge = db.query(Nudge).filter(Nudge.id == nudge_id).first()
+def snooze_nudge(
+    nudge_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    nudge = db.query(Nudge).filter(
+        Nudge.id == nudge_id, Nudge.user_id == user.id
+    ).first()
     if not nudge:
         raise HTTPException(404, "Nudge not found")
     nudge.status = NudgeStatus.snoozed
@@ -254,39 +397,38 @@ def snooze_nudge(nudge_id: int, db: Session = Depends(get_db)):
     return {"status": "snoozed", "nudge_id": nudge_id}
 
 
-# ── Dashboard ──
+# ══════════════════════════════════════════════
+# DASHBOARD (protected)
+# ══════════════════════════════════════════════
 
 @app.get("/dashboard", response_model=DashboardOut)
 def get_dashboard(
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
-    contacts_list = db.query(Contact).filter(Contact.user_id == user_id).all()
+    contacts_list = db.query(Contact).filter(Contact.user_id == user.id).all()
     now = datetime.utcnow()
     week_ago = now - timedelta(days=7)
 
-    # Compute health for all contacts
     reports = [compute_health(c, db, now) for c in contacts_list]
 
-    # Stats
     inner_circle = [r for r in reports if r.health >= 75]
     avg_health = sum(r.health for r in reports) / len(reports) if reports else 0
 
     interactions_week = (
         db.query(func.count(Interaction.id))
         .filter(
-            Interaction.user_id == user_id,
+            Interaction.user_id == user.id,
             Interaction.timestamp >= week_ago,
         )
         .scalar() or 0
     )
 
-    # Generate nudges for contacts that need attention
+    # Generate nudges
     nudge_reports = sorted(reports, key=lambda r: r.urgency, reverse=True)
     top_nudges = []
     for r in nudge_reports[:5]:
         if r.urgency > 0.2:
-            # Check if there's already a pending nudge for this contact
             existing = db.query(Nudge).filter(
                 Nudge.contact_id == r.contact_id,
                 Nudge.status == NudgeStatus.pending,
@@ -294,7 +436,7 @@ def get_dashboard(
 
             if not existing:
                 nudge = Nudge(
-                    user_id=user_id,
+                    user_id=user.id,
                     contact_id=r.contact_id,
                     message=f"It's been {r.days_since_contact:.0f} days since you talked to {r.contact_name}",
                     suggestion=r.suggested_action,
@@ -316,6 +458,17 @@ def get_dashboard(
                 created_at=existing.created_at,
             ))
 
+    # AI summary (non-blocking — falls back to static if no API key)
+    ai_summary = generate_relationship_summary(
+        contacts_data=[
+            {"name": r.contact_name, "health": r.health, "trend": r.trend}
+            for r in reports
+        ],
+        total_contacts=len(contacts_list),
+        avg_health=round(avg_health, 1),
+        interactions_this_week=interactions_week,
+    )
+
     return DashboardOut(
         total_contacts=len(contacts_list),
         inner_circle_count=len(inner_circle),
@@ -323,10 +476,13 @@ def get_dashboard(
         interactions_this_week=interactions_week,
         health_reports=reports,
         top_nudges=top_nudges,
+        ai_summary=ai_summary,
     )
 
 
-# ── Frontend ──
+# ══════════════════════════════════════════════
+# FRONTEND (serves index.html at root)
+# ══════════════════════════════════════════════
 
 FRONTEND_PATH = Path(__file__).resolve().parent.parent.parent / "index.html"
 

@@ -1,14 +1,35 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from typing import Optional
+from pydantic import BaseModel, Field
 
 from .models import RelationshipType, ContactFrequency, InteractionType, LifeEventType
+
+
+# ── Auth ──
+
+class SignupRequest(BaseModel):
+    email: str = Field(..., max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    name: str = Field(..., min_length=1, max_length=100)
+    timezone: str = "UTC"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: "UserOut"
 
 
 # ── User ──
 
 class UserCreate(BaseModel):
-    email: str
-    name: str
+    email: str = Field(..., max_length=255)
+    name: str = Field(..., max_length=100)
     timezone: str = "UTC"
 
 
@@ -26,10 +47,10 @@ class UserOut(BaseModel):
 # ── Contact ──
 
 class ContactCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=200)
     relationship_type: RelationshipType
     target_frequency: ContactFrequency = ContactFrequency.biweekly
-    notes: str = ""
+    notes: str = Field("", max_length=2000)
 
 
 class ContactOut(BaseModel):
@@ -49,9 +70,9 @@ class ContactOut(BaseModel):
 class InteractionCreate(BaseModel):
     contact_id: int
     interaction_type: InteractionType
-    duration_minutes: int = 0
+    duration_minutes: int = Field(0, ge=0, le=1440)
     initiated_by_user: bool = True
-    notes: str = ""
+    notes: str = Field("", max_length=2000)
 
 
 class InteractionOut(BaseModel):
@@ -104,7 +125,7 @@ class WeightsOut(BaseModel):
 class LifeEventCreate(BaseModel):
     contact_id: int
     event_type: LifeEventType
-    description: str = ""
+    description: str = Field("", max_length=1000)
     event_date: datetime
     pause_decay: bool = False
 
@@ -135,6 +156,18 @@ class NudgeOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── AI ──
+
+class ConversationStartersOut(BaseModel):
+    contact_id: int
+    contact_name: str
+    starters: list[str]
+
+
+class AISummaryOut(BaseModel):
+    summary: str
+
+
 # ── Dashboard aggregate ──
 
 class DashboardOut(BaseModel):
@@ -144,3 +177,4 @@ class DashboardOut(BaseModel):
     interactions_this_week: int
     health_reports: list[HealthReportOut]
     top_nudges: list[NudgeOut]
+    ai_summary: str = ""

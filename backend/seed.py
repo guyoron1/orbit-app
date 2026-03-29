@@ -27,7 +27,14 @@ def seed():
     now = datetime.utcnow()
 
     # ── User ──
-    user = User(id=1, email="jordan@example.com", name="Jordan Davis", plan="pro")
+    from app.auth import hash_password
+    user = User(
+        id=1,
+        email="jordan@example.com",
+        password_hash=hash_password("orbit2024demo"),
+        name="Jordan Davis",
+        plan="pro",
+    )
     db.add(user)
     db.commit()
 

@@ -592,6 +592,9 @@
         <div class="user-name">Jordan Davis</div>
         <div class="user-plan">Pro Plan</div>
       </div>
+      <button onclick="logout()" title="Log out" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
     </div>
   </aside>
 
@@ -845,15 +848,39 @@ const TYPE_COLORS = {
 let contacts = [];      // merged contact + health data
 let dashboardData = {};  // raw API response
 let contactsRaw = [];    // raw /contacts response
+let authToken = localStorage.getItem('orbit_token') || '';
+let currentUser = JSON.parse(localStorage.getItem('orbit_user') || 'null');
 
 // ═══════════ API HELPERS ═══════════
 async function api(path, opts) {
-  const res = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
-  if (!res.ok) throw new Error('API error: ' + res.status);
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch(API + path, { headers, ...opts });
+  if (res.status === 401) {
+    logout();
+    throw new Error('Session expired. Please log in again.');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || 'API error: ' + res.status);
+  }
   return res.json();
+}
+
+function setAuth(token, user) {
+  authToken = token;
+  currentUser = user;
+  localStorage.setItem('orbit_token', token);
+  localStorage.setItem('orbit_user', JSON.stringify(user));
+}
+
+function logout() {
+  authToken = '';
+  currentUser = null;
+  localStorage.removeItem('orbit_token');
+  localStorage.removeItem('orbit_user');
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('landingPage').classList.add('active');
 }
 
 // ═══════════ DOM HELPERS ═══════════
@@ -1297,9 +1324,30 @@ function renderOrbitLegend() {
 }
 
 // ═══════════ APP ENTRY ═══════════
-async function enterApp() {
+function enterApp() {
+  // If already logged in, go straight to dashboard
+  if (authToken && currentUser) {
+    showDashboard();
+    return;
+  }
+  // Otherwise show auth modal
+  showAuthModal('signup');
+}
+
+function showDashboard() {
   document.getElementById('landingPage').classList.remove('active');
+  document.getElementById('authModal').classList.remove('active');
   document.getElementById('mainApp').style.display = 'flex';
+
+  // Update user info in sidebar
+  const nameEl = document.querySelector('.user-name');
+  const planEl = document.querySelector('.user-plan');
+  if (currentUser && nameEl) {
+    nameEl.textContent = currentUser.name;
+    planEl.textContent = (currentUser.plan || 'free').charAt(0).toUpperCase() + (currentUser.plan || 'free').slice(1) + ' Plan';
+    const avatar = document.querySelector('.sidebar-footer .user-avatar');
+    if (avatar) avatar.textContent = getInitials(currentUser.name);
+  }
 
   // Show loading overlay
   let overlay = document.getElementById('loadingOverlay');
@@ -1311,15 +1359,131 @@ async function enterApp() {
   }
   overlay.classList.remove('hidden');
 
-  try {
-    await loadDashboard();
-    await renderAll();
-    animateStats();
-    overlay.classList.add('hidden');
-  } catch (e) {
-    overlay.classList.add('hidden');
-    showToast('Could not connect to backend: ' + e.message, 'info');
+  loadDashboard()
+    .then(() => renderAll())
+    .then(() => {
+      animateStats();
+      overlay.classList.add('hidden');
+    })
+    .catch(e => {
+      overlay.classList.add('hidden');
+      showToast('Could not connect: ' + e.message, 'info');
+    });
+}
+
+function showAuthModal(mode) {
+  let modal = document.getElementById('authModal');
+  if (!modal) {
+    modal = createElement('div', { className: 'modal-overlay', id: 'authModal' });
+    const box = createElement('div', { className: 'modal' });
+    box.innerHTML = '';
+    const header = createElement('div', { className: 'modal-header' });
+    header.appendChild(createElement('h2', { className: 'modal-title', id: 'authTitle' }, 'Create Account'));
+    modal.appendChild(box);
+    box.appendChild(header);
+
+    const body = createElement('div', { className: 'modal-body', id: 'authBody' });
+    box.appendChild(body);
+    document.body.appendChild(modal);
   }
+  modal.classList.add('active');
+  renderAuthForm(mode);
+}
+
+function renderAuthForm(mode) {
+  const title = document.getElementById('authTitle');
+  const body = document.getElementById('authBody');
+  body.textContent = '';
+
+  if (mode === 'signup') {
+    title.textContent = 'Create your Orbit';
+    const nameGroup = createElement('div', { className: 'form-group' });
+    nameGroup.appendChild(createElement('label', { className: 'form-label' }, 'Name'));
+    nameGroup.appendChild(createElement('input', { className: 'form-input', id: 'authName', type: 'text', placeholder: 'Your name' }));
+    body.appendChild(nameGroup);
+  } else {
+    title.textContent = 'Welcome back';
+  }
+
+  const emailGroup = createElement('div', { className: 'form-group' });
+  emailGroup.appendChild(createElement('label', { className: 'form-label' }, 'Email'));
+  emailGroup.appendChild(createElement('input', { className: 'form-input', id: 'authEmail', type: 'email', placeholder: 'you@example.com' }));
+  body.appendChild(emailGroup);
+
+  const passGroup = createElement('div', { className: 'form-group' });
+  passGroup.appendChild(createElement('label', { className: 'form-label' }, 'Password'));
+  passGroup.appendChild(createElement('input', { className: 'form-input', id: 'authPass', type: 'password', placeholder: mode === 'signup' ? 'Min 8 characters' : 'Your password' }));
+  body.appendChild(passGroup);
+
+  const footer = createElement('div', { className: 'modal-footer', style: 'flex-direction:column;align-items:stretch;gap:12px' });
+  const submitBtn = createElement('button', {
+    className: 'btn btn-primary',
+    style: 'width:100%;justify-content:center',
+    onClick: () => handleAuth(mode),
+  }, mode === 'signup' ? 'Create Account' : 'Log In');
+  footer.appendChild(submitBtn);
+
+  const switchText = mode === 'signup' ? 'Already have an account? ' : 'Need an account? ';
+  const switchLink = createElement('span', {
+    style: 'text-align:center;font-size:13px;color:var(--text-secondary)',
+  });
+  switchLink.appendChild(document.createTextNode(switchText));
+  const link = createElement('a', {
+    style: 'color:var(--accent-light);cursor:pointer',
+    onClick: () => renderAuthForm(mode === 'signup' ? 'login' : 'signup'),
+  }, mode === 'signup' ? 'Log in' : 'Sign up');
+  switchLink.appendChild(link);
+  footer.appendChild(switchLink);
+  body.appendChild(footer);
+
+  // Demo login hint
+  if (mode === 'login') {
+    const hint = createElement('div', {
+      style: 'margin-top:12px;padding:12px;background:var(--glass);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);text-align:center'
+    }, 'Demo: jordan@example.com / orbit2024demo');
+    body.appendChild(hint);
+  }
+}
+
+async function handleAuth(mode) {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPass').value;
+
+  if (!email || !password) {
+    showToast('Please fill in all fields', 'info');
+    return;
+  }
+  if (mode === 'signup' && password.length < 8) {
+    showToast('Password must be at least 8 characters', 'info');
+    return;
+  }
+
+  try {
+    const payload = { email, password };
+    if (mode === 'signup') {
+      const name = document.getElementById('authName').value.trim();
+      if (!name) { showToast('Please enter your name', 'info'); return; }
+      payload.name = name;
+    }
+
+    const data = await api('/auth/' + mode, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    setAuth(data.access_token, data.user);
+    showToast('Welcome' + (mode === 'signup' ? '! Your orbit is ready.' : ' back, ' + data.user.name + '!'), 'success');
+    showDashboard();
+  } catch (e) {
+    showToast(e.message, 'info');
+  }
+}
+
+// Auto-login on page load if token exists
+if (authToken && currentUser) {
+  document.addEventListener('DOMContentLoaded', () => {
+    showDashboard();
+  });
 }
 
 function animateStats() {
