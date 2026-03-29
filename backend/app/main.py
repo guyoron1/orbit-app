@@ -174,6 +174,7 @@ def create_contact(
         relationship_type=data.relationship_type,
         target_frequency=data.target_frequency,
         notes=data.notes,
+        city=data.city,
     )
     db.add(contact)
     db.commit()
@@ -726,7 +727,8 @@ def _party_to_out(party: Party, db: Session) -> PartyOut:
         activity_type=party.activity_type, description=party.description,
         location=party.location, scheduled_at=party.scheduled_at,
         max_members=party.max_members, xp_reward=party.xp_reward,
-        status=party.status, completed_at=party.completed_at,
+        status=party.status, is_recurring=party.is_recurring or False,
+        recurrence=party.recurrence, completed_at=party.completed_at,
         created_at=party.created_at, members=members,
     )
 
