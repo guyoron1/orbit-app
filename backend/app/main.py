@@ -38,13 +38,13 @@ from slowapi.errors import RateLimitExceeded
 from .database import Base, engine, get_db
 from .models import (
     User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
-    Party, PartyMember, Challenge,
-    NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus,
-    INTERACTION_DEPTH,
+    Party, PartyMember, Challenge, StravaConnection,
+    NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus, Recurrence,
+    INTERACTION_DEPTH, FREQUENCY_DAYS,
 )
 from .schemas import (
     UserCreate, UserOut,
-    ContactCreate, ContactOut,
+    ContactCreate, ContactUpdate, ContactOut,
     InteractionCreate, InteractionOut,
     HealthReportOut, WeightsOut,
     LifeEventCreate, LifeEventOut,
@@ -55,6 +55,8 @@ from .schemas import (
     GamificationDashboardOut,
     PartyCreate, PartyOut, PartyMemberOut,
     ChallengeCreate, ChallengeOut,
+    FeedItemOut, LeaderboardOut, LeaderboardEntryOut,
+    NearbyContactOut, LocationUpdate, StravaStatusOut,
 )
 from .decay import compute_health, update_weights_after_interaction
 from .auth import hash_password, verify_password, create_access_token, get_current_user
@@ -190,6 +192,26 @@ def list_contacts(
     user: User = Depends(get_current_user),
 ):
     return db.query(Contact).filter(Contact.user_id == user.id).all()
+
+
+@app.patch("/contacts/{contact_id}", response_model=ContactOut)
+def update_contact(
+    contact_id: int,
+    data: ContactUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    contact = db.query(Contact).filter(
+        Contact.id == contact_id, Contact.user_id == user.id
+    ).first()
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(contact, field, value)
+    db.commit()
+    db.refresh(contact)
+    return contact
 
 
 # ══════════════════════════════════════════════
@@ -523,6 +545,8 @@ def create_party(
         location=data.location,
         scheduled_at=data.scheduled_at,
         xp_reward=base_xp,
+        is_recurring=data.is_recurring,
+        recurrence=data.recurrence,
     )
     db.add(party)
     db.commit()
@@ -599,6 +623,34 @@ def complete_party(
     user.xp = (user.xp or 0) + xp
     from .gamification import level_from_xp
     user.level = level_from_xp(user.xp)
+
+    # Auto-create next occurrence for recurring parties
+    if party.is_recurring and party.recurrence:
+        recurrence_days = {"weekly": 7, "biweekly": 14, "monthly": 30}
+        days = recurrence_days.get(party.recurrence.value, 7)
+        next_date = (party.scheduled_at or datetime.utcnow()) + timedelta(days=days)
+
+        next_party = Party(
+            creator_id=user.id,
+            title=party.title,
+            activity_type=party.activity_type,
+            description=party.description,
+            location=party.location,
+            scheduled_at=next_date,
+            xp_reward=party.xp_reward,
+            is_recurring=True,
+            recurrence=party.recurrence,
+        )
+        db.add(next_party)
+        db.commit()
+        db.refresh(next_party)
+
+        # Re-invite the same contacts
+        for m in party.members:
+            new_member = PartyMember(
+                party_id=next_party.id, contact_id=m.contact_id, status="invited"
+            )
+            db.add(new_member)
 
     db.commit()
     return {
@@ -805,6 +857,393 @@ def decline_challenge(
     challenge.status = ChallengeStatus.declined
     db.commit()
     return {"status": "declined", "challenge_id": challenge_id}
+
+
+# ══════════════════════════════════════════════
+# SOCIAL FEED (protected)
+# ══════════════════════════════════════════════
+
+INTERACTION_ICONS = {
+    "call": "\U0001F4DE", "video_call": "\U0001F4F9", "text": "\U0001F4AC",
+    "in_person": "\U0001F91D", "social_media": "\U0001F4F1", "email": "\u2709\uFE0F",
+}
+
+FEED_ACTIVITY_ICONS = {
+    "run": "\U0001F3C3", "gym": "\U0001F4AA", "hike": "\u26F0\uFE0F",
+    "concert": "\U0001F3B5", "dinner": "\U0001F37D\uFE0F", "drinks": "\U0001F37B",
+    "gaming": "\U0001F3AE", "movie": "\U0001F3AC", "sports": "\u26BD",
+    "study": "\U0001F4DA", "custom": "\u2B50",
+}
+
+
+@app.get("/feed", response_model=list[FeedItemOut])
+def get_feed(
+    limit: int = 30,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from .models import UserAchievement
+    feed = []
+
+    # 1. Recent interactions
+    interactions = (
+        db.query(Interaction, Contact)
+        .join(Contact, Interaction.contact_id == Contact.id)
+        .filter(Interaction.user_id == user.id)
+        .order_by(Interaction.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    for ix, contact in interactions:
+        itype = ix.interaction_type.value
+        feed.append(FeedItemOut(
+            event_type="interaction",
+            title=f"{itype.replace('_', ' ').title()} with {contact.name}",
+            description=ix.notes or f"{ix.duration_minutes} min {itype.replace('_', ' ')}",
+            icon=INTERACTION_ICONS.get(itype, "\U0001F4AC"),
+            contact_name=contact.name,
+            timestamp=ix.timestamp,
+        ))
+
+    # 2. Completed parties
+    parties = (
+        db.query(Party)
+        .filter(Party.creator_id == user.id, Party.status == PartyStatus.completed)
+        .order_by(Party.completed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    for p in parties:
+        member_count = len(p.members)
+        feed.append(FeedItemOut(
+            event_type="party_completed",
+            title=f"Completed: {p.title}",
+            description=f"{p.activity_type.value.title()} with {member_count} friend{'s' if member_count != 1 else ''}",
+            icon=FEED_ACTIVITY_ICONS.get(p.activity_type.value, "\U0001F389"),
+            xp=p.xp_reward,
+            timestamp=p.completed_at or p.created_at,
+        ))
+
+    # 3. Completed challenges
+    challenges = (
+        db.query(Challenge, Contact)
+        .join(Contact, Challenge.contact_id == Contact.id)
+        .filter(Challenge.challenger_id == user.id, Challenge.status == ChallengeStatus.completed)
+        .order_by(Challenge.completed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    for c, contact in challenges:
+        feed.append(FeedItemOut(
+            event_type="challenge_completed",
+            title=f"Challenge completed: {c.title}",
+            description=f"vs {contact.name}",
+            icon="\U0001F3C6",
+            xp=c.xp_reward,
+            contact_name=contact.name,
+            timestamp=c.completed_at or c.created_at,
+        ))
+
+    # 4. Achievements
+    achievements = (
+        db.query(UserAchievement)
+        .filter(UserAchievement.user_id == user.id)
+        .order_by(UserAchievement.earned_at.desc())
+        .limit(limit)
+        .all()
+    )
+    achiev_map = {key: (name, icon) for key, name, _, icon, _ in ACHIEVEMENT_DEFS}
+    for ua in achievements:
+        name, icon = achiev_map.get(ua.achievement_key, (ua.achievement_key, "\U0001F3C5"))
+        feed.append(FeedItemOut(
+            event_type="achievement",
+            title=f"Achievement unlocked: {name}",
+            description="",
+            icon=icon,
+            timestamp=ua.earned_at,
+        ))
+
+    # Sort all by timestamp, most recent first
+    feed.sort(key=lambda f: f.timestamp, reverse=True)
+    return feed[:limit]
+
+
+# ══════════════════════════════════════════════
+# LEADERBOARD (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/leaderboard", response_model=LeaderboardOut)
+def get_leaderboard(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    contacts = db.query(Contact).filter(Contact.user_id == user.id).all()
+    since = datetime.utcnow() - timedelta(days=days)
+
+    # Most interactions in period
+    interaction_counts = {}
+    for c in contacts:
+        count = (
+            db.query(func.count(Interaction.id))
+            .filter(Interaction.contact_id == c.id, Interaction.timestamp >= since)
+            .scalar() or 0
+        )
+        interaction_counts[c.id] = count
+
+    most_interactions = sorted(contacts, key=lambda c: interaction_counts.get(c.id, 0), reverse=True)
+    most_interactions_out = [
+        LeaderboardEntryOut(
+            contact_id=c.id, contact_name=c.name,
+            relationship_type=c.relationship_type.value,
+            value=interaction_counts.get(c.id, 0), rank=i + 1,
+        )
+        for i, c in enumerate(most_interactions[:10])
+    ]
+
+    # Highest relationship XP
+    by_xp = sorted(contacts, key=lambda c: c.relationship_xp or 0, reverse=True)
+    highest_xp_out = [
+        LeaderboardEntryOut(
+            contact_id=c.id, contact_name=c.name,
+            relationship_type=c.relationship_type.value,
+            value=c.relationship_xp or 0, rank=i + 1,
+        )
+        for i, c in enumerate(by_xp[:10])
+    ]
+
+    # Longest active streak (days since last interaction, inverted — most recent = best)
+    streak_data = []
+    for c in contacts:
+        last_ix = (
+            db.query(Interaction)
+            .filter(Interaction.contact_id == c.id)
+            .order_by(Interaction.timestamp.desc())
+            .first()
+        )
+        if last_ix:
+            days_since = (datetime.utcnow() - last_ix.timestamp).total_seconds() / 86400
+            streak_data.append((c, max(0, days - days_since)))
+        else:
+            streak_data.append((c, 0))
+
+    streak_data.sort(key=lambda x: x[1], reverse=True)
+    longest_streak_out = [
+        LeaderboardEntryOut(
+            contact_id=c.id, contact_name=c.name,
+            relationship_type=c.relationship_type.value,
+            value=round(score, 1), rank=i + 1,
+        )
+        for i, (c, score) in enumerate(streak_data[:10])
+    ]
+
+    return LeaderboardOut(
+        most_interactions=most_interactions_out,
+        highest_relationship_xp=highest_xp_out,
+        longest_streak=longest_streak_out,
+    )
+
+
+# ══════════════════════════════════════════════
+# LOCATION / NEARBY (protected)
+# ══════════════════════════════════════════════
+
+@app.post("/location", response_model=dict)
+def update_user_location(
+    data: LocationUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if data.city:
+        user.city = data.city
+    if data.latitude is not None:
+        user.latitude = data.latitude
+    if data.longitude is not None:
+        user.longitude = data.longitude
+    db.commit()
+    return {"status": "updated", "city": user.city}
+
+
+@app.get("/nearby", response_model=list[NearbyContactOut])
+def get_nearby_contacts(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not user.city:
+        return []
+
+    # Find contacts in the same city
+    contacts = (
+        db.query(Contact)
+        .filter(Contact.user_id == user.id, Contact.city == user.city, Contact.city != "")
+        .all()
+    )
+
+    result = []
+    now = datetime.utcnow()
+    for c in contacts:
+        last_ix = (
+            db.query(Interaction)
+            .filter(Interaction.contact_id == c.id)
+            .order_by(Interaction.timestamp.desc())
+            .first()
+        )
+        days_since = (now - last_ix.timestamp).total_seconds() / 86400 if last_ix else 999
+
+        freq_days = FREQUENCY_DAYS.get(c.target_frequency, 14)
+        if days_since > freq_days * 0.5:
+            suggestion = f"You're both in {user.city} — grab coffee with {c.name}!"
+        else:
+            suggestion = f"{c.name} is nearby — catch up soon?"
+
+        result.append(NearbyContactOut(
+            contact_id=c.id,
+            contact_name=c.name,
+            city=c.city,
+            relationship_type=c.relationship_type.value,
+            days_since_contact=round(days_since, 1),
+            suggestion=suggestion,
+        ))
+
+    result.sort(key=lambda x: x.days_since_contact, reverse=True)
+    return result
+
+
+# ══════════════════════════════════════════════
+# STRAVA INTEGRATION (protected)
+# ══════════════════════════════════════════════
+
+STRAVA_CLIENT_ID = os.environ.get("STRAVA_CLIENT_ID", "")
+STRAVA_CLIENT_SECRET = os.environ.get("STRAVA_CLIENT_SECRET", "")
+STRAVA_REDIRECT_URI = os.environ.get("STRAVA_REDIRECT_URI", "")
+
+
+@app.get("/strava/status", response_model=StravaStatusOut)
+def strava_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    conn = db.query(StravaConnection).filter(StravaConnection.user_id == user.id).first()
+    if conn:
+        return StravaStatusOut(
+            connected=True, athlete_id=conn.strava_athlete_id,
+            connected_at=conn.connected_at,
+        )
+    return StravaStatusOut(connected=False)
+
+
+@app.get("/strava/connect")
+def strava_connect(user: User = Depends(get_current_user)):
+    if not STRAVA_CLIENT_ID:
+        raise HTTPException(503, "Strava integration not configured")
+    auth_url = (
+        f"https://www.strava.com/oauth/authorize"
+        f"?client_id={STRAVA_CLIENT_ID}"
+        f"&redirect_uri={STRAVA_REDIRECT_URI}"
+        f"&response_type=code"
+        f"&scope=activity:read_all"
+        f"&state={user.id}"
+    )
+    return {"auth_url": auth_url}
+
+
+@app.get("/strava/callback")
+def strava_callback(
+    code: str,
+    state: str,
+    db: Session = Depends(get_db),
+):
+    import httpx
+
+    if not STRAVA_CLIENT_ID or not STRAVA_CLIENT_SECRET:
+        raise HTTPException(503, "Strava integration not configured")
+
+    # Exchange code for token
+    resp = httpx.post("https://www.strava.com/oauth/token", data={
+        "client_id": STRAVA_CLIENT_ID,
+        "client_secret": STRAVA_CLIENT_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+    })
+    if resp.status_code != 200:
+        raise HTTPException(400, "Strava auth failed")
+
+    data = resp.json()
+    user_id = int(state)
+
+    # Upsert connection
+    existing = db.query(StravaConnection).filter(StravaConnection.user_id == user_id).first()
+    if existing:
+        existing.access_token = data["access_token"]
+        existing.refresh_token = data["refresh_token"]
+        existing.expires_at = data["expires_at"]
+        existing.strava_athlete_id = data["athlete"]["id"]
+    else:
+        conn = StravaConnection(
+            user_id=user_id,
+            strava_athlete_id=data["athlete"]["id"],
+            access_token=data["access_token"],
+            refresh_token=data["refresh_token"],
+            expires_at=data["expires_at"],
+        )
+        db.add(conn)
+    db.commit()
+    return {"status": "connected", "athlete_id": data["athlete"]["id"]}
+
+
+@app.post("/strava/webhook")
+async def strava_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receive Strava activity webhook — auto-verify challenges/parties."""
+    body = await request.json()
+
+    if body.get("aspect_type") != "create" or body.get("object_type") != "activity":
+        return {"status": "ignored"}
+
+    athlete_id = body.get("owner_id")
+    conn = db.query(StravaConnection).filter(
+        StravaConnection.strava_athlete_id == athlete_id
+    ).first()
+    if not conn:
+        return {"status": "unknown_athlete"}
+
+    # Map Strava activity type to our ActivityType
+    strava_type = body.get("activity_type", "").lower()
+    type_map = {
+        "run": "run", "ride": "run", "hike": "hike", "walk": "hike",
+        "workout": "gym", "weighttraining": "gym", "swim": "sports",
+    }
+    our_type = type_map.get(strava_type)
+    if not our_type:
+        return {"status": "unmapped_type", "strava_type": strava_type}
+
+    # Auto-complete matching pending challenges
+    pending = (
+        db.query(Challenge)
+        .filter(
+            Challenge.challenger_id == conn.user_id,
+            Challenge.activity_type == our_type,
+            Challenge.status.in_([ChallengeStatus.pending, ChallengeStatus.accepted]),
+        )
+        .all()
+    )
+    user = db.query(User).filter(User.id == conn.user_id).first()
+    from .gamification import level_from_xp
+
+    completed_ids = []
+    for c in pending:
+        c.status = ChallengeStatus.completed
+        c.completed_at = datetime.utcnow()
+        if user:
+            user.xp = (user.xp or 0) + c.xp_reward
+            user.level = level_from_xp(user.xp)
+        completed_ids.append(c.id)
+
+    db.commit()
+    return {
+        "status": "processed",
+        "challenges_completed": completed_ids,
+        "activity_type": our_type,
+    }
 
 
 # ══════════════════════════════════════════════

@@ -39,6 +39,12 @@ class ContactFrequency(str, enum.Enum):
     quarterly = "quarterly"
 
 
+class Recurrence(str, enum.Enum):
+    weekly = "weekly"
+    biweekly = "biweekly"
+    monthly = "monthly"
+
+
 class InteractionType(str, enum.Enum):
     call = "call"
     video_call = "video_call"
@@ -157,6 +163,10 @@ class User(Base):
     plan = Column(String(20), default="free")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    city = Column(String(100), default="")
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+
     # Gamification
     xp = Column(Integer, default=0)
     level = Column(Integer, default=1)
@@ -180,6 +190,9 @@ class Contact(Base):
     relationship_type = Column(Enum(RelationshipType), nullable=False)
     target_frequency = Column(Enum(ContactFrequency), default=ContactFrequency.biweekly)
     notes = Column(Text, default="")
+    city = Column(String(100), default="")
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Gamification
@@ -323,6 +336,8 @@ class Party(Base):
     max_members = Column(Integer, default=10)
     xp_reward = Column(Integer, default=50)
     status = Column(Enum(PartyStatus), default=PartyStatus.waiting)
+    is_recurring = Column(Boolean, default=False)
+    recurrence = Column(Enum(Recurrence), nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -365,3 +380,18 @@ class Challenge(Base):
 
     challenger = relationship("User", back_populates="challenges_sent", foreign_keys=[challenger_id])
     challenged_contact = relationship("Contact", foreign_keys=[contact_id])
+
+
+class StravaConnection(Base):
+    """OAuth connection to Strava for auto-verifying activities."""
+    __tablename__ = "strava_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    strava_athlete_id = Column(Integer, nullable=False)
+    access_token = Column(String(255), nullable=False)
+    refresh_token = Column(String(255), nullable=False)
+    expires_at = Column(Integer, nullable=False)
+    connected_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

@@ -754,6 +754,78 @@
     display: flex; align-items: center; gap: 4px;
   }
 
+  /* Social Feed */
+  .feed-item {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px;
+    border-bottom: 1px solid var(--border); transition: background 0.2s;
+  }
+  .feed-item:hover { background: var(--glass); }
+  .feed-icon { font-size: 22px; flex-shrink: 0; width: 36px; text-align: center; padding-top: 2px; }
+  .feed-content { flex: 1; min-width: 0; }
+  .feed-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .feed-desc { font-size: 12px; color: var(--text-secondary); }
+  .feed-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .feed-time { font-size: 11px; color: var(--text-muted); }
+  .feed-xp { font-size: 11px; color: var(--success); font-weight: 600; }
+
+  /* Leaderboard */
+  .leaderboard-section { margin-bottom: 20px; }
+  .leaderboard-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .leaderboard-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    border-radius: var(--radius-sm); margin-bottom: 4px; transition: background 0.2s;
+  }
+  .leaderboard-item:hover { background: var(--glass); }
+  .lb-rank {
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .lb-rank.gold { background: linear-gradient(135deg, #f9ca24, #f0932b); color: #000; }
+  .lb-rank.silver { background: linear-gradient(135deg, #dfe6e9, #b2bec3); color: #000; }
+  .lb-rank.bronze { background: linear-gradient(135deg, #e17055, #d63031); color: #fff; }
+  .lb-rank.normal { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); }
+  .lb-name { flex: 1; font-size: 13px; font-weight: 600; }
+  .lb-type { font-size: 11px; color: var(--text-muted); margin-left: -8px; }
+  .lb-value { font-size: 14px; font-weight: 700; color: var(--accent-light); }
+
+  /* Nearby Contacts */
+  .nearby-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px; position: relative; overflow: hidden;
+  }
+  .nearby-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00cec9, #55efc4);
+  }
+  .nearby-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .nearby-pin { font-size: 16px; }
+  .nearby-name { font-size: 14px; font-weight: 600; }
+  .nearby-city { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .nearby-suggestion { font-size: 12px; color: var(--success); margin-top: 4px; }
+
+  /* Toggle Switch */
+  .form-toggle-row { display: flex; align-items: center; gap: 12px; }
+  .form-toggle {
+    width: 42px; height: 24px; border-radius: 12px; background: var(--bg-card);
+    border: 1px solid var(--border); cursor: pointer; position: relative; transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .form-toggle.active { background: var(--accent); border-color: var(--accent); }
+  .form-toggle::after {
+    content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+    background: white; top: 2px; left: 2px; transition: transform 0.2s;
+  }
+  .form-toggle.active::after { transform: translateX(18px); }
+
+  /* Strava */
+  .strava-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+    background: #fc4c02; color: white; border: none; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+  }
+  .strava-btn:hover { opacity: 0.85; }
+  .strava-connected { color: var(--success); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+
   /* Responsive — Tablet */
   @media (max-width: 1024px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -1068,6 +1140,28 @@
         <div class="achievements-row" id="achievementsRow"></div>
       </div>
 
+      <!-- Leaderboard -->
+      <div id="leaderboardSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Leaderboard</div>
+          <a class="section-link" id="leaderboardPeriod">Last 30 days</a>
+        </div>
+        <div id="leaderboardContent"></div>
+      </div>
+
+      <!-- Nearby Contacts -->
+      <div id="nearbySection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Nearby Friends</div>
+        </div>
+        <div class="contacts-grid" id="nearbyGrid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));"></div>
+      </div>
+
+      <!-- Strava -->
+      <div id="stravaSection" style="margin-top:16px;margin-bottom:16px;">
+        <div id="stravaStatus"></div>
+      </div>
+
       <div class="section-header">
         <div class="section-title">Smart Nudges</div>
         <a class="section-link" onclick="navigateTo('insights')">View all</a>
@@ -1152,13 +1246,13 @@
       </div>
     </div>
 
-    <!-- ACTIVITY PAGE -->
+    <!-- ACTIVITY / FEED PAGE -->
     <div class="page" id="page-activity">
       <div class="header">
         <div class="header-top">
           <div>
-            <h1>Activity</h1>
-            <p>Your recent interaction history.</p>
+            <h1>Activity Feed</h1>
+            <p>Everything happening in your orbit.</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-primary" onclick="openLogInteraction()">
@@ -1169,7 +1263,8 @@
         </div>
       </div>
       <div class="insight-card">
-        <div class="timeline" id="activityTimeline"></div>
+        <div id="socialFeed"></div>
+        <div class="timeline" id="activityTimeline" style="display:none"></div>
       </div>
     </div>
   </main>
@@ -1211,6 +1306,10 @@
           <div class="form-tag" data-val="monthly" onclick="selectTag(this)">Monthly</div>
           <div class="form-tag" data-val="quarterly" onclick="selectTag(this)">Quarterly</div>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">City / Location</label>
+        <input type="text" class="form-input" placeholder="e.g. San Francisco, NYC, Tel Aviv" id="personCity">
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
@@ -1316,6 +1415,19 @@
       <div class="form-group">
         <label class="form-label">Description</label>
         <textarea class="form-textarea" placeholder="What's the plan?" id="partyDesc"></textarea>
+      </div>
+      <div class="form-group">
+        <div class="form-toggle-row">
+          <div class="form-toggle" id="partyRecurringToggle" onclick="this.classList.toggle('active'); document.getElementById('partyRecurrenceRow').style.display = this.classList.contains('active') ? 'block' : 'none';"></div>
+          <label class="form-label" style="margin:0;cursor:pointer" onclick="document.getElementById('partyRecurringToggle').click()">Make it recurring</label>
+        </div>
+        <div id="partyRecurrenceRow" style="display:none;margin-top:8px;">
+          <div class="form-tags" id="partyRecurrenceTags">
+            <div class="form-tag selected" data-val="weekly" onclick="selectTag(this)">Weekly</div>
+            <div class="form-tag" data-val="biweekly" onclick="selectTag(this)">Every 2 weeks</div>
+            <div class="form-tag" data-val="monthly" onclick="selectTag(this)">Monthly</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1464,7 +1576,7 @@
 
 <script>
 // === CONFIG ===
-const API = location.hostname.includes('railway.app') ? '' : 'https://orbit-app-production-fd37.up.railway.app';
+const API = '';  // same origin
 
 const COLORS = [
   'linear-gradient(135deg, #6c5ce7, #a29bfe)',
@@ -1908,8 +2020,10 @@ function buildPartyCard(p) {
   const icon = createElement('div', { className: 'party-activity-icon' }, ACTIVITY_ICONS[p.activity_type] || '\u{2728}');
   const info = createElement('div', { className: 'party-info' });
   info.appendChild(createElement('div', { className: 'party-title' }, p.title));
-  const metaText = p.location ? p.activity_type + ' \u00B7 ' + p.location : p.activity_type;
-  info.appendChild(createElement('div', { className: 'party-meta' }, metaText));
+  const metaParts = [p.activity_type];
+  if (p.location) metaParts.push(p.location);
+  if (p.is_recurring) metaParts.push('\u{1F501} ' + (p.recurrence || 'recurring'));
+  info.appendChild(createElement('div', { className: 'party-meta' }, metaParts.join(' \u00B7 ')));
   header.appendChild(icon);
   header.appendChild(info);
   const statusBadge = createElement('div', { className: 'party-status-badge ' + p.status }, p.status === 'waiting' ? 'Lobby' : p.status);
@@ -2013,6 +2127,10 @@ async function submitCreateParty() {
       body: JSON.stringify({
         title, activity_type: activity, description: desc,
         location, scheduled_at: when || null, contact_ids: invitedIds,
+        is_recurring: document.getElementById('partyRecurringToggle').classList.contains('active'),
+        recurrence: document.getElementById('partyRecurringToggle').classList.contains('active')
+          ? (document.querySelector('#partyRecurrenceTags .form-tag.selected')?.dataset?.val || 'weekly')
+          : null,
       }),
     });
     showToast('Party created! Invite your friends!', 'success');
@@ -2117,6 +2235,158 @@ async function submitCreateChallenge() {
     await renderAll();
   } catch (e) { showToast('Error: ' + e.message, 'info'); }
   finally { btn.disabled = false; btn.textContent = 'Send Challenge'; }
+}
+
+// === SOCIAL FEED ===
+async function loadFeed() {
+  try {
+    const feed = await api('/feed?limit=40');
+    const el = document.getElementById('socialFeed');
+    if (!el) return;
+    el.textContent = '';
+
+    if (feed.length === 0) {
+      el.appendChild(buildEmptyState(
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+        'No activity yet',
+        'Log interactions, complete challenges, and join parties to fill your feed.'
+      ));
+      return;
+    }
+
+    feed.forEach(item => {
+      const div = createElement('div', { className: 'feed-item' });
+      div.appendChild(createElement('div', { className: 'feed-icon' }, item.icon));
+
+      const content = createElement('div', { className: 'feed-content' });
+      content.appendChild(createElement('div', { className: 'feed-title' }, item.title));
+      if (item.description) content.appendChild(createElement('div', { className: 'feed-desc' }, item.description));
+
+      const meta = createElement('div', { className: 'feed-meta' });
+      const ago = timeAgo(new Date(item.timestamp));
+      meta.appendChild(createElement('span', { className: 'feed-time' }, ago));
+      if (item.xp > 0) meta.appendChild(createElement('span', { className: 'feed-xp' }, '+' + item.xp + ' XP'));
+      content.appendChild(meta);
+
+      div.appendChild(content);
+      el.appendChild(div);
+    });
+  } catch (e) { console.log('Feed error:', e); }
+}
+
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  if (s < 604800) return Math.floor(s / 86400) + 'd ago';
+  return date.toLocaleDateString();
+}
+
+// === LEADERBOARD ===
+async function loadLeaderboard() {
+  try {
+    const lb = await api('/leaderboard?days=30');
+    const sec = document.getElementById('leaderboardSection');
+    const content = document.getElementById('leaderboardContent');
+    if (!sec || !content) return;
+
+    const hasData = (lb.most_interactions || []).some(e => e.value > 0);
+    if (!hasData) { sec.style.display = 'none'; return; }
+
+    sec.style.display = '';
+    content.textContent = '';
+
+    const categories = [
+      { title: 'Most Interactions', data: lb.most_interactions, suffix: '' },
+      { title: 'Highest Relationship XP', data: lb.highest_relationship_xp, suffix: ' XP' },
+    ];
+
+    categories.forEach(cat => {
+      const top = (cat.data || []).filter(e => e.value > 0).slice(0, 5);
+      if (top.length === 0) return;
+
+      const section = createElement('div', { className: 'leaderboard-section' });
+      section.appendChild(createElement('div', { className: 'leaderboard-title' }, cat.title));
+
+      top.forEach(entry => {
+        const item = createElement('div', { className: 'leaderboard-item' });
+
+        const rankClass = entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : 'normal';
+        item.appendChild(createElement('div', { className: 'lb-rank ' + rankClass }, '#' + entry.rank));
+        item.appendChild(createElement('div', { className: 'lb-name' }, entry.contact_name));
+        item.appendChild(createElement('div', { className: 'lb-value' }, Math.round(entry.value) + cat.suffix));
+
+        section.appendChild(item);
+      });
+
+      content.appendChild(section);
+    });
+  } catch (e) { console.log('Leaderboard error:', e); }
+}
+
+// === NEARBY CONTACTS ===
+async function loadNearby() {
+  try {
+    const nearby = await api('/nearby');
+    const sec = document.getElementById('nearbySection');
+    const grid = document.getElementById('nearbyGrid');
+    if (!sec || !grid) return;
+
+    if (nearby.length === 0) { sec.style.display = 'none'; return; }
+
+    sec.style.display = '';
+    grid.textContent = '';
+
+    nearby.forEach(n => {
+      const card = createElement('div', { className: 'nearby-card' });
+
+      const header = createElement('div', { className: 'nearby-header' });
+      header.appendChild(createElement('span', { className: 'nearby-pin' }, '\u{1F4CD}'));
+      header.appendChild(createElement('span', { className: 'nearby-name' }, n.contact_name));
+      header.appendChild(createElement('span', { className: 'nearby-city' }, n.city));
+      card.appendChild(header);
+
+      card.appendChild(createElement('div', { className: 'nearby-suggestion' }, n.suggestion));
+      grid.appendChild(card);
+    });
+  } catch (e) { console.log('Nearby error:', e); }
+}
+
+// === STRAVA ===
+async function loadStravaStatus() {
+  try {
+    const status = await api('/strava/status');
+    const el = document.getElementById('stravaStatus');
+    if (!el) return;
+    el.textContent = '';
+
+    if (status.connected) {
+      const div = createElement('div', { className: 'strava-connected' });
+      div.innerHTML = '\u2705 Strava connected — activities auto-verify your challenges!';
+      el.appendChild(div);
+    } else {
+      const btn = createElement('button', {
+        className: 'strava-btn',
+        onClick: connectStrava,
+      });
+      btn.innerHTML = '\u{1F3C3} Connect Strava';
+      el.appendChild(btn);
+      el.appendChild(createElement('span', {
+        style: 'font-size:12px;color:var(--text-muted);margin-left:10px;'
+      }, 'Auto-verify challenges with your Strava activities'));
+    }
+  } catch (e) { /* Strava not configured, hide section */
+    const sec = document.getElementById('stravaSection');
+    if (sec) sec.style.display = 'none';
+  }
+}
+
+async function connectStrava() {
+  try {
+    const data = await api('/strava/connect');
+    if (data.auth_url) window.location.href = data.auth_url;
+  } catch (e) { showToast('Strava connection not available yet', 'info'); }
 }
 
 function renderInsightsReport() {
@@ -2239,6 +2509,10 @@ async function renderAll() {
   renderGamification();
   renderParties();
   renderChallenges();
+  loadFeed();
+  loadLeaderboard();
+  loadNearby();
+  loadStravaStatus();
 }
 
 // === NAVIGATION ===
@@ -2823,6 +3097,7 @@ async function addPerson() {
   const rel = document.getElementById('relationship').value.toLowerCase();
   const freq = (document.querySelector('#frequencyTags .form-tag.selected') || {}).dataset?.val || 'biweekly';
   const notes = document.getElementById('personNotes').value;
+  const city = (document.getElementById('personCity') || {}).value || '';
 
   try {
     await api('/contacts', {
@@ -2832,6 +3107,7 @@ async function addPerson() {
         relationship_type: rel,
         target_frequency: freq,
         notes: notes,
+        city: city,
       }),
     });
 
@@ -2843,6 +3119,7 @@ async function addPerson() {
 
     document.getElementById('firstName').value = '';
     document.getElementById('lastName').value = '';
+    document.getElementById('personCity').value = '';
     document.getElementById('personNotes').value = '';
   } catch (e) {
     showToast('Failed to add: ' + e.message, 'info');

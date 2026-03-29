@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from .models import (
     RelationshipType, ContactFrequency, InteractionType, LifeEventType,
     QuestType, QuestStatus, DifficultyTier,
-    ActivityType, PartyStatus, ChallengeStatus,
+    ActivityType, PartyStatus, ChallengeStatus, Recurrence,
 )
 
 
@@ -58,6 +58,15 @@ class ContactCreate(BaseModel):
     relationship_type: RelationshipType
     target_frequency: ContactFrequency = ContactFrequency.biweekly
     notes: str = Field("", max_length=2000)
+    city: str = Field("", max_length=100)
+
+
+class ContactUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    relationship_type: Optional[RelationshipType] = None
+    target_frequency: Optional[ContactFrequency] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+    city: Optional[str] = Field(None, max_length=100)
 
 
 class ContactOut(BaseModel):
@@ -67,6 +76,7 @@ class ContactOut(BaseModel):
     relationship_type: RelationshipType
     target_frequency: ContactFrequency
     notes: str
+    city: str = ""
     created_at: datetime
     relationship_xp: int = 0
     relationship_level: str = "new"
@@ -255,6 +265,8 @@ class PartyCreate(BaseModel):
     location: str = Field("", max_length=200)
     scheduled_at: Optional[datetime] = None
     contact_ids: list[int] = []
+    is_recurring: bool = False
+    recurrence: Optional[Recurrence] = None
 
 
 class PartyOut(BaseModel):
@@ -268,6 +280,8 @@ class PartyOut(BaseModel):
     max_members: int
     xp_reward: int
     status: PartyStatus
+    is_recurring: bool = False
+    recurrence: Optional[Recurrence] = None
     completed_at: Optional[datetime] = None
     created_at: datetime
     members: list[PartyMemberOut] = []
@@ -299,6 +313,59 @@ class ChallengeOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Social Feed ──
+
+class FeedItemOut(BaseModel):
+    event_type: str  # interaction, party_completed, challenge_completed, achievement, level_up
+    title: str
+    description: str
+    icon: str
+    xp: int = 0
+    contact_name: str = ""
+    timestamp: datetime
+
+
+# ── Leaderboard ──
+
+class LeaderboardEntryOut(BaseModel):
+    contact_id: int
+    contact_name: str
+    relationship_type: str
+    value: float
+    rank: int
+
+
+class LeaderboardOut(BaseModel):
+    most_interactions: list[LeaderboardEntryOut]
+    highest_relationship_xp: list[LeaderboardEntryOut]
+    longest_streak: list[LeaderboardEntryOut]
+
+
+# ── Location ──
+
+class NearbyContactOut(BaseModel):
+    contact_id: int
+    contact_name: str
+    city: str
+    relationship_type: str
+    days_since_contact: float
+    suggestion: str
+
+
+class LocationUpdate(BaseModel):
+    city: str = Field("", max_length=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+# ── Strava ──
+
+class StravaStatusOut(BaseModel):
+    connected: bool
+    athlete_id: Optional[int] = None
+    connected_at: Optional[datetime] = None
 
 
 # ── Dashboard aggregate ──
