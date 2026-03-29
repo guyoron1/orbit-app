@@ -1312,6 +1312,217 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+  /* ═══ LIGHT MODE ═══ */
+  :root.light-mode {
+    --bg-primary: #f5f5fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f0f0f8;
+    --text-primary: #1a1a2e;
+    --text-secondary: #666680;
+    --text-muted: #9999aa;
+    --border: rgba(0,0,0,0.08);
+    --glass: rgba(0,0,0,0.03);
+    --shadow: 0 8px 32px rgba(0,0,0,0.08);
+    --accent-glow: rgba(108, 92, 231, 0.15);
+  }
+  :root.light-mode .sidebar { box-shadow: 2px 0 12px rgba(0,0,0,0.05); }
+  :root.light-mode .contact-card { border: 1px solid rgba(0,0,0,0.06); }
+  :root.light-mode .detail-panel { box-shadow: -4px 0 20px rgba(0,0,0,0.1); }
+
+  .theme-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--glass); border: 1px solid var(--border);
+    cursor: pointer; color: var(--text-secondary); transition: all 0.2s;
+  }
+  .theme-toggle:hover { background: var(--bg-card); color: var(--accent); }
+
+  /* ═══ ENHANCED AVATARS ═══ */
+  .avatar-gradient {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; font-weight: 700; color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    flex-shrink: 0;
+  }
+  .avatar-sm { width: 36px; height: 36px; font-size: 13px; }
+  .avatar-md { width: 44px; height: 44px; font-size: 15px; }
+  .avatar-lg { width: 56px; height: 56px; font-size: 20px; }
+
+  /* ═══ TITLE BADGE ═══ */
+  .title-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(162,155,254,0.1));
+    color: var(--accent-light); border: 1px solid rgba(108,92,231,0.2);
+  }
+  .title-badge.legendary {
+    background: linear-gradient(135deg, rgba(253,203,110,0.15), rgba(255,107,107,0.1));
+    color: #fdcb6e; border-color: rgba(253,203,110,0.3);
+    animation: titleGlow 2s ease-in-out infinite;
+  }
+  @keyframes titleGlow {
+    0%, 100% { box-shadow: 0 0 4px rgba(253,203,110,0.2); }
+    50% { box-shadow: 0 0 12px rgba(253,203,110,0.4); }
+  }
+
+  /* ═══ BIRTHDAY BADGE ═══ */
+  .birthday-badge {
+    position: absolute; top: -4px; right: -4px;
+    padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 700;
+    background: linear-gradient(135deg, #fdcb6e, #e17055);
+    color: white; z-index: 2; white-space: nowrap;
+    animation: bdayPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes bdayPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  /* ═══ BOSS RAID CARD ═══ */
+  .boss-raid-card {
+    background: linear-gradient(135deg, rgba(255,107,107,0.08), rgba(108,92,231,0.08));
+    border: 1px solid rgba(255,107,107,0.15);
+    border-radius: var(--radius-sm); padding: 16px;
+    position: relative; overflow: hidden;
+  }
+  .boss-raid-card::before {
+    content: ''; position: absolute; top: 0; right: 0; width: 60px; height: 60px;
+    background: radial-gradient(circle, rgba(255,107,107,0.15), transparent);
+    border-radius: 0 0 0 100%;
+  }
+  .boss-name { font-size: 16px; font-weight: 700; color: #ff6b6b; margin-bottom: 4px; }
+  .boss-hp-bar {
+    height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px;
+    overflow: hidden; margin: 8px 0;
+  }
+  .boss-hp-fill {
+    height: 100%; border-radius: 5px; transition: width 0.5s ease;
+    background: linear-gradient(90deg, #ff6b6b, #e17055);
+  }
+  .boss-hp-text { font-size: 11px; color: var(--text-secondary); }
+  .boss-attack-btn {
+    margin-top: 10px; padding: 8px 16px; border-radius: 8px;
+    background: linear-gradient(135deg, #ff6b6b, #e17055);
+    color: white; font-weight: 600; font-size: 13px;
+    border: none; cursor: pointer; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .boss-attack-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,107,107,0.3); }
+
+  /* ═══ WEEKLY REPORT MODAL ═══ */
+  .report-overlay {
+    position: fixed; inset: 0; z-index: 5000;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+  }
+  .report-overlay.active { display: flex; }
+  .report-card {
+    background: var(--bg-secondary); border-radius: var(--radius);
+    padding: 32px; width: 420px; max-width: 92vw;
+    border: 1px solid var(--border);
+    animation: pageIn 0.3s ease forwards;
+  }
+  .report-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .report-subtitle { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+  .report-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;
+  }
+  .report-stat-card {
+    background: var(--bg-card); border-radius: var(--radius-sm);
+    padding: 16px; text-align: center; border: 1px solid var(--border);
+  }
+  .report-stat-value { font-size: 28px; font-weight: 800; color: var(--accent); }
+  .report-stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* ═══ DAILY REWARD POPUP ═══ */
+  .reward-overlay {
+    position: fixed; inset: 0; z-index: 6000;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+  }
+  .reward-overlay.active { display: flex; }
+  .reward-card {
+    background: var(--bg-secondary); border-radius: var(--radius);
+    padding: 40px; text-align: center; width: 380px; max-width: 90vw;
+    border: 1px solid rgba(108,92,231,0.3);
+    box-shadow: 0 0 40px rgba(108,92,231,0.2);
+    animation: pageIn 0.4s ease forwards;
+  }
+  .reward-icon { font-size: 48px; margin-bottom: 12px; }
+  .reward-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+  .reward-detail { color: var(--text-secondary); font-size: 14px; margin-bottom: 6px; }
+  .reward-xp { color: var(--success); font-size: 18px; font-weight: 700; margin: 12px 0; }
+
+  /* ═══ STREAK FREEZE BUTTON ═══ */
+  .freeze-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    background: rgba(0,206,201,0.1); border: 1px solid rgba(0,206,201,0.2);
+    color: var(--success); cursor: pointer; transition: all 0.2s;
+  }
+  .freeze-btn:hover { background: rgba(0,206,201,0.2); }
+
+  /* ═══ NETWORK GRAPH PAGE ═══ */
+  #page-network { position: relative; }
+  .network-canvas {
+    width: 100%; height: calc(100vh - 80px);
+    background: var(--bg-primary); border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  .network-tooltip {
+    position: absolute; padding: 8px 12px; border-radius: 8px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    font-size: 12px; pointer-events: none; z-index: 100;
+    box-shadow: var(--shadow); display: none;
+  }
+
+  /* ═══ DETAIL PANEL ENHANCEMENTS ═══ */
+  .detail-timeline { margin-top: 12px; }
+  .detail-timeline-item {
+    display: flex; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .detail-timeline-item:last-child { border-bottom: none; }
+  .detail-timeline-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(108,92,231,0.1); display: flex;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 12px;
+  }
+  .detail-timeline-text { flex: 1; }
+  .detail-timeline-date { font-size: 11px; color: var(--text-muted); }
+
+  .detail-rxp-bar {
+    height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px;
+    overflow: hidden; margin: 6px 0;
+  }
+  .detail-rxp-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-light));
+    transition: width 0.5s ease;
+  }
+
+  /* ═══ SOUND TOGGLE ═══ */
+  .sound-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--glass); border: 1px solid var(--border);
+    cursor: pointer; color: var(--text-secondary); transition: all 0.2s;
+  }
+  .sound-toggle:hover { background: var(--bg-card); color: var(--accent); }
+  .sound-toggle.muted { opacity: 0.4; }
+
+  /* ═══ NOTIFICATION PERMISSION ═══ */
+  .notif-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    background: rgba(108,92,231,0.1); border: 1px solid rgba(108,92,231,0.2);
+    color: var(--accent-light); cursor: pointer; transition: all 0.2s;
+  }
+  .notif-btn:hover { background: rgba(108,92,231,0.2); }
 </style>
 </head>
 <body>
@@ -1555,12 +1766,26 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
         Activity
       </button>
+      <button class="nav-item" data-page="network">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><line x1="5" y1="8" x2="12" y2="16"/><line x1="19" y1="8" x2="12" y2="16"/><line x1="7" y1="6" x2="17" y2="6"/></svg>
+        Network
+        <span class="nav-badge">New</span>
+      </button>
     </nav>
+    <div style="display:flex;gap:6px;padding:8px 16px;justify-content:flex-end;">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode" id="themeToggleBtn">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+      <button class="sound-toggle" onclick="toggleSound()" title="Toggle sound effects" id="soundToggleBtn">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      </button>
+    </div>
     <div class="sidebar-footer">
       <div class="user-avatar">JD</div>
       <div class="user-info">
         <div class="user-name">Jordan Davis</div>
         <div class="user-plan">Free Plan</div>
+        <div class="title-badge" id="userTitleBadge" style="margin-top:4px;">Rookie Hunter</div>
       </div>
       <button onclick="logout()" title="Log out" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -1858,7 +2083,49 @@
         <div class="timeline" id="activityTimeline" style="display:none"></div>
       </div>
     </div>
+
+    <!-- NETWORK GRAPH PAGE -->
+    <div class="page" id="page-network">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>Relationship Network</h1>
+            <p>Your connections visualized as a force-directed graph.</p>
+          </div>
+        </div>
+      </div>
+      <canvas class="network-canvas" id="networkCanvas"></canvas>
+      <div class="network-tooltip" id="networkTooltip"></div>
+    </div>
   </main>
+</div>
+
+<!-- WEEKLY REPORT MODAL -->
+<div class="report-overlay" id="reportOverlay" onclick="closeReport()">
+  <div class="report-card" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div class="report-title">Weekly Report Card</div>
+        <div class="report-subtitle" id="reportDateRange"></div>
+      </div>
+      <button onclick="closeReport()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;">&times;</button>
+    </div>
+    <div class="report-grid" id="reportGrid"></div>
+    <div id="reportSummary" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;"></div>
+    <button class="btn btn-primary" onclick="closeReport()" style="width:100%;justify-content:center;">Awesome!</button>
+  </div>
+</div>
+
+<!-- DAILY REWARD POPUP -->
+<div class="reward-overlay" id="rewardOverlay" onclick="closeReward()">
+  <div class="reward-card" onclick="event.stopPropagation()">
+    <div class="reward-icon" id="rewardIcon"></div>
+    <div class="reward-title" id="rewardTitle">Daily Check-in!</div>
+    <div class="reward-detail" id="rewardDetail"></div>
+    <div class="reward-xp" id="rewardXP"></div>
+    <div id="rewardStreak" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
+    <button class="btn btn-primary" onclick="closeReward()" style="width:100%;justify-content:center;">Claim Reward</button>
+  </div>
 </div>
 
 <!-- ADD PERSON MODAL -->
@@ -4323,7 +4590,7 @@ document.addEventListener('keydown', e => {
   }
   // Number keys 1-5 for nav
   if (!inInput && !e.ctrlKey && !e.metaKey && e.key >= '1' && e.key <= '5') {
-    const pages = ['dashboard', 'contacts', 'orbit', 'insights', 'activity'];
+    const pages = ['dashboard', 'contacts', 'orbit', 'insights', 'activity', 'network'];
     const idx = parseInt(e.key) - 1;
     if (pages[idx]) navigateTo(pages[idx]);
   }
@@ -4403,6 +4670,633 @@ function finishOnboarding() {
   const overlay = document.getElementById('onboardingOverlay');
   if (overlay) overlay.remove();
 }
+
+// ═══════════════════════════════════════════
+// DARK/LIGHT MODE TOGGLE
+// ═══════════════════════════════════════════
+function toggleTheme() {
+  const root = document.documentElement;
+  const isLight = root.classList.toggle('light-mode');
+  localStorage.setItem('orbit_theme', isLight ? 'light' : 'dark');
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.innerHTML = isLight
+    ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  playSound('click');
+}
+// Restore saved theme
+if (localStorage.getItem('orbit_theme') === 'light') {
+  document.documentElement.classList.add('light-mode');
+}
+
+// ═══════════════════════════════════════════
+// SOUND EFFECTS (Web Audio API synthesis)
+// ═══════════════════════════════════════════
+let soundEnabled = localStorage.getItem('orbit_sound') !== 'off';
+const audioCtx = typeof AudioContext !== 'undefined' ? new AudioContext() : null;
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('orbit_sound', soundEnabled ? 'on' : 'off');
+  const btn = document.getElementById('soundToggleBtn');
+  if (btn) btn.classList.toggle('muted', !soundEnabled);
+  if (soundEnabled) playSound('click');
+}
+
+function playSound(type) {
+  if (!soundEnabled || !audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  switch (type) {
+    case 'click':
+      osc.frequency.setValueAtTime(800, now);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.start(now); osc.stop(now + 0.08);
+      break;
+    case 'levelup':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523, now);
+      osc.frequency.setValueAtTime(659, now + 0.1);
+      osc.frequency.setValueAtTime(784, now + 0.2);
+      osc.frequency.setValueAtTime(1047, now + 0.3);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.start(now); osc.stop(now + 0.5);
+      break;
+    case 'rankup':
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(261, now);
+      osc.frequency.exponentialRampToValueAtTime(1047, now + 0.4);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.setValueAtTime(0.15, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      osc.start(now); osc.stop(now + 0.8);
+      // Add a second harmonic
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.connect(gain2); gain2.connect(audioCtx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(523, now + 0.2);
+      osc2.frequency.exponentialRampToValueAtTime(2093, now + 0.6);
+      gain2.gain.setValueAtTime(0.1, now + 0.2);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      osc2.start(now + 0.2); osc2.stop(now + 0.8);
+      break;
+    case 'arise':
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(80, now);
+      osc.frequency.exponentialRampToValueAtTime(400, now + 0.6);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      osc.start(now); osc.stop(now + 0.8);
+      break;
+    case 'gateclear':
+      osc.type = 'triangle';
+      [523, 659, 784, 1047, 1319].forEach((f, i) => {
+        osc.frequency.setValueAtTime(f, now + i * 0.08);
+      });
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      osc.start(now); osc.stop(now + 0.6);
+      break;
+    case 'reward':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.setValueAtTime(554, now + 0.12);
+      osc.frequency.setValueAtTime(659, now + 0.24);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc.start(now); osc.stop(now + 0.4);
+      break;
+    case 'attack':
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      osc.start(now); osc.stop(now + 0.2);
+      break;
+  }
+}
+
+// ═══════════════════════════════════════════
+// AVATAR GRADIENT SYSTEM
+// ═══════════════════════════════════════════
+const AVATAR_GRADIENTS = [
+  ['#6c5ce7', '#a29bfe'], ['#00cec9', '#81ecec'], ['#fd79a8', '#fab1a0'],
+  ['#e17055', '#fdcb6e'], ['#00b894', '#55efc4'], ['#0984e3', '#74b9ff'],
+  ['#d63031', '#ff7675'], ['#6c5ce7', '#fd79a8'], ['#00cec9', '#fdcb6e'],
+  ['#e84393', '#a29bfe'],
+];
+
+function getAvatarGradient(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const idx = Math.abs(hash) % AVATAR_GRADIENTS.length;
+  const [c1, c2] = AVATAR_GRADIENTS[idx];
+  return 'linear-gradient(135deg, ' + c1 + ', ' + c2 + ')';
+}
+
+// ═══════════════════════════════════════════
+// DAILY CHECK-IN SYSTEM
+// ═══════════════════════════════════════════
+async function performDailyCheckIn() {
+  try {
+    const data = await api('/daily/check-in', { method: 'POST' });
+    if (data && data.checked_in) {
+      playSound('reward');
+      showDailyReward(data);
+    }
+  } catch (e) {
+    // Silently fail — endpoint may not exist yet
+  }
+}
+
+function showDailyReward(data) {
+  const overlay = document.getElementById('rewardOverlay');
+  document.getElementById('rewardIcon').textContent = data.hp_change < 0 ? '💔' : (data.streak > 5 ? '🔥' : '✨');
+  document.getElementById('rewardTitle').textContent = data.hp_change < 0
+    ? 'Welcome Back, Hunter!' : 'Daily Check-in!';
+  document.getElementById('rewardDetail').textContent = data.message || 'Keep your streak alive!';
+  document.getElementById('rewardXP').textContent = '+' + data.xp_earned + ' XP';
+  document.getElementById('rewardStreak').textContent = data.streak > 0
+    ? '🔥 ' + data.streak + '-day streak' + (data.hp_change < 0 ? ' (HP -' + Math.abs(data.hp_change) + ')' : '')
+    : '';
+  overlay.classList.add('active');
+  launchConfetti();
+}
+
+function closeReward() {
+  document.getElementById('rewardOverlay').classList.remove('active');
+}
+
+// ═══════════════════════════════════════════
+// WEEKLY REPORT
+// ═══════════════════════════════════════════
+async function showWeeklyReport() {
+  try {
+    const data = await api('/report/weekly');
+    const grid = document.getElementById('reportGrid');
+    grid.innerHTML = '';
+
+    const now = new Date();
+    const weekAgo = new Date(now - 7 * 86400000);
+    document.getElementById('reportDateRange').textContent =
+      weekAgo.toLocaleDateString() + ' — ' + now.toLocaleDateString();
+
+    const stats = [
+      { value: data.interactions_count || 0, label: 'Interactions' },
+      { value: data.contacts_reached || 0, label: 'People Reached' },
+      { value: data.gates_cleared || 0, label: 'Gates Cleared' },
+      { value: data.quests_completed || 0, label: 'Quests Done' },
+    ];
+    stats.forEach(s => {
+      const card = createElement('div', { className: 'report-stat-card' });
+      card.appendChild(createElement('div', { className: 'report-stat-value' }, String(s.value)));
+      card.appendChild(createElement('div', { className: 'report-stat-label' }, s.label));
+      grid.appendChild(card);
+    });
+
+    document.getElementById('reportSummary').textContent = data.summary || 'Keep nurturing your relationships!';
+    document.getElementById('reportOverlay').classList.add('active');
+    playSound('reward');
+  } catch (e) {
+    showToast('Report not available yet', 'info');
+  }
+}
+
+function closeReport() {
+  document.getElementById('reportOverlay').classList.remove('active');
+}
+
+// ═══════════════════════════════════════════
+// STREAK FREEZE
+// ═══════════════════════════════════════════
+async function buyStreakFreeze() {
+  try {
+    const data = await api('/streak/freeze', { method: 'POST' });
+    showToast('Streak freeze purchased! ❄️ (' + data.freezes + ' total)', 'success');
+    playSound('reward');
+    await loadDashboard();
+    renderGamification();
+  } catch (e) {
+    showToast(e.message || 'Not enough XP (need 100)', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════
+// BOSS RAID SYSTEM
+// ═══════════════════════════════════════════
+function renderBossRaids(raids) {
+  const container = document.getElementById('bossRaidsSection');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!raids || raids.length === 0) {
+    container.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px;">No active boss raids. Create one from the Quests menu!</div>';
+    return;
+  }
+
+  raids.forEach(r => {
+    const card = createElement('div', { className: 'boss-raid-card' });
+    card.appendChild(createElement('div', { className: 'boss-name' }, '👹 ' + (r.boss_name || 'Shadow Beast')));
+    card.appendChild(createElement('div', { style: 'font-size:13px;color:var(--text-secondary);margin-bottom:4px;' }, r.title));
+
+    const hpPct = Math.max(0, ((r.boss_hp || 0) / (r.boss_max_hp || 100)) * 100);
+    const hpBar = createElement('div', { className: 'boss-hp-bar' });
+    hpBar.appendChild(createElement('div', { className: 'boss-hp-fill', style: 'width:' + hpPct + '%' }));
+    card.appendChild(hpBar);
+    card.appendChild(createElement('div', { className: 'boss-hp-text' }, 'HP: ' + (r.boss_hp || 0) + '/' + (r.boss_max_hp || 100)));
+
+    const atkBtn = createElement('button', {
+      className: 'boss-attack-btn',
+      onClick: () => attackBoss(r.id)
+    }, '⚔️ Attack');
+    card.appendChild(atkBtn);
+    container.appendChild(card);
+  });
+}
+
+async function attackBoss(bossId) {
+  try {
+    playSound('attack');
+    const data = await api('/boss-raids/' + bossId + '/attack', { method: 'POST' });
+    showToast(data.message || 'Attack landed!', data.status === 'cleared' ? 'success' : 'info');
+    if (data.status === 'cleared') {
+      playSound('gateclear');
+      launchMegaConfetti();
+    }
+    await loadDashboard();
+    renderGamification();
+  } catch (e) {
+    showToast(e.message || 'Attack failed', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════
+// TITLE SYSTEM
+// ═══════════════════════════════════════════
+async function checkTitle() {
+  try {
+    const data = await api('/titles/check', { method: 'POST' });
+    if (data && data.title) {
+      const badge = document.getElementById('userTitleBadge');
+      if (badge) {
+        badge.textContent = data.title;
+        const legendary = ['Shadow Monarch', 'S-Rank Hunter', 'Shadow Commander'].includes(data.title);
+        badge.classList.toggle('legendary', legendary);
+      }
+    }
+  } catch (e) { /* endpoint may not exist yet */ }
+}
+
+// ═══════════════════════════════════════════
+// BIRTHDAY COUNTDOWN
+// ═══════════════════════════════════════════
+function getBirthdayBadge(contact) {
+  // Check life events for upcoming birthdays
+  if (!contact.life_events) return null;
+  const now = new Date();
+  for (const evt of contact.life_events) {
+    if (evt.event_type !== 'birthday') continue;
+    const evtDate = new Date(evt.event_date);
+    // Set to this year
+    const thisYear = new Date(now.getFullYear(), evtDate.getMonth(), evtDate.getDate());
+    if (thisYear < now) thisYear.setFullYear(thisYear.getFullYear() + 1);
+    const daysUntil = Math.ceil((thisYear - now) / 86400000);
+    if (daysUntil <= 30) {
+      return daysUntil === 0 ? '🎂 Today!' : '🎂 ' + daysUntil + 'd';
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+// NETWORK GRAPH (Canvas-based force-directed)
+// ═══════════════════════════════════════════
+let networkAnimFrame = null;
+
+function renderNetworkGraph() {
+  const canvas = document.getElementById('networkCanvas');
+  if (!canvas || contacts.length === 0) return;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * (window.devicePixelRatio || 1);
+  canvas.height = (window.innerHeight - 120) * (window.devicePixelRatio || 1);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = (window.innerHeight - 120) + 'px';
+  const W = canvas.width, H = canvas.height;
+  const scale = window.devicePixelRatio || 1;
+
+  // Create nodes
+  const centerNode = { x: W / 2, y: H / 2, vx: 0, vy: 0, name: currentUser ? currentUser.name : 'You', r: 24 * scale, color: '#6c5ce7', isCenter: true };
+  const nodes = [centerNode];
+  contacts.forEach((c, i) => {
+    const angle = (i / contacts.length) * Math.PI * 2;
+    const dist = 120 + Math.random() * 80;
+    nodes.push({
+      x: W / 2 + Math.cos(angle) * dist * scale,
+      y: H / 2 + Math.sin(angle) * dist * scale,
+      vx: 0, vy: 0,
+      name: c.name, r: (8 + (c.health || 50) / 10) * scale,
+      color: c.color || '#a29bfe',
+      health: c.health || 50,
+      contact: c,
+    });
+  });
+
+  // Edges: all contacts connect to center
+  const edges = contacts.map((_, i) => ({ from: 0, to: i + 1 }));
+
+  function simulate() {
+    // Repulsion between nodes
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        let dx = nodes[j].x - nodes[i].x;
+        let dy = nodes[j].y - nodes[i].y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        let force = (800 * scale * scale) / (dist * dist);
+        let fx = (dx / dist) * force;
+        let fy = (dy / dist) * force;
+        if (!nodes[i].isCenter) { nodes[i].vx -= fx; nodes[i].vy -= fy; }
+        if (!nodes[j].isCenter) { nodes[j].vx += fx; nodes[j].vy += fy; }
+      }
+    }
+    // Attraction along edges
+    edges.forEach(e => {
+      let dx = nodes[e.to].x - nodes[e.from].x;
+      let dy = nodes[e.to].y - nodes[e.from].y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      let force = (dist - 160 * scale) * 0.005;
+      let fx = (dx / dist) * force;
+      let fy = (dy / dist) * force;
+      if (!nodes[e.from].isCenter) { nodes[e.from].vx += fx; nodes[e.from].vy += fy; }
+      if (!nodes[e.to].isCenter) { nodes[e.to].vx += fx; nodes[e.to].vy += fy; }
+    });
+    // Center gravity
+    nodes.forEach(n => {
+      if (n.isCenter) return;
+      n.vx += (W / 2 - n.x) * 0.001;
+      n.vy += (H / 2 - n.y) * 0.001;
+      n.vx *= 0.9; n.vy *= 0.9;
+      n.x += n.vx; n.y += n.vy;
+    });
+  }
+
+  function draw() {
+    simulate();
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw edges
+    ctx.lineWidth = 1.5 * scale;
+    edges.forEach(e => {
+      const from = nodes[e.from], to = nodes[e.to];
+      const health = to.health || 50;
+      ctx.strokeStyle = health > 60 ? 'rgba(0,206,201,0.25)' : health > 30 ? 'rgba(253,203,110,0.25)' : 'rgba(255,107,107,0.25)';
+      ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
+    });
+
+    // Draw nodes
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+      // Glow
+      ctx.shadowColor = n.color;
+      ctx.shadowBlur = n.isCenter ? 20 * scale : 8 * scale;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Label
+      ctx.fillStyle = '#f0f0f5';
+      ctx.font = (n.isCenter ? 'bold ' + (11 * scale) : (9 * scale)) + 'px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.name.split(' ')[0], n.x, n.y + n.r + 14 * scale);
+    });
+
+    networkAnimFrame = requestAnimationFrame(draw);
+  }
+
+  if (networkAnimFrame) cancelAnimationFrame(networkAnimFrame);
+  draw();
+}
+
+// ═══════════════════════════════════════════
+// PUSH NOTIFICATIONS
+// ═══════════════════════════════════════════
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showToast('Notifications not supported in this browser', 'info');
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    showToast('Notifications enabled! You\'ll get reminders.', 'success');
+    playSound('reward');
+    // Schedule a test notification
+    setTimeout(() => {
+      new Notification('Orbit', { body: 'Notifications are working! You\'ll get nudge reminders here.', icon: '/manifest.json' });
+    }, 2000);
+  }
+}
+
+// ═══════════════════════════════════════════
+// ENHANCED DETAIL PANEL (interaction timeline + shadow info)
+// ═══════════════════════════════════════════
+const originalOpenDetail = openDetail;
+openDetail = function(c) {
+  originalOpenDetail(c);
+
+  // Add relationship XP bar
+  const statsEl = document.getElementById('detailStats');
+  if (c.relationship_xp !== undefined) {
+    const rxpDiv = createElement('div', { style: 'margin-top:12px;' });
+    const levels = ['New', 'Acquaintance', 'Friend', 'Close', 'Inner Circle'];
+    const thresholds = [0, 50, 200, 500, 1000];
+    let currentLvl = 0;
+    thresholds.forEach((t, i) => { if ((c.relationship_xp || 0) >= t) currentLvl = i; });
+    const nextThreshold = thresholds[currentLvl + 1] || 1500;
+    const prevThreshold = thresholds[currentLvl] || 0;
+    const pct = Math.min(100, ((c.relationship_xp - prevThreshold) / (nextThreshold - prevThreshold)) * 100);
+
+    rxpDiv.appendChild(createElement('div', { style: 'display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;' },
+      ''));
+    const labelRow = rxpDiv.lastChild;
+    labelRow.appendChild(createElement('span', { style: 'color:var(--accent-light);font-weight:600;' }, levels[currentLvl]));
+    labelRow.appendChild(createElement('span', { style: 'color:var(--text-muted);' }, c.relationship_xp + ' XP'));
+
+    const bar = createElement('div', { className: 'detail-rxp-bar' });
+    bar.appendChild(createElement('div', { className: 'detail-rxp-fill', style: 'width:' + pct + '%' }));
+    rxpDiv.appendChild(bar);
+    statsEl.appendChild(rxpDiv);
+  }
+
+  // Add shadow info
+  if (c.shadow_grade) {
+    const shadowDiv = createElement('div', { style: 'margin-top:12px;padding:8px 12px;background:rgba(108,92,231,0.08);border-radius:8px;font-size:13px;' });
+    shadowDiv.innerHTML = '👤 <strong>Shadow Soldier</strong> — Grade: <span style="color:var(--accent-light);text-transform:capitalize;">' + c.shadow_grade + '</span>';
+    statsEl.appendChild(shadowDiv);
+  }
+
+  // Add extract shadow button if not already a shadow
+  if (!c.shadow_grade) {
+    const extractBtn = createElement('button', {
+      className: 'btn btn-ghost',
+      style: 'width:100%;justify-content:center;margin-top:8px;font-size:13px;',
+      onClick: async () => {
+        try {
+          const data = await api('/contacts/' + c.id + '/extract-shadow', { method: 'POST' });
+          if (data.success) {
+            playSound('arise');
+            showShadowExtraction(data.contact_name, data.shadow_grade);
+            await loadDashboard();
+            renderAll();
+            const updated = contacts.find(x => x.id === c.id);
+            if (updated) openDetail(updated);
+          } else {
+            showToast(data.message, 'info');
+          }
+        } catch (e) { showToast(e.message || 'Extraction failed', 'info'); }
+      }
+    }, '⬆️ ARISE — Extract Shadow');
+    statsEl.appendChild(extractBtn);
+  }
+};
+
+// ═══════════════════════════════════════════
+// HOOKS INTO EXISTING FLOW
+// ═══════════════════════════════════════════
+
+// Override showDashboard to add daily check-in + title check
+const originalShowDashboard = showDashboard;
+showDashboard = function() {
+  originalShowDashboard();
+  // Update title badge
+  if (currentUser) {
+    const badge = document.getElementById('userTitleBadge');
+    if (badge && currentUser.title) {
+      badge.textContent = currentUser.title;
+      const legendary = ['Shadow Monarch', 'S-Rank Hunter', 'Shadow Commander'].includes(currentUser.title);
+      badge.classList.toggle('legendary', legendary);
+    }
+  }
+};
+
+// After dashboard loads, do daily check-in
+const originalLoadDashboard = loadDashboard;
+loadDashboard = async function() {
+  const result = await originalLoadDashboard();
+  // Check title on every load
+  checkTitle();
+  return result;
+};
+
+// Inject boss raids into gamification render
+const originalRenderGamification = renderGamification;
+renderGamification = function() {
+  originalRenderGamification();
+  // Add boss raids section if not exists
+  const gamSection = document.querySelector('#page-dashboard .gamification-section') ||
+                     document.querySelector('#page-dashboard .section:last-child');
+  if (gamSection && !document.getElementById('bossRaidsSection')) {
+    const section = createElement('div', { id: 'bossRaidsSection', style: 'margin-top:16px;' });
+    const header = createElement('div', { style: 'font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;' });
+    header.innerHTML = '👹 Boss Raids';
+    gamSection.appendChild(header);
+    gamSection.appendChild(section);
+  }
+  // Render boss raids from dashboard data
+  const raids = dashboardData?.gamification?.active_boss_raids || [];
+  renderBossRaids(raids);
+
+  // Add streak freeze button
+  if (!document.getElementById('freezeSection') && dashboardData?.gamification) {
+    const gam = dashboardData.gamification;
+    const freezeDiv = createElement('div', { id: 'freezeSection', style: 'margin-top:12px;display:flex;gap:8px;align-items:center;' });
+    const freezeCount = currentUser?.streak_freezes || 0;
+    freezeDiv.appendChild(createElement('span', { style: 'font-size:12px;color:var(--text-secondary);' }, '❄️ Streak Freezes: ' + freezeCount));
+    const buyBtn = createElement('button', { className: 'freeze-btn', onClick: buyStreakFreeze }, '+ Buy (100 XP)');
+    freezeDiv.appendChild(buyBtn);
+    const gamEl = document.querySelector('#page-dashboard .gamification-section') ||
+                  document.querySelector('#page-dashboard .section:last-child');
+    if (gamEl) gamEl.appendChild(freezeDiv);
+  }
+
+  // Add weekly report button
+  if (!document.getElementById('weeklyReportBtn')) {
+    const reportBtn = createElement('button', {
+      className: 'notif-btn', id: 'weeklyReportBtn',
+      style: 'margin-top:12px;',
+      onClick: showWeeklyReport
+    }, '📊 Weekly Report');
+    const gamEl = document.querySelector('#page-dashboard .gamification-section') ||
+                  document.querySelector('#page-dashboard .section:last-child');
+    if (gamEl) gamEl.appendChild(reportBtn);
+  }
+
+  // Add notification subscribe button
+  if (!document.getElementById('notifSubBtn') && 'Notification' in window && Notification.permission !== 'granted') {
+    const notifBtn = createElement('button', {
+      className: 'notif-btn', id: 'notifSubBtn',
+      style: 'margin-top:8px;',
+      onClick: requestNotificationPermission
+    }, '🔔 Enable Notifications');
+    const gamEl = document.querySelector('#page-dashboard .gamification-section') ||
+                  document.querySelector('#page-dashboard .section:last-child');
+    if (gamEl) gamEl.appendChild(notifBtn);
+  }
+};
+
+// Render network when navigating to network page
+const originalNavigateTo = navigateTo;
+navigateTo = function(page) {
+  originalNavigateTo(page);
+  if (page === 'network') {
+    setTimeout(renderNetworkGraph, 100);
+  }
+  playSound('click');
+};
+
+// Play sounds on key events — hook into existing functions
+const originalLaunchConfetti = launchConfetti;
+launchConfetti = function() { playSound('levelup'); originalLaunchConfetti(); };
+
+const originalShowRankUpOverlay = typeof showRankUpOverlay === 'function' ? showRankUpOverlay : null;
+if (originalShowRankUpOverlay) {
+  showRankUpOverlay = function(rank) { playSound('rankup'); originalShowRankUpOverlay(rank); };
+}
+
+const originalShowShadowExtraction = typeof showShadowExtraction === 'function' ? showShadowExtraction : null;
+if (originalShowShadowExtraction) {
+  showShadowExtraction = function(name, grade) { playSound('arise'); originalShowShadowExtraction(name, grade); };
+}
+
+// Daily check-in on first dashboard load
+let dailyCheckInDone = false;
+const originalShowDashboard2 = showDashboard;
+showDashboard = function() {
+  originalShowDashboard2();
+  if (!dailyCheckInDone) {
+    dailyCheckInDone = true;
+    setTimeout(performDailyCheckIn, 2000);
+  }
+};
+
+// Add avatar gradients to contact card rendering
+const originalBuildContactCard = buildContactCard;
+buildContactCard = function(c) {
+  // Assign gradient color if not set
+  if (!c.colorGradient) c.colorGradient = getAvatarGradient(c.name);
+  c.color = c.colorGradient;
+  return originalBuildContactCard(c);
+};
 
 // PWA Service Worker
 if ('serviceWorker' in navigator) {

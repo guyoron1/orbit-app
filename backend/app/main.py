@@ -23,8 +23,9 @@ import os
 import csv
 import io
 import time
+import random
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from contextlib import asynccontextmanager
 
 from pathlib import Path
@@ -42,7 +43,7 @@ from slowapi.errors import RateLimitExceeded
 from .database import Base, engine, get_db
 from .models import (
     User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
-    Party, PartyMember, Challenge, StravaConnection, Gate,
+    Party, PartyMember, Challenge, StravaConnection, Gate, BossRaid,
     NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus, Recurrence,
     HunterRank,
     INTERACTION_DEPTH, FREQUENCY_DAYS,
@@ -63,6 +64,7 @@ from .schemas import (
     FeedItemOut, LeaderboardOut, LeaderboardEntryOut,
     NearbyContactOut, LocationUpdate, StravaStatusOut,
     GateOut, GateCreate, StatAllocation, ShadowExtractOut,
+    BossRaidCreate, BossRaidOut,
 )
 from .decay import compute_health, update_weights_after_interaction
 from .auth import hash_password, verify_password, create_access_token, get_current_user
@@ -1440,6 +1442,15 @@ def get_dashboard(
         .all()
     )
 
+    # Fetch active boss raids for this user
+    active_boss_raid_models = (
+        db.query(BossRaid)
+        .filter(BossRaid.creator_id == user.id, BossRaid.status == "active")
+        .order_by(BossRaid.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
     gamification = GamificationDashboardOut(
         level_progress=LevelProgressOut(**level_progress(user.xp or 0)),
         streak_days=user.streak_days or 0,
@@ -1476,6 +1487,7 @@ def get_dashboard(
             )
             for g in active_gates
         ],
+        active_boss_raids=[BossRaidOut.model_validate(r) for r in active_boss_raid_models],
     )
 
     return DashboardOut(
@@ -1741,6 +1753,348 @@ def check_rank(
         "previous_rank": old_rank,
         "ranked_up": ranked_up,
         "level": user.level,
+    }
+
+
+# ══════════════════════════════════════════════
+# TITLE SYSTEM (protected)
+# ══════════════════════════════════════════════
+
+TITLE_CHECKS = [
+    # (title, check_function) — ordered from lowest to highest priority
+    ("Rookie Hunter", lambda user, gates_cleared: True),
+    ("Shadow Soldier", lambda user, gates_cleared: (user.shadow_army_count or 0) >= 3),
+    ("Gate Keeper", lambda user, gates_cleared: gates_cleared >= 3),
+    ("Shadow Commander", lambda user, gates_cleared: (user.shadow_army_count or 0) >= 10),
+    ("Elite Hunter", lambda user, gates_cleared: (user.level or 1) >= 10),
+    ("S-Rank Hunter", lambda user, gates_cleared: (user.hunter_rank and user.hunter_rank.value in ("S-Rank", "SS-Rank", "Monarch"))),
+    ("Shadow Monarch", lambda user, gates_cleared: (
+        user.hunter_rank and user.hunter_rank.value == "Monarch"
+        and (user.shadow_army_count or 0) >= 20
+    )),
+]
+
+
+@app.post("/titles/check")
+def check_title(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Check user stats and award the highest earned title."""
+    gates_cleared = (
+        db.query(func.count(Gate.id))
+        .filter(Gate.creator_id == user.id, Gate.status == "cleared")
+        .scalar() or 0
+    )
+
+    best_title = "Rookie Hunter"
+    for title, check_fn in TITLE_CHECKS:
+        if check_fn(user, gates_cleared):
+            best_title = title
+
+    old_title = user.title or "Rookie Hunter"
+    user.title = best_title
+    db.commit()
+
+    return {
+        "title": best_title,
+        "previous_title": old_title,
+        "changed": old_title != best_title,
+    }
+
+
+# ══════════════════════════════════════════════
+# DAILY LOGIN / CHECK-IN (protected)
+# ══════════════════════════════════════════════
+
+@app.post("/daily/check-in")
+def daily_check_in(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Daily check-in: grant XP, manage streak, penalize missed days."""
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    last_active = user.last_active_date
+
+    # Already checked in today
+    if last_active == today:
+        return {
+            "checked_in": False,
+            "xp_earned": 0,
+            "hp_change": 0,
+            "streak": user.daily_quest_streak or 0,
+            "message": "Already checked in today!",
+        }
+
+    xp_earned = 15
+    hp_change = 0
+    streak = user.daily_quest_streak or 0
+
+    if last_active is not None and last_active == yesterday:
+        # Consecutive day
+        streak += 1
+        bonus_xp = 5 * min(streak, 10)
+        xp_earned += bonus_xp
+        message = f"Check-in successful! {streak}-day streak! +{xp_earned} XP"
+    elif last_active is not None and last_active < yesterday:
+        # Missed day(s) — penalize
+        hp_loss = 10
+        user.hp = max(10, (user.hp or 100) - hp_loss)
+        hp_change = -hp_loss
+        streak = 0
+        message = f"Check-in successful! Streak broken. HP -{hp_loss}. +{xp_earned} XP"
+    else:
+        # First ever check-in (last_active is None) or same logic
+        streak = 1
+        message = f"Welcome! First check-in. +{xp_earned} XP"
+
+    # Grant XP and stat point
+    user.xp = (user.xp or 0) + xp_earned
+    user.stat_points = (user.stat_points or 0) + 1
+    user.daily_quest_streak = streak
+    user.last_active_date = today
+
+    # Update level
+    from .gamification import level_from_xp
+    user.level = level_from_xp(user.xp)
+
+    db.commit()
+
+    return {
+        "checked_in": True,
+        "xp_earned": xp_earned,
+        "hp_change": hp_change,
+        "streak": streak,
+        "message": message,
+    }
+
+
+# ══════════════════════════════════════════════
+# STREAK FREEZE (protected)
+# ══════════════════════════════════════════════
+
+@app.post("/streak/freeze")
+def buy_streak_freeze(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Buy a streak freeze for 100 XP."""
+    if (user.xp or 0) < 100:
+        raise HTTPException(400, f"Not enough XP. Have {user.xp or 0}, need 100.")
+
+    user.xp = (user.xp or 0) - 100
+    user.streak_freezes = (user.streak_freezes or 0) + 1
+
+    from .gamification import level_from_xp
+    user.level = level_from_xp(user.xp)
+
+    db.commit()
+
+    return {
+        "freezes": user.streak_freezes,
+        "xp_remaining": user.xp,
+    }
+
+
+@app.post("/streak/use-freeze")
+def use_streak_freeze(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Use a streak freeze to prevent streak from breaking."""
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    last_active = user.last_active_date
+
+    # Check if streak would break (missed yesterday and haven't checked in today)
+    streak_would_break = (
+        last_active is not None
+        and last_active < yesterday
+        and last_active != today
+    )
+
+    if not streak_would_break:
+        return {
+            "used": False,
+            "freezes_remaining": user.streak_freezes or 0,
+            "message": "Streak is not in danger. No freeze needed.",
+        }
+
+    if (user.streak_freezes or 0) <= 0:
+        return {
+            "used": False,
+            "freezes_remaining": 0,
+            "message": "No streak freezes available.",
+        }
+
+    # Use the freeze — maintain streak, update last_active to yesterday
+    user.streak_freezes -= 1
+    user.last_active_date = yesterday
+    db.commit()
+
+    return {
+        "used": True,
+        "freezes_remaining": user.streak_freezes,
+        "message": "Streak freeze used! Your streak is safe.",
+    }
+
+
+# ══════════════════════════════════════════════
+# BOSS RAIDS (protected)
+# ══════════════════════════════════════════════
+
+@app.post("/boss-raids", response_model=BossRaidOut)
+def create_boss_raid(
+    data: BossRaidCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Create a new boss raid."""
+    raid = BossRaid(
+        creator_id=user.id,
+        title=data.title,
+        description=data.description,
+        boss_name=data.boss_name,
+        boss_hp=data.boss_hp,
+        boss_max_hp=data.boss_hp,
+        xp_reward=data.xp_reward,
+        time_limit_days=data.time_limit_days,
+        expires_at=datetime.utcnow() + timedelta(days=data.time_limit_days),
+    )
+    db.add(raid)
+    db.commit()
+    db.refresh(raid)
+    return raid
+
+
+@app.get("/boss-raids", response_model=list[BossRaidOut])
+def list_boss_raids(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List user's boss raids."""
+    return (
+        db.query(BossRaid)
+        .filter(BossRaid.creator_id == user.id)
+        .order_by(BossRaid.created_at.desc())
+        .all()
+    )
+
+
+@app.post("/boss-raids/{raid_id}/attack")
+def attack_boss_raid(
+    raid_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Deal damage to a boss raid. Random 10-25 damage per attack."""
+    raid = db.query(BossRaid).filter(
+        BossRaid.id == raid_id, BossRaid.creator_id == user.id
+    ).first()
+    if not raid:
+        raise HTTPException(404, "Boss raid not found")
+    if raid.status != "active":
+        raise HTTPException(400, f"Boss raid is {raid.status}, cannot attack")
+
+    # Check expiry
+    if raid.expires_at and datetime.utcnow() > raid.expires_at:
+        raid.status = "failed"
+        db.commit()
+        return {"status": "failed", "message": "Boss raid expired! The beast escaped."}
+
+    damage = random.randint(10, 25)
+    raid.boss_hp = max(0, raid.boss_hp - damage)
+
+    result = {
+        "damage_dealt": damage,
+        "boss_hp": raid.boss_hp,
+        "boss_max_hp": raid.boss_max_hp,
+    }
+
+    if raid.boss_hp <= 0:
+        raid.status = "cleared"
+        raid.cleared_at = datetime.utcnow()
+
+        # Award XP + 3 stat points
+        user.xp = (user.xp or 0) + raid.xp_reward
+        user.stat_points = (user.stat_points or 0) + 3
+        from .gamification import level_from_xp
+        user.level = level_from_xp(user.xp)
+
+        result["status"] = "cleared"
+        result["message"] = f"Boss defeated! +{raid.xp_reward} XP, +3 stat points!"
+        result["xp_earned"] = raid.xp_reward
+        result["stat_points_earned"] = 3
+    else:
+        result["status"] = "active"
+        result["message"] = f"Hit for {damage} damage! Boss HP: {raid.boss_hp}/{raid.boss_max_hp}"
+
+    db.commit()
+    return result
+
+
+# ══════════════════════════════════════════════
+# WEEKLY REPORT (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/report/weekly")
+def weekly_report(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Generate a weekly activity report."""
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+
+    # Interactions this week
+    interactions_this_week = (
+        db.query(func.count(Interaction.id))
+        .filter(Interaction.user_id == user.id, Interaction.timestamp >= week_ago)
+        .scalar() or 0
+    )
+
+    # Distinct contacts reached this week
+    contacts_reached = (
+        db.query(func.count(func.distinct(Interaction.contact_id)))
+        .filter(Interaction.user_id == user.id, Interaction.timestamp >= week_ago)
+        .scalar() or 0
+    )
+
+    # Gates cleared this week
+    gates_cleared = (
+        db.query(func.count(Gate.id))
+        .filter(
+            Gate.creator_id == user.id,
+            Gate.status == "cleared",
+            Gate.cleared_at >= week_ago,
+        )
+        .scalar() or 0
+    )
+
+    # Quests completed this week
+    quests_completed = (
+        db.query(func.count(Quest.id))
+        .filter(
+            Quest.user_id == user.id,
+            Quest.status == QuestStatus.completed,
+            Quest.completed_at >= week_ago,
+        )
+        .scalar() or 0
+    )
+
+    # Approximate XP earned this week (from interactions: ~20 XP avg per interaction)
+    xp_estimated = interactions_this_week * 20
+
+    return {
+        "period": "weekly",
+        "start": week_ago.isoformat(),
+        "end": now.isoformat(),
+        "interactions": interactions_this_week,
+        "contacts_reached": contacts_reached,
+        "gates_cleared": gates_cleared,
+        "quests_completed": quests_completed,
+        "xp_estimated": xp_estimated,
     }
 
 

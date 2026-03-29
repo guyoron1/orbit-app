@@ -10,7 +10,7 @@ COPY manifest.json .
 COPY sw.js .
 
 # Force cache bust for new party/challenge features
-RUN echo "deploy-v3-solo-leveling"
+RUN echo "deploy-v4-full-monarch"
 
 WORKDIR /app/backend
 RUN python seed.py

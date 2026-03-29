@@ -195,6 +195,8 @@ class User(Base):
     shadow_army_count = Column(Integer, default=0)
     daily_quest_streak = Column(Integer, default=0)
     hp = Column(Integer, default=100)
+    title = Column(String(100), default="Rookie Hunter")
+    streak_freezes = Column(Integer, default=0)
 
     contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")
     nudges = relationship("Nudge", back_populates="user", cascade="all, delete-orphan")
@@ -442,6 +444,30 @@ class Gate(Base):
     objective_type = Column(String(50), default="interactions")  # interactions, party, streak
     objective_target = Column(Integer, default=3)
     objective_current = Column(Integer, default=0)
+    expires_at = Column(DateTime, nullable=True)
+    cleared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")
+
+
+class BossRaid(Base):
+    """
+    Boss Raid — cooperative boss fight with HP-based damage system.
+    Users attack the boss to reduce its HP and earn rewards on clear.
+    """
+    __tablename__ = "boss_raids"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    boss_name = Column(String(100), default="Shadow Beast")
+    boss_hp = Column(Integer, default=100)
+    boss_max_hp = Column(Integer, default=100)
+    xp_reward = Column(Integer, default=200)
+    status = Column(String(20), default="active")  # active, cleared, failed
+    time_limit_days = Column(Integer, default=7)
     expires_at = Column(DateTime, nullable=True)
     cleared_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

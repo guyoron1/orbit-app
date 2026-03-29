@@ -58,6 +58,8 @@ class UserOut(BaseModel):
     shadow_army_count: int = 0
     daily_quest_streak: int = 0
     hp: int = 100
+    title: str = "Rookie Hunter"
+    streak_freezes: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -291,6 +293,35 @@ class ShadowExtractOut(BaseModel):
     message: str = ""
 
 
+# ── Boss Raid ──
+
+class BossRaidCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field("", max_length=1000)
+    boss_name: str = Field("Shadow Beast", max_length=100)
+    boss_hp: int = Field(100, ge=10, le=10000)
+    xp_reward: int = Field(200, ge=10, le=5000)
+    time_limit_days: int = Field(7, ge=1, le=30)
+
+
+class BossRaidOut(BaseModel):
+    id: int
+    creator_id: int
+    title: str
+    description: str
+    boss_name: str
+    boss_hp: int
+    boss_max_hp: int
+    xp_reward: int
+    status: str
+    time_limit_days: int
+    expires_at: Optional[datetime] = None
+    cleared_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Gamification Dashboard ──
 
 class GamificationDashboardOut(BaseModel):
@@ -308,6 +339,7 @@ class GamificationDashboardOut(BaseModel):
     shadow_army_count: int = 0
     daily_quest_streak: int = 0
     active_gates: list[GateOut] = []
+    active_boss_raids: list["BossRaidOut"] = []
 
 
 # ── Party / Hangout ──
