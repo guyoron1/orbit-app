@@ -20,15 +20,19 @@ Protected endpoints (require Bearer token):
 """
 
 import os
+import csv
+import io
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -38,8 +42,9 @@ from slowapi.errors import RateLimitExceeded
 from .database import Base, engine, get_db
 from .models import (
     User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
-    Party, PartyMember, Challenge, StravaConnection,
+    Party, PartyMember, Challenge, StravaConnection, Gate,
     NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus, Recurrence,
+    HunterRank,
     INTERACTION_DEPTH, FREQUENCY_DAYS,
 )
 from .schemas import (
@@ -57,6 +62,7 @@ from .schemas import (
     ChallengeCreate, ChallengeOut,
     FeedItemOut, LeaderboardOut, LeaderboardEntryOut,
     NearbyContactOut, LocationUpdate, StravaStatusOut,
+    GateOut, GateCreate, StatAllocation, ShadowExtractOut,
 )
 from .decay import compute_health, update_weights_after_interaction
 from .auth import hash_password, verify_password, create_access_token, get_current_user
@@ -106,6 +112,33 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+# ── In-memory rate limiter (60 req/min per IP) ──
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT_MAX_REQUESTS = 60
+RATE_LIMIT_WINDOW_SECONDS = 60
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW_SECONDS
+
+    # Prune old timestamps
+    timestamps = _rate_limit_store[client_ip]
+    _rate_limit_store[client_ip] = [t for t in timestamps if t > window_start]
+
+    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Max 60 requests per minute."},
+        )
+
+    _rate_limit_store[client_ip].append(now)
+    response = await call_next(request)
     return response
 
 
@@ -193,6 +226,22 @@ def list_contacts(
     user: User = Depends(get_current_user),
 ):
     return db.query(Contact).filter(Contact.user_id == user.id).all()
+
+
+@app.delete("/contacts/{contact_id}")
+def delete_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    contact = db.query(Contact).filter(
+        Contact.id == contact_id, Contact.user_id == user.id
+    ).first()
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    db.delete(contact)
+    db.commit()
+    return {"status": "deleted", "contact_id": contact_id}
 
 
 @app.patch("/contacts/{contact_id}", response_model=ContactOut)
@@ -781,25 +830,25 @@ def list_challenges(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    challenges = (
-        db.query(Challenge)
+    rows = (
+        db.query(Challenge, Contact)
+        .join(Contact, Challenge.contact_id == Contact.id)
         .filter(Challenge.challenger_id == user.id)
         .order_by(Challenge.created_at.desc())
         .limit(20)
         .all()
     )
-    result = []
-    for c in challenges:
-        contact = db.query(Contact).filter(Contact.id == c.contact_id).first()
-        result.append(ChallengeOut(
+    return [
+        ChallengeOut(
             id=c.id, challenger_id=c.challenger_id,
-            contact_id=c.contact_id, contact_name=contact.name if contact else "Unknown",
+            contact_id=c.contact_id, contact_name=contact.name,
             title=c.title, description=c.description,
             activity_type=c.activity_type, xp_reward=c.xp_reward,
             status=c.status, expires_at=c.expires_at,
             completed_at=c.completed_at, created_at=c.created_at,
-        ))
-    return result
+        )
+        for c, contact in rows
+    ]
 
 
 @app.post("/challenges/{challenge_id}/accept")
@@ -981,17 +1030,22 @@ def get_leaderboard(
     user: User = Depends(get_current_user),
 ):
     contacts = db.query(Contact).filter(Contact.user_id == user.id).all()
-    since = datetime.utcnow() - timedelta(days=days)
+    if not contacts:
+        empty = LeaderboardOut(most_interactions=[], highest_relationship_xp=[], longest_streak=[])
+        return empty
 
-    # Most interactions in period
-    interaction_counts = {}
-    for c in contacts:
-        count = (
-            db.query(func.count(Interaction.id))
-            .filter(Interaction.contact_id == c.id, Interaction.timestamp >= since)
-            .scalar() or 0
-        )
-        interaction_counts[c.id] = count
+    since = datetime.utcnow() - timedelta(days=days)
+    contact_ids = [c.id for c in contacts]
+    contact_map = {c.id: c for c in contacts}
+
+    # Most interactions — single aggregation query instead of N queries
+    ix_counts = (
+        db.query(Interaction.contact_id, func.count(Interaction.id))
+        .filter(Interaction.contact_id.in_(contact_ids), Interaction.timestamp >= since)
+        .group_by(Interaction.contact_id)
+        .all()
+    )
+    interaction_counts = {cid: cnt for cid, cnt in ix_counts}
 
     most_interactions = sorted(contacts, key=lambda c: interaction_counts.get(c.id, 0), reverse=True)
     most_interactions_out = [
@@ -1014,17 +1068,21 @@ def get_leaderboard(
         for i, c in enumerate(by_xp[:10])
     ]
 
-    # Longest active streak (days since last interaction, inverted — most recent = best)
+    # Longest active streak — single query for last interaction per contact
+    last_interactions = (
+        db.query(Interaction.contact_id, func.max(Interaction.timestamp).label("last_ts"))
+        .filter(Interaction.contact_id.in_(contact_ids))
+        .group_by(Interaction.contact_id)
+        .all()
+    )
+    last_ts_map = {cid: ts for cid, ts in last_interactions}
+    now = datetime.utcnow()
+
     streak_data = []
     for c in contacts:
-        last_ix = (
-            db.query(Interaction)
-            .filter(Interaction.contact_id == c.id)
-            .order_by(Interaction.timestamp.desc())
-            .first()
-        )
-        if last_ix:
-            days_since = (datetime.utcnow() - last_ix.timestamp).total_seconds() / 86400
+        last_ts = last_ts_map.get(c.id)
+        if last_ts:
+            days_since = (now - last_ts).total_seconds() / 86400
             streak_data.append((c, max(0, days - days_since)))
         else:
             streak_data.append((c, 0))
@@ -1351,9 +1409,10 @@ def get_dashboard(
     )
     active_parties_out = [_party_to_out(p, db) for p in active_party_models]
 
-    # Active challenges
-    active_challenge_models = (
-        db.query(Challenge)
+    # Active challenges — single join query
+    active_challenge_rows = (
+        db.query(Challenge, Contact)
+        .join(Contact, Challenge.contact_id == Contact.id)
         .filter(
             Challenge.challenger_id == user.id,
             Challenge.status.in_([ChallengeStatus.pending, ChallengeStatus.accepted]),
@@ -1362,17 +1421,24 @@ def get_dashboard(
         .limit(5)
         .all()
     )
-    active_challenges_out = []
-    for c in active_challenge_models:
-        ct = db.query(Contact).filter(Contact.id == c.contact_id).first()
-        active_challenges_out.append(ChallengeOut(
+    active_challenges_out = [
+        ChallengeOut(
             id=c.id, challenger_id=c.challenger_id,
-            contact_id=c.contact_id, contact_name=ct.name if ct else "Unknown",
+            contact_id=c.contact_id, contact_name=ct.name,
             title=c.title, description=c.description,
             activity_type=c.activity_type, xp_reward=c.xp_reward,
             status=c.status, expires_at=c.expires_at,
             completed_at=c.completed_at, created_at=c.created_at,
-        ))
+        )
+        for c, ct in active_challenge_rows
+    ]
+
+    # Fetch active gates for this user
+    active_gates = (
+        db.query(Gate)
+        .filter(Gate.creator_id == user.id, Gate.status.in_(["open", "active"]))
+        .all()
+    )
 
     gamification = GamificationDashboardOut(
         level_progress=LevelProgressOut(**level_progress(user.xp or 0)),
@@ -1382,6 +1448,34 @@ def get_dashboard(
         all_achievements=all_achiev,
         active_parties=active_parties_out,
         active_challenges=active_challenges_out,
+        hunter_rank=user.hunter_rank.value if user.hunter_rank else "E-Rank",
+        hp=user.hp or 100,
+        stat_points=user.stat_points or 0,
+        stats={
+            "charisma": user.stat_charisma or 1,
+            "empathy": user.stat_empathy or 1,
+            "consistency": user.stat_consistency or 1,
+            "initiative": user.stat_initiative or 1,
+            "wisdom": user.stat_wisdom or 1,
+        },
+        shadow_army_count=user.shadow_army_count or 0,
+        daily_quest_streak=user.daily_quest_streak or 0,
+        active_gates=[
+            GateOut(
+                id=g.id, creator_id=g.creator_id, title=g.title,
+                description=g.description or "",
+                gate_rank=g.gate_rank.value if g.gate_rank else "E-Rank",
+                xp_reward=g.xp_reward or 100,
+                time_limit_hours=g.time_limit_hours or 24,
+                status=g.status or "open",
+                objective_type=g.objective_type or "interactions",
+                objective_target=g.objective_target or 3,
+                objective_current=g.objective_current or 0,
+                expires_at=g.expires_at, cleared_at=g.cleared_at,
+                created_at=g.created_at,
+            )
+            for g in active_gates
+        ],
     )
 
     return DashboardOut(
@@ -1397,12 +1491,460 @@ def get_dashboard(
 
 
 # ══════════════════════════════════════════════
+# SOLO LEVELING — Stat Allocation, Shadow Army, Gates
+# ══════════════════════════════════════════════
+
+RANK_LEVELS = {
+    "E-Rank": 1, "D-Rank": 5, "C-Rank": 10, "B-Rank": 18,
+    "A-Rank": 28, "S-Rank": 40, "SS-Rank": 55, "Monarch": 75,
+}
+
+GATE_XP_REWARDS = {
+    "E-Rank": 50, "D-Rank": 100, "C-Rank": 200, "B-Rank": 350,
+    "A-Rank": 500, "S-Rank": 750, "SS-Rank": 1000, "Monarch": 2000,
+}
+
+SHADOW_GRADE_THRESHOLDS = {
+    0: "normal", 50: "elite", 150: "knight", 400: "general", 1000: "marshal",
+}
+
+
+def compute_rank_for_level(level: int) -> str:
+    rank = "E-Rank"
+    for r, min_lvl in RANK_LEVELS.items():
+        if level >= min_lvl:
+            rank = r
+    return rank
+
+
+def compute_shadow_grade(relationship_xp: int) -> str:
+    grade = "normal"
+    for threshold, g in sorted(SHADOW_GRADE_THRESHOLDS.items()):
+        if relationship_xp >= threshold:
+            grade = g
+    return grade
+
+
+@app.post("/stats/allocate")
+def allocate_stats(
+    allocation: StatAllocation,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Spend stat points on hunter stats (Charisma, Empathy, Consistency, Initiative, Wisdom)."""
+    total_requested = (
+        allocation.charisma + allocation.empathy + allocation.consistency
+        + allocation.initiative + allocation.wisdom
+    )
+    if total_requested <= 0:
+        raise HTTPException(400, "Must allocate at least 1 point")
+    if total_requested > (user.stat_points or 0):
+        raise HTTPException(400, f"Not enough stat points. Have {user.stat_points}, need {total_requested}")
+
+    user.stat_charisma = (user.stat_charisma or 1) + allocation.charisma
+    user.stat_empathy = (user.stat_empathy or 1) + allocation.empathy
+    user.stat_consistency = (user.stat_consistency or 1) + allocation.consistency
+    user.stat_initiative = (user.stat_initiative or 1) + allocation.initiative
+    user.stat_wisdom = (user.stat_wisdom or 1) + allocation.wisdom
+    user.stat_points -= total_requested
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "stat_points_remaining": user.stat_points,
+        "stats": {
+            "charisma": user.stat_charisma,
+            "empathy": user.stat_empathy,
+            "consistency": user.stat_consistency,
+            "initiative": user.stat_initiative,
+            "wisdom": user.stat_wisdom,
+        },
+    }
+
+
+@app.post("/contacts/{contact_id}/extract-shadow", response_model=ShadowExtractOut)
+def extract_shadow(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Extract a contact into your Shadow Army. Grade depends on relationship XP."""
+    contact = db.query(Contact).filter(
+        Contact.id == contact_id, Contact.user_id == user.id
+    ).first()
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    if contact.shadow_grade:
+        return ShadowExtractOut(
+            success=False, shadow_grade=contact.shadow_grade,
+            contact_name=contact.name,
+            message=f"{contact.name} is already a shadow ({contact.shadow_grade})",
+        )
+
+    grade = compute_shadow_grade(contact.relationship_xp or 0)
+    contact.shadow_grade = grade
+    contact.shadow_extracted_at = datetime.utcnow()
+    user.shadow_army_count = (user.shadow_army_count or 0) + 1
+
+    # Bonus XP for extraction
+    bonus_xp = {"normal": 10, "elite": 25, "knight": 50, "general": 100, "marshal": 250}.get(grade, 10)
+    user.xp = (user.xp or 0) + bonus_xp
+
+    # Check for rank up
+    new_rank = compute_rank_for_level(user.level or 1)
+    rank_enum = HunterRank(new_rank)
+    if user.hunter_rank != rank_enum:
+        user.hunter_rank = rank_enum
+
+    db.commit()
+    db.refresh(contact)
+
+    return ShadowExtractOut(
+        success=True, shadow_grade=grade,
+        contact_name=contact.name,
+        message=f"ARISE! {contact.name} has been extracted as a {grade} shadow! +{bonus_xp} XP",
+    )
+
+
+@app.post("/gates", response_model=GateOut)
+def create_gate(
+    gate_data: GateCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Open a new gate (social challenge/dungeon)."""
+    rank_str = gate_data.gate_rank if gate_data.gate_rank in RANK_LEVELS else "E-Rank"
+    xp_reward = GATE_XP_REWARDS.get(rank_str, 50)
+
+    gate = Gate(
+        creator_id=user.id,
+        title=gate_data.title,
+        description=gate_data.description,
+        gate_rank=HunterRank(rank_str),
+        xp_reward=xp_reward,
+        time_limit_hours=gate_data.time_limit_hours,
+        status="open",
+        objective_type=gate_data.objective_type,
+        objective_target=gate_data.objective_target,
+        objective_current=0,
+        expires_at=datetime.utcnow() + timedelta(hours=gate_data.time_limit_hours),
+    )
+    db.add(gate)
+    db.commit()
+    db.refresh(gate)
+
+    return GateOut(
+        id=gate.id, creator_id=gate.creator_id, title=gate.title,
+        description=gate.description or "",
+        gate_rank=gate.gate_rank.value if gate.gate_rank else rank_str,
+        xp_reward=gate.xp_reward, time_limit_hours=gate.time_limit_hours,
+        status=gate.status, objective_type=gate.objective_type,
+        objective_target=gate.objective_target, objective_current=gate.objective_current,
+        expires_at=gate.expires_at, cleared_at=gate.cleared_at,
+        created_at=gate.created_at,
+    )
+
+
+@app.get("/gates", response_model=list[GateOut])
+def list_gates(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List all gates for the user."""
+    gates = db.query(Gate).filter(Gate.creator_id == user.id).order_by(Gate.created_at.desc()).all()
+    return [
+        GateOut(
+            id=g.id, creator_id=g.creator_id, title=g.title,
+            description=g.description or "",
+            gate_rank=g.gate_rank.value if g.gate_rank else "E-Rank",
+            xp_reward=g.xp_reward or 100, time_limit_hours=g.time_limit_hours or 24,
+            status=g.status or "open", objective_type=g.objective_type or "interactions",
+            objective_target=g.objective_target or 3, objective_current=g.objective_current or 0,
+            expires_at=g.expires_at, cleared_at=g.cleared_at, created_at=g.created_at,
+        )
+        for g in gates
+    ]
+
+
+@app.post("/gates/{gate_id}/progress")
+def update_gate_progress(
+    gate_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Increment gate progress. Auto-clears when objective is met."""
+    gate = db.query(Gate).filter(Gate.id == gate_id, Gate.creator_id == user.id).first()
+    if not gate:
+        raise HTTPException(404, "Gate not found")
+    if gate.status in ("cleared", "failed"):
+        raise HTTPException(400, f"Gate already {gate.status}")
+
+    # Check expiry
+    if gate.expires_at and datetime.utcnow() > gate.expires_at:
+        gate.status = "failed"
+        db.commit()
+        return {"status": "failed", "message": "Gate expired! The dungeon has collapsed."}
+
+    gate.objective_current = (gate.objective_current or 0) + 1
+    gate.status = "active"
+
+    if gate.objective_current >= (gate.objective_target or 3):
+        # Gate cleared!
+        gate.status = "cleared"
+        gate.cleared_at = datetime.utcnow()
+        user.xp = (user.xp or 0) + (gate.xp_reward or 100)
+
+        # Grant stat points on gate clear
+        stat_points_earned = {"E-Rank": 1, "D-Rank": 2, "C-Rank": 3, "B-Rank": 4,
+                              "A-Rank": 5, "S-Rank": 7, "SS-Rank": 10, "Monarch": 15}
+        rank_str = gate.gate_rank.value if gate.gate_rank else "E-Rank"
+        user.stat_points = (user.stat_points or 0) + stat_points_earned.get(rank_str, 1)
+
+        # Check rank up
+        new_rank = compute_rank_for_level(user.level or 1)
+        rank_enum = HunterRank(new_rank)
+        if user.hunter_rank != rank_enum:
+            user.hunter_rank = rank_enum
+
+        db.commit()
+        return {
+            "status": "cleared",
+            "message": f"Gate cleared! +{gate.xp_reward} XP, +{stat_points_earned.get(rank_str, 1)} stat points!",
+            "xp_earned": gate.xp_reward,
+            "stat_points_earned": stat_points_earned.get(rank_str, 1),
+        }
+
+    db.commit()
+    return {
+        "status": "active",
+        "objective_current": gate.objective_current,
+        "objective_target": gate.objective_target,
+        "message": f"Progress: {gate.objective_current}/{gate.objective_target}",
+    }
+
+
+@app.post("/rank/check")
+def check_rank(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Recalculate hunter rank based on current level."""
+    new_rank = compute_rank_for_level(user.level or 1)
+    old_rank = user.hunter_rank.value if user.hunter_rank else "E-Rank"
+    rank_enum = HunterRank(new_rank)
+    ranked_up = old_rank != new_rank
+    user.hunter_rank = rank_enum
+    db.commit()
+
+    return {
+        "hunter_rank": new_rank,
+        "previous_rank": old_rank,
+        "ranked_up": ranked_up,
+        "level": user.level,
+    }
+
+
+# ══════════════════════════════════════════════
+# CSV & DATA EXPORT / IMPORT (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/contacts/export/csv")
+def export_contacts_csv(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    contacts = db.query(Contact).filter(Contact.user_id == user.id).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "name", "relationship_type", "target_frequency", "notes",
+        "city", "relationship_xp", "relationship_level", "created_at",
+    ])
+    for c in contacts:
+        writer.writerow([
+            c.name,
+            c.relationship_type.value if c.relationship_type else "",
+            c.target_frequency.value if c.target_frequency else "",
+            c.notes or "",
+            c.city or "",
+            c.relationship_xp or 0,
+            c.relationship_level or 0,
+            c.created_at.isoformat() if c.created_at else "",
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=orbit_contacts.csv"},
+    )
+
+
+@app.post("/contacts/import/csv")
+def import_contacts_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(400, "Please upload a .csv file")
+
+    try:
+        contents = file.file.read().decode("utf-8")
+    except Exception:
+        raise HTTPException(400, "Could not read file. Ensure it is UTF-8 encoded CSV.")
+
+    reader = csv.DictReader(io.StringIO(contents))
+    required_columns = {"name"}
+    if not required_columns.issubset(set(reader.fieldnames or [])):
+        raise HTTPException(400, "CSV must contain at least a 'name' column")
+
+    imported_count = 0
+    errors = []
+    for i, row in enumerate(reader, start=2):
+        name = (row.get("name") or "").strip()
+        if not name:
+            errors.append(f"Row {i}: missing name, skipped")
+            continue
+
+        relationship_type = (row.get("relationship_type") or "friend").strip().lower()
+        frequency = (row.get("frequency") or row.get("target_frequency") or "monthly").strip().lower()
+        notes = (row.get("notes") or "").strip()
+        city = (row.get("city") or "").strip()
+
+        try:
+            contact = Contact(
+                user_id=user.id,
+                name=name,
+                relationship_type=relationship_type,
+                target_frequency=frequency,
+                notes=notes or None,
+                city=city or None,
+            )
+            db.add(contact)
+            db.flush()
+
+            weights = Weights(contact_id=contact.id)
+            db.add(weights)
+            imported_count += 1
+        except Exception as e:
+            errors.append(f"Row {i}: {str(e)}")
+            db.rollback()
+            continue
+
+    db.commit()
+    result = {"imported": imported_count}
+    if errors:
+        result["errors"] = errors
+    return result
+
+
+@app.get("/export/data")
+def export_all_user_data(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from .models import UserAchievement
+
+    contacts = db.query(Contact).filter(Contact.user_id == user.id).all()
+    interactions = db.query(Interaction).filter(Interaction.user_id == user.id).all()
+
+    contact_ids = [c.id for c in contacts]
+    life_events = (
+        db.query(LifeEvent).filter(LifeEvent.contact_id.in_(contact_ids)).all()
+        if contact_ids else []
+    )
+    achievements = (
+        db.query(UserAchievement).filter(UserAchievement.user_id == user.id).all()
+    )
+
+    return {
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "xp": user.xp or 0,
+            "level": user.level or 1,
+            "exported_at": datetime.utcnow().isoformat(),
+        },
+        "contacts": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "relationship_type": c.relationship_type.value if c.relationship_type else None,
+                "target_frequency": c.target_frequency.value if c.target_frequency else None,
+                "notes": c.notes,
+                "city": c.city,
+                "relationship_xp": c.relationship_xp or 0,
+                "relationship_level": c.relationship_level or 0,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in contacts
+        ],
+        "interactions": [
+            {
+                "id": ix.id,
+                "contact_id": ix.contact_id,
+                "interaction_type": ix.interaction_type.value if ix.interaction_type else None,
+                "duration_minutes": ix.duration_minutes,
+                "initiated_by_user": ix.initiated_by_user,
+                "notes": ix.notes,
+                "quality_score": ix.quality_score,
+                "timestamp": ix.timestamp.isoformat() if ix.timestamp else None,
+            }
+            for ix in interactions
+        ],
+        "life_events": [
+            {
+                "id": le.id,
+                "contact_id": le.contact_id,
+                "event_type": le.event_type,
+                "description": le.description,
+                "event_date": le.event_date.isoformat() if le.event_date else None,
+                "pause_decay": le.pause_decay,
+            }
+            for le in life_events
+        ],
+        "achievements": [
+            {
+                "achievement_key": ua.achievement_key,
+                "earned_at": ua.earned_at.isoformat() if ua.earned_at else None,
+            }
+            for ua in achievements
+        ],
+    }
+
+
+# ══════════════════════════════════════════════
 # FRONTEND (serves index.html at root if present)
 # When deployed as monolith: index.html sits alongside backend/
 # When API-only mode: returns JSON health check instead
 # ══════════════════════════════════════════════
 
 FRONTEND_PATH = Path(__file__).resolve().parent.parent.parent / "index.html"
+MANIFEST_PATH = Path(__file__).resolve().parent.parent.parent / "manifest.json"
+SW_PATH = Path(__file__).resolve().parent.parent.parent / "sw.js"
+
+
+@app.get("/manifest.json")
+def serve_manifest():
+    return FileResponse(MANIFEST_PATH, media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def serve_sw():
+    return FileResponse(SW_PATH, media_type="application/javascript")
+
+
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """Health check for monitoring and load balancers."""
+    try:
+        db.execute(func.now())
+        return {"status": "healthy", "service": "Orbit API", "version": "0.3.0"}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
 
 
 @app.get("/")

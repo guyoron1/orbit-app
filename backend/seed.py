@@ -13,8 +13,9 @@ import random
 
 from app.database import Base, engine, SessionLocal
 from app.models import (
-    User, Contact, Interaction, Weights, LifeEvent,
+    User, Contact, Interaction, Weights, LifeEvent, Gate,
     RelationshipType, ContactFrequency, InteractionType, LifeEventType,
+    HunterRank,
 )
 from app.decay import update_weights_after_interaction
 
@@ -34,6 +35,16 @@ def seed():
         password_hash=hash_password("orbit2024demo"),
         name="Jordan Davis",
         plan="pro",
+        hunter_rank=HunterRank.c_rank,
+        stat_points=5,
+        stat_charisma=8,
+        stat_empathy=6,
+        stat_consistency=4,
+        stat_initiative=5,
+        stat_wisdom=3,
+        shadow_army_count=3,
+        daily_quest_streak=7,
+        hp=100,
     )
     db.add(user)
     db.commit()
@@ -190,12 +201,45 @@ def seed():
         ))
 
     db.commit()
+
+    # ── Shadow Army (set some contacts as shadows) ──
+    shadow_assignments = {
+        "Sarah Chen": ("knight", now - timedelta(days=14)),
+        "Lisa Zhang": ("elite", now - timedelta(days=7)),
+        "Emma Kim": ("general", now - timedelta(days=30)),
+    }
+    for contact in contact_objs:
+        if contact.name in shadow_assignments:
+            grade, extracted_at = shadow_assignments[contact.name]
+            contact.shadow_grade = grade
+            contact.shadow_extracted_at = extracted_at
+    db.commit()
+
+    # ── Sample Gate ──
+    gate = Gate(
+        creator_id=1,
+        title="Reconnect with 3 old friends",
+        description="Reach out to contacts you haven't spoken to in over 30 days.",
+        gate_rank=HunterRank.d_rank,
+        xp_reward=150,
+        time_limit_hours=48,
+        status="active",
+        objective_type="interactions",
+        objective_target=3,
+        objective_current=1,
+        expires_at=now + timedelta(hours=48),
+        created_at=now,
+    )
+    db.add(gate)
+    db.commit()
+
     db.close()
     print("Database seeded successfully!")
-    print(f"  - 1 user")
-    print(f"  - {len(contacts_data)} contacts")
+    print(f"  - 1 user (C-Rank Hunter)")
+    print(f"  - {len(contacts_data)} contacts ({len(shadow_assignments)} shadows)")
     print(f"  - ~189 interactions with learned weights")
     print(f"  - {len(events)} life events")
+    print(f"  - 1 active gate")
 
 
 if __name__ == "__main__":

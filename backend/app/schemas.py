@@ -6,6 +6,7 @@ from .models import (
     RelationshipType, ContactFrequency, InteractionType, LifeEventType,
     QuestType, QuestStatus, DifficultyTier,
     ActivityType, PartyStatus, ChallengeStatus, Recurrence,
+    HunterRank,
 )
 
 
@@ -47,6 +48,16 @@ class UserOut(BaseModel):
     xp: int = 0
     level: int = 1
     streak_days: int = 0
+    hunter_rank: str = "E-Rank"
+    stat_points: int = 0
+    stat_charisma: int = 1
+    stat_empathy: int = 1
+    stat_consistency: int = 1
+    stat_initiative: int = 1
+    stat_wisdom: int = 1
+    shadow_army_count: int = 0
+    daily_quest_streak: int = 0
+    hp: int = 100
 
     model_config = {"from_attributes": True}
 
@@ -80,6 +91,7 @@ class ContactOut(BaseModel):
     created_at: datetime
     relationship_xp: int = 0
     relationship_level: str = "new"
+    shadow_grade: str = ""
 
     model_config = {"from_attributes": True}
 
@@ -234,6 +246,51 @@ class LevelProgressOut(BaseModel):
     progress: float
 
 
+# ── Gate / Dungeon ──
+
+class GateOut(BaseModel):
+    id: int
+    creator_id: int
+    title: str
+    description: str
+    gate_rank: str
+    xp_reward: int
+    time_limit_hours: int
+    status: str
+    objective_type: str
+    objective_target: int
+    objective_current: int
+    expires_at: Optional[datetime] = None
+    cleared_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class GateCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field("", max_length=1000)
+    gate_rank: str = "E-Rank"
+    objective_type: str = "interactions"
+    objective_target: int = Field(3, ge=1, le=50)
+    time_limit_hours: int = Field(24, ge=1, le=168)
+
+
+class StatAllocation(BaseModel):
+    charisma: int = Field(0, ge=0)
+    empathy: int = Field(0, ge=0)
+    consistency: int = Field(0, ge=0)
+    initiative: int = Field(0, ge=0)
+    wisdom: int = Field(0, ge=0)
+
+
+class ShadowExtractOut(BaseModel):
+    success: bool
+    shadow_grade: str = ""
+    contact_name: str = ""
+    message: str = ""
+
+
 # ── Gamification Dashboard ──
 
 class GamificationDashboardOut(BaseModel):
@@ -244,6 +301,13 @@ class GamificationDashboardOut(BaseModel):
     all_achievements: list[AchievementDef]
     active_parties: list["PartyOut"] = []
     active_challenges: list["ChallengeOut"] = []
+    hunter_rank: str = "E-Rank"
+    hp: int = 100
+    stat_points: int = 0
+    stats: dict = {}
+    shadow_army_count: int = 0
+    daily_quest_streak: int = 0
+    active_gates: list[GateOut] = []
 
 
 # ── Party / Hangout ──

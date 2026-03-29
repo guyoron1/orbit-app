@@ -92,8 +92,14 @@ def award_interaction_xp(user: User, contact: Contact, interaction: Interaction,
     total = base + duration_bonus
 
     # Update user XP
+    old_level = user.level or 1
     user.xp = (user.xp or 0) + total
     user.level = level_from_xp(user.xp)
+
+    # Grant stat points on level-up (Solo Leveling mechanic)
+    if user.level > old_level:
+        levels_gained = user.level - old_level
+        user.stat_points = (user.stat_points or 0) + (3 * levels_gained)
 
     # Update contact relationship XP
     contact.relationship_xp = (contact.relationship_xp or 0) + total
@@ -265,8 +271,14 @@ def complete_quest(quest: Quest, user: User, db: Session) -> dict:
     quest.completed_at = datetime.utcnow()
 
     xp = quest.xp_reward
+    old_level = user.level or 1
     user.xp = (user.xp or 0) + xp
     user.level = level_from_xp(user.xp)
+
+    # Grant stat points on level-up
+    if user.level > old_level:
+        levels_gained = user.level - old_level
+        user.stat_points = (user.stat_points or 0) + (3 * levels_gained)
 
     db.commit()
 

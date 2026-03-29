@@ -128,6 +128,17 @@ class ChallengeStatus(str, enum.Enum):
     expired = "expired"
 
 
+class HunterRank(str, enum.Enum):
+    e_rank = "E-Rank"
+    d_rank = "D-Rank"
+    c_rank = "C-Rank"
+    b_rank = "B-Rank"
+    a_rank = "A-Rank"
+    s_rank = "S-Rank"
+    ss_rank = "SS-Rank"
+    monarch = "Monarch"
+
+
 # ── Interaction depth scores ──
 # Used by the decay algorithm to weight interaction quality.
 # Higher = more meaningful contact.
@@ -173,6 +184,18 @@ class User(Base):
     streak_days = Column(Integer, default=0)
     last_active_date = Column(Date, nullable=True)
 
+    # Solo Leveling
+    hunter_rank = Column(Enum(HunterRank), default=HunterRank.e_rank)
+    stat_points = Column(Integer, default=0)
+    stat_charisma = Column(Integer, default=1)
+    stat_empathy = Column(Integer, default=1)
+    stat_consistency = Column(Integer, default=1)
+    stat_initiative = Column(Integer, default=1)
+    stat_wisdom = Column(Integer, default=1)
+    shadow_army_count = Column(Integer, default=0)
+    daily_quest_streak = Column(Integer, default=0)
+    hp = Column(Integer, default=100)
+
     contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")
     nudges = relationship("Nudge", back_populates="user", cascade="all, delete-orphan")
     quests = relationship("Quest", back_populates="user", cascade="all, delete-orphan")
@@ -198,6 +221,10 @@ class Contact(Base):
     # Gamification
     relationship_xp = Column(Integer, default=0)
     relationship_level = Column(String(20), default="new")
+
+    # Solo Leveling - Shadow Army
+    shadow_grade = Column(String(20), default="")  # empty = not a shadow, then: normal, elite, knight, general, marshal
+    shadow_extracted_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="contacts")
     interactions = relationship("Interaction", back_populates="contact", cascade="all, delete-orphan")
@@ -395,3 +422,28 @@ class StravaConnection(Base):
     connected_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class Gate(Base):
+    """
+    Solo Leveling-inspired gate/dungeon.
+    Users open gates (social challenges) and must clear objectives to earn XP.
+    """
+    __tablename__ = "gates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    gate_rank = Column(Enum(HunterRank), default=HunterRank.e_rank)
+    xp_reward = Column(Integer, default=100)
+    time_limit_hours = Column(Integer, default=24)
+    status = Column(String(20), default="open")  # open, active, cleared, failed
+    objective_type = Column(String(50), default="interactions")  # interactions, party, streak
+    objective_target = Column(Integer, default=3)
+    objective_current = Column(Integer, default=0)
+    expires_at = Column(DateTime, nullable=True)
+    cleared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")

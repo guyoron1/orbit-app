@@ -2,8 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Orbit - Relationship Intelligence</title>
+<meta name="description" content="AI-powered relationship intelligence. Smart nudges, health tracking, and gamified social engagement to help you nurture the connections that matter most.">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:title" content="Orbit - Relationship Intelligence">
+<meta property="og:description" content="Never lose touch again. AI-powered reminders, relationship health scores, and gamified social engagement.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='none' stroke='%236c5ce7' stroke-width='6' stroke-dasharray='15 10'/><circle cx='50' cy='50' r='15' fill='%236c5ce7'/></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0a0f'/><circle cx='50' cy='50' r='30' fill='none' stroke='%236c5ce7' stroke-width='5' stroke-dasharray='12 8'/><circle cx='50' cy='50' r='12' fill='%236c5ce7'/></svg>">
+<link rel="manifest" href="/manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/animejs@4/dist/anime.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -357,6 +371,7 @@
   }
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+  @keyframes toastBar { from { width: 100%; } to { width: 0%; } }
 
   /* Search Bar */
   .search-bar { position: relative; margin-bottom: 24px; }
@@ -385,9 +400,13 @@
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Landing */
-  .landing { display: none; min-height: 100vh; position: relative; z-index: 1; }
+  .landing { display: none; min-height: 100vh; position: relative; z-index: 1; overflow: hidden; }
   .landing.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .landing-content { text-align: center; max-width: 700px; padding: 40px; }
+  .landing-content { text-align: center; max-width: 700px; padding: 40px; position: relative; z-index: 2; }
+  .orbit-hero-canvas {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 600px; height: 600px; opacity: 0.18; pointer-events: none; z-index: 1;
+  }
   .landing-badge {
     display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px;
     background: rgba(108,92,231,0.15); border: 1px solid rgba(108,92,231,0.3);
@@ -418,6 +437,100 @@
     align-items: center; justify-content: center;
   }
   .feature-icon svg { width: 22px; height: 22px; }
+  .landing-stats {
+    display: flex; align-items: center; justify-content: center; gap: 24px;
+    margin-top: 48px; padding: 20px 32px;
+    background: rgba(108,92,231,0.06); border: 1px solid rgba(108,92,231,0.12);
+    border-radius: 16px;
+  }
+  .landing-stat { text-align: center; }
+  .landing-stat strong { display: block; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .landing-stat span { font-size: 12px; color: var(--text-muted); }
+  .landing-stat-divider { width: 1px; height: 32px; background: var(--border); }
+
+  /* Landing sections */
+  .landing-section {
+    width: 100%; max-width: 900px; margin: 0 auto; padding: 80px 40px; text-align: center;
+  }
+  .landing-section h2 {
+    font-size: 36px; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px;
+  }
+  .landing-section .section-sub {
+    font-size: 16px; color: var(--text-secondary); max-width: 600px; margin: 0 auto 48px; line-height: 1.6;
+  }
+  /* How it works */
+  .how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; text-align: center; }
+  .how-step-num {
+    width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 16px;
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 800; color: white;
+  }
+  .how-step h4 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .how-step p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  /* Testimonials */
+  .testimonials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .testimonial-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; text-align: left;
+  }
+  .testimonial-stars { color: #fdcb6e; font-size: 14px; margin-bottom: 12px; }
+  .testimonial-text { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; font-style: italic; }
+  .testimonial-author { display: flex; align-items: center; gap: 10px; }
+  .testimonial-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #00cec9);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: white;
+  }
+  .testimonial-name { font-size: 13px; font-weight: 600; }
+  .testimonial-role { font-size: 11px; color: var(--text-muted); }
+  /* Pricing */
+  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .pricing-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 32px 24px; text-align: center; position: relative;
+  }
+  .pricing-card.featured { border-color: var(--accent); }
+  .pricing-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: white; font-size: 11px; font-weight: 700;
+    padding: 4px 16px; border-radius: 12px;
+  }
+  .pricing-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .pricing-price { font-size: 42px; font-weight: 900; letter-spacing: -2px; }
+  .pricing-price span { font-size: 16px; font-weight: 400; color: var(--text-muted); }
+  .pricing-features { list-style: none; padding: 0; margin: 24px 0; text-align: left; }
+  .pricing-features li {
+    font-size: 13px; color: var(--text-secondary); padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pricing-features li::before { content: '\2713 '; color: var(--success); font-weight: 700; margin-right: 8px; }
+  /* FAQ */
+  .faq-list { max-width: 640px; margin: 0 auto; text-align: left; }
+  .faq-item { border-bottom: 1px solid var(--border); }
+  .faq-q {
+    padding: 20px 0; font-size: 15px; font-weight: 600; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .faq-q::after { content: '+'; font-size: 20px; color: var(--text-muted); transition: transform 0.3s; }
+  .faq-item.open .faq-q::after { content: '\2212'; }
+  .faq-a {
+    max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s;
+    font-size: 14px; color: var(--text-secondary); line-height: 1.6;
+  }
+  .faq-item.open .faq-a { max-height: 200px; padding-bottom: 20px; }
+  /* Footer */
+  .landing-footer {
+    width: 100%; padding: 40px; text-align: center;
+    border-top: 1px solid var(--border); color: var(--text-muted); font-size: 13px;
+  }
+  .landing-footer a { color: var(--accent-light); text-decoration: none; }
+  @media (max-width: 768px) {
+    .landing-section { padding: 48px 20px; }
+    .landing-section h2 { font-size: 26px; }
+    .how-steps, .testimonials, .pricing-grid { grid-template-columns: 1fr; }
+  }
 
   /* Auth Modal — Branded */
   .auth-modal .modal {
@@ -649,19 +762,7 @@
   .achievement-name { font-size: 12px; font-weight: 700; }
   .achievement-desc { font-size: 10px; color: var(--text-muted); }
 
-  /* XP Toast */
-  .xp-toast {
-    position: fixed; top: 80px; right: 24px; z-index: 250;
-    background: linear-gradient(135deg, rgba(108,92,231,0.95), rgba(162,155,254,0.95));
-    border-radius: var(--radius-sm); padding: 14px 20px;
-    box-shadow: 0 8px 32px var(--accent-glow);
-    animation: xpToastIn 0.4s ease, xpToastOut 0.4s ease 2.6s forwards;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .xp-toast-amount { font-size: 22px; font-weight: 900; }
-  .xp-toast-label { font-size: 12px; font-weight: 600; opacity: 0.9; }
-  @keyframes xpToastIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-  @keyframes xpToastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
+  /* (XP Toast styles are in the enhanced section below) */
 
   /* Mobile bottom nav */
   .mobile-nav {
@@ -865,6 +966,9 @@
     .feature-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 36px; }
     .feature-item { padding: 18px; }
     .orbit-canvas { height: 320px; }
+    .orbit-hero-canvas { width: 400px; height: 400px; opacity: 0.12; }
+    .landing-stats { flex-direction: column; gap: 12px; padding: 16px; }
+    .landing-stat-divider { width: 60px; height: 1px; }
     .modal { width: calc(100vw - 32px); max-width: 480px; border-radius: 16px; }
     .modal-header { padding: 20px 20px 0; }
     .modal-body { padding: 20px; }
@@ -905,6 +1009,305 @@
     font-size: 12px; color: var(--text-muted); margin-bottom: 12px; margin-top: -8px;
   }
 
+  /* Confetti Canvas */
+  #confettiCanvas {
+    position: fixed; inset: 0; z-index: 300; pointer-events: none;
+  }
+
+  /* Enhanced XP Toast */
+  .xp-toast {
+    position: fixed; top: 80px; right: 24px; z-index: 250;
+    background: linear-gradient(135deg, rgba(108,92,231,0.95), rgba(162,155,254,0.95));
+    border-radius: var(--radius); padding: 16px 24px;
+    box-shadow: 0 12px 40px var(--accent-glow), 0 0 80px rgba(108,92,231,0.2);
+    animation: xpToastIn 0.5s cubic-bezier(0.34,1.56,0.64,1), xpToastOut 0.4s ease 2.8s forwards;
+    display: flex; align-items: center; gap: 14px;
+    backdrop-filter: blur(20px);
+  }
+  .xp-toast-icon { font-size: 28px; animation: xpBounce 0.6s ease 0.2s; }
+  .xp-toast-amount { font-size: 26px; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+  .xp-toast-label { font-size: 13px; font-weight: 600; opacity: 0.9; }
+  .xp-toast-bar { height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .xp-toast-bar-fill { height: 100%; background: white; border-radius: 2px; animation: xpBarFill 2.8s ease-out; }
+  @keyframes xpBounce { 0%{transform:scale(0)} 50%{transform:scale(1.3)} 100%{transform:scale(1)} }
+  @keyframes xpBarFill { from{width:100%} to{width:0%} }
+  @keyframes xpToastIn { from { transform: translateX(120px) scale(0.8); opacity: 0; } to { transform: translateX(0) scale(1); opacity: 1; } }
+  @keyframes xpToastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-30px) scale(0.9); } }
+
+  /* Level Up Overlay */
+  .level-up-overlay {
+    position: fixed; inset: 0; z-index: 280; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(12px);
+    animation: fadeIn 0.3s ease;
+  }
+  .level-up-card {
+    text-align: center; padding: 48px 60px;
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+    border: 1px solid rgba(108,92,231,0.4);
+    border-radius: 24px; box-shadow: 0 0 100px var(--accent-glow);
+    animation: levelUpPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .level-up-badge {
+    width: 100px; height: 100px; border-radius: 28px; margin: 0 auto 20px;
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; box-shadow: 0 8px 40px var(--accent-glow);
+    animation: levelBadgePulse 2s ease infinite;
+  }
+  .level-up-num { font-size: 40px; font-weight: 900; line-height: 1; }
+  .level-up-label { font-size: 11px; font-weight: 700; text-transform: uppercase; opacity: 0.8; }
+  .level-up-title { font-size: 28px; font-weight: 900; letter-spacing: -1px; margin-bottom: 8px; }
+  .level-up-subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 24px; }
+  @keyframes levelUpPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes levelBadgePulse { 0%,100%{box-shadow:0 8px 40px var(--accent-glow)} 50%{box-shadow:0 8px 60px rgba(108,92,231,0.5)} }
+
+  /* Achievement unlock animation */
+  .achievement-badge.just-earned {
+    animation: achieveUnlock 0.6s cubic-bezier(0.34,1.56,0.64,1);
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  @keyframes achieveUnlock { from { transform: scale(0.5) rotate(-10deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+
+  /* Enhanced Toast */
+  .toast {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4); animation: slideIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    min-width: 320px; position: relative; overflow: hidden;
+  }
+  .toast::after {
+    content: ''; position: absolute; bottom: 0; left: 0; height: 3px;
+    background: var(--accent); animation: toastProgress 3s linear forwards;
+  }
+  @keyframes toastProgress { from{width:100%} to{width:0%} }
+  .toast.success::after { background: var(--success); }
+  .toast.error::after { background: var(--danger); }
+  .toast-icon { font-size: 18px; flex-shrink: 0; }
+  .toast-text { font-size: 13px; font-weight: 500; }
+
+  /* Smooth stat counter */
+  .stat-value { transition: color 0.3s; }
+  .stat-value.counting { color: var(--accent-light); }
+
+  /* Page transition enhancement */
+  .page { display: none; opacity: 0; transform: translateY(12px); }
+  .page.active { display: block; animation: pageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  .page.page-exit { display: block; animation: pageOut 0.2s ease forwards; }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pageOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
+
+  /* Card interaction feedback */
+  .contact-card { transition: transform 0.2s, box-shadow 0.2s; }
+  .contact-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .contact-card:active { transform: scale(0.98); }
+  .quest-card, .party-card, .challenge-card { transition: transform 0.2s, box-shadow 0.2s; }
+  .quest-card:hover, .party-card:hover, .challenge-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .quest-card:active, .party-card:active, .challenge-card:active { transform: scale(0.98); }
+
+  /* Health bar fill animation */
+  .health-fill { transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
+
+  /* Sparkline on contact cards */
+  .sparkline-container { height: 24px; margin-top: 8px; opacity: 0.7; }
+  .sparkline-container svg { width: 100%; height: 100%; }
+
+  /* Stat card pulse on hover */
+  .stat-card { transition: transform 0.2s, border-color 0.3s; }
+  .stat-card:hover { transform: translateY(-2px); border-color: var(--accent-light); }
+
+  /* Dashboard charts */
+  .dashboard-charts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; }
+  .health-dist-bars { display: flex; align-items: flex-end; gap: 4px; height: 60px; }
+  .health-dist-bar {
+    flex: 1; border-radius: 3px 3px 0 0; min-height: 4px;
+    transition: height 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .health-dist-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+  .heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .heatmap-cell {
+    aspect-ratio: 1; border-radius: 3px; background: var(--bg-card-hover);
+    transition: background 0.3s;
+  }
+  .heatmap-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+
+  /* Onboarding overlay */
+  .onboarding-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .onboarding-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 40px; max-width: 480px; width: 90%;
+    text-align: center; animation: pageIn 0.4s ease;
+  }
+  .onboarding-step { font-size: 12px; color: var(--accent-light); font-weight: 600; margin-bottom: 8px; }
+  .onboarding-title { font-size: 24px; font-weight: 800; margin-bottom: 12px; }
+  .onboarding-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; }
+  .onboarding-dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
+  .onboarding-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
+  .onboarding-dot.active { background: var(--accent-light); width: 24px; border-radius: 4px; }
+  .onboarding-icon {
+    width: 80px; height: 80px; border-radius: 20px; margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center; font-size: 36px;
+    background: rgba(108,92,231,0.1);
+  }
+  .onboarding-actions { display: flex; gap: 12px; justify-content: center; }
+
+  @media (max-width: 768px) {
+    .dashboard-charts { grid-template-columns: 1fr; }
+  }
+
+  /* ═══ SOLO LEVELING SYSTEM ═══ */
+
+  /* Hunter Rank Badge */
+  .rank-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+    border-radius: 8px; font-size: 12px; font-weight: 800; letter-spacing: 1px;
+    text-transform: uppercase; border: 1px solid;
+  }
+  .rank-E { background: rgba(149,165,166,0.15); border-color: rgba(149,165,166,0.3); color: #95a5a6; }
+  .rank-D { background: rgba(46,204,113,0.15); border-color: rgba(46,204,113,0.3); color: #2ecc71; }
+  .rank-C { background: rgba(52,152,219,0.15); border-color: rgba(52,152,219,0.3); color: #3498db; }
+  .rank-B { background: rgba(155,89,182,0.15); border-color: rgba(155,89,182,0.3); color: #9b59b6; }
+  .rank-A { background: rgba(243,156,18,0.15); border-color: rgba(243,156,18,0.3); color: #f39c12; }
+  .rank-S { background: rgba(231,76,60,0.15); border-color: rgba(231,76,60,0.3); color: #e74c3c; }
+  .rank-SS { background: rgba(255,215,0,0.15); border-color: rgba(255,215,0,0.4); color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,0.4); }
+  .rank-Monarch { background: linear-gradient(135deg, rgba(108,92,231,0.2), rgba(255,215,0,0.2)); border-color: rgba(255,215,0,0.5); color: #ffd700; text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+
+  /* Rank-up overlay */
+  .rankup-overlay {
+    position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.85);
+  }
+  .rankup-card {
+    text-align: center; padding: 48px; max-width: 400px;
+    animation: rankUpAppear 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes rankUpAppear {
+    0% { opacity: 0; transform: scale(0.5) translateY(40px); }
+    60% { transform: scale(1.05) translateY(-10px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .rankup-glow {
+    width: 120px; height: 120px; margin: 0 auto 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px; font-weight: 900;
+    animation: rankGlow 2s ease infinite;
+  }
+  @keyframes rankGlow {
+    0%, 100% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor; }
+    50% { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor, 0 0 90px currentColor; }
+  }
+  .rankup-title { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+  .rankup-rank { font-size: 36px; font-weight: 900; letter-spacing: -1px; margin-bottom: 8px; }
+  .rankup-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; }
+
+  /* Shadow extraction */
+  .shadow-extract-overlay {
+    position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.9);
+  }
+  .shadow-arise {
+    text-align: center; animation: ariseAppear 1s ease;
+  }
+  @keyframes ariseAppear {
+    0% { opacity: 0; transform: translateY(60px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .arise-text {
+    font-size: 72px; font-weight: 900; letter-spacing: 8px;
+    background: linear-gradient(180deg, #a29bfe 0%, #6c5ce7 50%, #4a3db5 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    text-shadow: none; filter: drop-shadow(0 0 30px rgba(108,92,231,0.8));
+    animation: ariseGlow 1.5s ease infinite alternate;
+  }
+  @keyframes ariseGlow {
+    0% { filter: drop-shadow(0 0 20px rgba(108,92,231,0.6)); }
+    100% { filter: drop-shadow(0 0 40px rgba(108,92,231,1)); }
+  }
+  .arise-subtitle { font-size: 16px; color: var(--accent-light); margin-top: 16px; }
+  .arise-grade { font-size: 14px; color: var(--text-muted); margin-top: 8px; text-transform: uppercase; letter-spacing: 2px; }
+
+  /* Shadow badge on contact cards */
+  .shadow-badge {
+    position: absolute; top: 8px; right: 8px; padding: 2px 8px;
+    border-radius: 6px; font-size: 10px; font-weight: 700;
+    background: rgba(108,92,231,0.2); border: 1px solid rgba(108,92,231,0.3);
+    color: var(--accent-light); text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* Stat radar chart */
+  .stat-radar { text-align: center; margin: 16px 0; }
+  .stat-radar svg { max-width: 200px; }
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px;
+  }
+  .stat-item {
+    text-align: center; padding: 8px 4px; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .stat-item-val { font-size: 20px; font-weight: 800; color: var(--accent-light); }
+  .stat-item-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .stat-item-btn {
+    width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--accent);
+    background: transparent; color: var(--accent-light); font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 4px; transition: all 0.2s;
+  }
+  .stat-item-btn:hover { background: var(--accent); color: white; }
+
+  /* Gate card */
+  .gate-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; position: relative; overflow: hidden;
+  }
+  .gate-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), #ff6b6b);
+  }
+  .gate-rank-badge { float: right; }
+  .gate-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .gate-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+  .gate-progress-bar { height: 6px; background: var(--bg-card-hover); border-radius: 3px; overflow: hidden; }
+  .gate-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00cec9); border-radius: 3px; transition: width 0.5s; }
+  .gate-meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+  .gate-timer { color: #ff6b6b; font-weight: 600; }
+
+  /* HP bar */
+  .hp-bar-container { margin-top: 8px; }
+  .hp-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .hp-bar-bg { height: 6px; background: var(--bg-card-hover); border-radius: 3px; overflow: hidden; }
+  .hp-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+
+  /* Daily quest countdown */
+  .daily-countdown {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.15);
+    border-radius: 8px; font-size: 12px; color: #ff6b6b; font-weight: 600;
+  }
+
+  /* Focus visible for accessibility */
+  :focus-visible {
+    outline: 2px solid var(--accent-light);
+    outline-offset: 2px;
+  }
+  button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+
+  /* Keyboard shortcut hint */
+  .kbd {
+    display: inline-block; padding: 2px 6px; border-radius: 4px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    font-size: 11px; font-family: monospace; color: var(--text-muted);
+  }
+
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
@@ -922,6 +1325,7 @@
 
 <!-- LANDING PAGE -->
 <div class="landing active" id="landingPage">
+  <canvas class="orbit-hero-canvas" id="orbitHeroCanvas"></canvas>
   <div class="landing-content">
     <div class="landing-badge">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
@@ -959,6 +1363,147 @@
         <p>Track birthdays, milestones, and shared memories. Never forget what matters to the people you love.</p>
       </div>
     </div>
+    <div class="landing-stats">
+      <div class="landing-stat"><strong>Gamified</strong><span>XP, quests, streaks</span></div>
+      <div class="landing-stat-divider"></div>
+      <div class="landing-stat"><strong>AI-Powered</strong><span>Smart nudges & starters</span></div>
+      <div class="landing-stat-divider"></div>
+      <div class="landing-stat"><strong>Privacy-First</strong><span>Your data, your orbit</span></div>
+    </div>
+  </div>
+
+  <!-- How It Works -->
+  <div class="landing-section">
+    <h2>How It Works</h2>
+    <p class="section-sub">Three simple steps to never lose touch with the people who matter most.</p>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-step-num">1</div>
+        <h4>Add Your People</h4>
+        <p>Import contacts or add them manually. Set how often you'd like to stay in touch with each person.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">2</div>
+        <h4>Log Interactions</h4>
+        <p>Record calls, meetups, and messages. Orbit's AI learns your patterns and adapts to your style.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">3</div>
+        <h4>Stay Connected</h4>
+        <p>Get smart nudges, earn XP, and watch your relationship health thrive. The algorithm does the rest.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Testimonials -->
+  <div class="landing-section">
+    <h2>Loved by Connectors</h2>
+    <p class="section-sub">People who take their relationships seriously trust Orbit.</p>
+    <div class="testimonials">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="testimonial-text">"I used to feel guilty about losing touch with friends. Orbit turned relationship maintenance into a game I actually enjoy playing."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">SK</div>
+          <div><div class="testimonial-name">Sarah K.</div><div class="testimonial-role">Product Manager</div></div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="testimonial-text">"The health decay algorithm is genius. It mirrors real life perfectly and the nudges always come at the right time."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar" style="background:linear-gradient(135deg,#00cec9,#55efc4)">MR</div>
+          <div><div class="testimonial-name">Marcus R.</div><div class="testimonial-role">Software Engineer</div></div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="testimonial-text">"As someone who manages 200+ professional relationships, Orbit is indispensable. The quest system keeps me motivated."</div>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar" style="background:linear-gradient(135deg,#fd79a8,#e17055)">JT</div>
+          <div><div class="testimonial-name">Jamie T.</div><div class="testimonial-role">Sales Director</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pricing -->
+  <div class="landing-section">
+    <h2>Simple Pricing</h2>
+    <p class="section-sub">Start free, upgrade when you're ready. No credit card required.</p>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-name">Free</div>
+        <div class="pricing-price">$0<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>Up to 25 contacts</li>
+          <li>Basic health tracking</li>
+          <li>5 nudges per week</li>
+          <li>XP & achievements</li>
+        </ul>
+        <button class="btn btn-ghost" onclick="enterApp()" style="width:100%">Get Started</button>
+      </div>
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most Popular</div>
+        <div class="pricing-name">Pro</div>
+        <div class="pricing-price">$9<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>Unlimited contacts</li>
+          <li>AI conversation starters</li>
+          <li>Unlimited nudges</li>
+          <li>Quests & parties</li>
+          <li>CSV import/export</li>
+          <li>Priority support</li>
+        </ul>
+        <button class="btn btn-primary" onclick="enterApp()" style="width:100%">Start Pro Trial</button>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-name">Team</div>
+        <div class="pricing-price">$29<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>Everything in Pro</li>
+          <li>Team leaderboards</li>
+          <li>Shared contact pools</li>
+          <li>Strava integration</li>
+          <li>API access</li>
+          <li>Dedicated support</li>
+        </ul>
+        <button class="btn btn-ghost" onclick="enterApp()" style="width:100%">Contact Sales</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="landing-section">
+    <h2>Frequently Asked Questions</h2>
+    <div class="faq-list" id="faqList">
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">How does relationship health work?</div>
+        <div class="faq-a">Each relationship has a health score (0-100%) that naturally decays over time based on your desired contact frequency. When you log an interaction, health goes back up. The algorithm learns from your patterns and adapts the decay curve to each relationship.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Is my data private?</div>
+        <div class="faq-a">Absolutely. Your relationship data is encrypted and never shared with third parties. You can export or delete your data at any time. We use AI features locally where possible and only use OpenAI for optional conversation starters.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What are quests and parties?</div>
+        <div class="faq-a">Quests are gamified challenges that encourage you to nurture specific relationships ("Call a friend you haven't spoken to in 2 weeks"). Parties let you create group activities and earn bonus XP when you hang out with multiple people.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Can I import my existing contacts?</div>
+        <div class="faq-a">Yes! Upload a CSV file with your contacts and we'll import them automatically. You can also add contacts manually or connect integrations like Strava for activity tracking.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Does Orbit work offline?</div>
+        <div class="faq-a">Orbit is a Progressive Web App (PWA). You can install it on your home screen and basic features work offline. Interactions logged offline will sync when you're back online.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="landing-footer">
+    <p>Built with care by the Orbit team. <a href="#">Privacy Policy</a> &middot; <a href="#">Terms</a> &middot; <a href="#">GitHub</a></p>
+    <p style="margin-top:8px; opacity:0.6">&copy; 2026 Orbit. All rights reserved.</p>
   </div>
 </div>
 
@@ -1078,7 +1623,21 @@
           <div class="stat-change up" id="stat-total-change">&nbsp;</div>
         </div>
       </div>
+      <!-- Dashboard Charts -->
+      <div class="dashboard-charts" id="dashboardCharts" style="display:none">
+        <div class="chart-card">
+          <div class="chart-title">Health Distribution</div>
+          <div class="health-dist-bars" id="healthDistBars"></div>
+          <div class="health-dist-label"><span>Critical</span><span>Low</span><span>Fair</span><span>Good</span><span>Excellent</span></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Activity Heatmap (4 weeks)</div>
+          <div class="heatmap-grid" id="heatmapGrid"></div>
+          <div class="heatmap-labels"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        </div>
+      </div>
       <!-- Gamification: XP & Level -->
+      <!-- Solo Leveling: Hunter Status -->
       <div class="xp-section" id="xpSection" style="display:none">
         <div class="xp-level-badge">
           <div class="xp-level-num" id="xpLevelNum">1</div>
@@ -1086,11 +1645,18 @@
         </div>
         <div class="xp-info">
           <div class="xp-header">
-            <div class="xp-title" id="xpTitle">Level 1</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="xp-title" id="xpTitle">Level 1</div>
+              <span class="rank-badge rank-E" id="hunterRankBadge">E-Rank</span>
+            </div>
             <div class="xp-numbers" id="xpNumbers">0 / 100 XP</div>
           </div>
           <div class="xp-bar-bg">
             <div class="xp-bar-fill" id="xpBarFill" style="width:0%"></div>
+          </div>
+          <div class="hp-bar-container">
+            <div class="hp-bar-label"><span>HP</span><span id="hpValue">100/100</span></div>
+            <div class="hp-bar-bg"><div class="hp-bar-fill" id="hpBarFill" style="width:100%;background:#55efc4"></div></div>
           </div>
         </div>
         <div class="xp-streak" id="xpStreak" style="display:none">
@@ -1103,10 +1669,35 @@
       </div>
 
       <!-- Gamification: Active Quests -->
+      <!-- Solo Leveling: Hunter Stats -->
+      <div id="hunterStatsSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Hunter Stats</div>
+          <span id="statPointsAvailable" style="font-size:12px;color:var(--accent-light);font-weight:600"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center">
+          <div class="stat-radar" id="statRadar"></div>
+          <div class="stat-grid" id="statGrid"></div>
+        </div>
+      </div>
+
+      <!-- Solo Leveling: Active Gates -->
+      <div id="gatesSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Active Gates</div>
+          <span class="section-link" style="color:var(--text-muted);font-size:12px" id="shadowArmyCount"></span>
+        </div>
+        <div class="quests-grid" id="gatesGrid"></div>
+      </div>
+
+      <!-- Daily Quests -->
       <div id="questsSection" style="display:none">
         <div class="section-header">
-          <div class="section-title">Active Quests</div>
-          <a class="section-link" id="questsRefresh" onclick="refreshQuests()">Refresh</a>
+          <div class="section-title">Daily Quests</div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="daily-countdown" id="dailyCountdown"></div>
+            <a class="section-link" id="questsRefresh" onclick="refreshQuests()">Refresh</a>
+          </div>
         </div>
         <div class="quests-grid" id="questsGrid"></div>
       </div>
@@ -1574,6 +2165,9 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
+<!-- Confetti Canvas -->
+<canvas id="confettiCanvas"></canvas>
+
 <script>
 // === CONFIG ===
 const API = '';  // same origin
@@ -1747,7 +2341,12 @@ function buildEmptyState(icon, title, desc, action) {
 // === RENDERING ===
 function buildContactCard(c) {
   const hColor = getHealthColor(c.health);
-  const card = createElement('div', { className: 'contact-card', onClick: () => openDetail(c) });
+  const card = createElement('div', { className: 'contact-card', style: 'position:relative', onClick: () => openDetail(c) });
+
+  // Shadow badge
+  if (c.shadow_grade) {
+    card.appendChild(createElement('div', { className: 'shadow-badge' }, c.shadow_grade));
+  }
 
   const top = createElement('div', { className: 'contact-top' });
   const avatar = createElement('div', { className: 'contact-avatar', style: 'background:' + c.color }, c.initials);
@@ -1769,6 +2368,10 @@ function buildContactCard(c) {
   healthDiv.appendChild(barBg);
   card.appendChild(healthDiv);
 
+  // Mini sparkline
+  const sparkline = buildSparkline(c.health, c.trend);
+  if (sparkline) card.appendChild(sparkline);
+
   const meta = createElement('div', { className: 'contact-meta' });
   meta.appendChild(createElement('span', { className: 'contact-last' }, 'Last: ' + c.lastContact));
   const tags = createElement('div', { className: 'contact-tags' });
@@ -1782,6 +2385,32 @@ function buildContactCard(c) {
   card.appendChild(meta);
 
   return card;
+}
+
+function buildSparkline(health, trend) {
+  // Generate synthetic sparkline data based on health and trend
+  const points = 8;
+  const data = [];
+  let val = trend === 'declining' ? Math.min(health + 25, 100) : Math.max(health - 20, 10);
+  for (let i = 0; i < points; i++) {
+    data.push(val);
+    const drift = trend === 'declining' ? -3 : trend === 'improving' ? 3 : 0;
+    val = Math.max(5, Math.min(100, val + drift + (Math.random() - 0.5) * 10));
+  }
+  data.push(health);
+
+  const w = 120, h = 20, pad = 2;
+  const min = Math.min(...data) - 5, max = Math.max(...data) + 5;
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
+    return x + ',' + y;
+  });
+  const color = trend === 'declining' ? '#ff6b6b' : trend === 'improving' ? '#00cec9' : '#a29bfe';
+  const container = createElement('div', { className: 'sparkline-container' });
+  container.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none"><polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  return container;
 }
 
 function buildNudge(n) {
@@ -1865,6 +2494,71 @@ function renderGamification() {
   document.getElementById('xpTitle').textContent = 'Level ' + lp.level;
   document.getElementById('xpNumbers').textContent = lp.level_xp + ' / ' + lp.level_xp_needed + ' XP';
   document.getElementById('xpBarFill').style.width = Math.round(lp.progress * 100) + '%';
+
+  // Solo Leveling: Hunter Rank
+  const rank = g.hunter_rank || getRankForLevel(lp.level);
+  const rankBadge = document.getElementById('hunterRankBadge');
+  rankBadge.textContent = rank;
+  rankBadge.className = 'rank-badge ' + getRankClass(rank);
+
+  // Solo Leveling: HP bar
+  const hp = g.hp !== undefined ? g.hp : 100;
+  document.getElementById('hpValue').textContent = hp + '/100';
+  const hpFill = document.getElementById('hpBarFill');
+  hpFill.style.width = hp + '%';
+  hpFill.style.background = hp > 60 ? '#55efc4' : hp > 30 ? '#fdcb6e' : '#ff6b6b';
+
+  // Solo Leveling: Stats
+  const stats = g.stats || {};
+  const statPoints = g.stat_points || 0;
+  const hunterStatsSection = document.getElementById('hunterStatsSection');
+  if (stats.charisma !== undefined) {
+    hunterStatsSection.style.display = '';
+    document.getElementById('statRadar').innerHTML = buildStatRadar(stats);
+    const statGrid = document.getElementById('statGrid');
+    statGrid.textContent = '';
+    const statNames = ['charisma', 'empathy', 'consistency', 'initiative', 'wisdom'];
+    const statLabels = ['CHA', 'EMP', 'CON', 'INI', 'WIS'];
+    statNames.forEach((name, i) => {
+      const item = createElement('div', { className: 'stat-item' });
+      item.appendChild(createElement('div', { className: 'stat-item-val' }, String(stats[name] || 1)));
+      item.appendChild(createElement('div', { className: 'stat-item-label' }, statLabels[i]));
+      if (statPoints > 0) {
+        item.appendChild(createElement('button', {
+          className: 'stat-item-btn',
+          onClick: () => allocateStat(name),
+        }, '+'));
+      }
+      statGrid.appendChild(item);
+    });
+    document.getElementById('statPointsAvailable').textContent = statPoints > 0 ? statPoints + ' points available' : '';
+  }
+
+  // Solo Leveling: Gates
+  const gatesSection = document.getElementById('gatesSection');
+  const gatesGrid = document.getElementById('gatesGrid');
+  const gates = g.active_gates || [];
+  if (gates.length > 0) {
+    gatesSection.style.display = '';
+    gatesGrid.textContent = '';
+    gates.forEach(gate => gatesGrid.appendChild(buildGateCard(gate)));
+  } else {
+    gatesSection.style.display = 'none';
+  }
+
+  // Shadow army count
+  const shadowCount = g.shadow_army_count || contacts.filter(c => c.shadow_grade).length;
+  document.getElementById('shadowArmyCount').textContent = shadowCount > 0 ? 'Shadow Army: ' + shadowCount : '';
+
+  // Daily countdown
+  const countdownEl = document.getElementById('dailyCountdown');
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const remaining = midnight - now;
+  const hrs = Math.floor(remaining / 3600000);
+  const mins = Math.floor((remaining % 3600000) / 60000);
+  countdownEl.textContent = 'Resets in ' + hrs + 'h ' + mins + 'm';
 
   // Streak
   const streakEl = document.getElementById('xpStreak');
@@ -1962,6 +2656,19 @@ async function skipQuest(questId) {
   }
 }
 
+async function allocateStat(statName) {
+  try {
+    const body = {};
+    body[statName] = 1;
+    await api('/stats/allocate', { method: 'POST', body: JSON.stringify(body) });
+    showToast(statName.charAt(0).toUpperCase() + statName.slice(1) + ' increased!', 'success');
+    await loadDashboard();
+    renderGamification();
+  } catch (e) {
+    showToast('Could not allocate stat', 'error');
+  }
+}
+
 async function refreshQuests() {
   await loadDashboard();
   await renderAll();
@@ -1973,13 +2680,265 @@ function showXPToast(xp, achievements) {
   if (existing) existing.remove();
 
   const toast = createElement('div', { className: 'xp-toast' });
-  toast.appendChild(createElement('div', { className: 'xp-toast-amount' }, '+' + xp));
+  toast.appendChild(createElement('div', { className: 'xp-toast-icon' }, '\u2728'));
+  const textDiv = createElement('div');
+  textDiv.appendChild(createElement('div', { className: 'xp-toast-amount' }, '+' + xp + ' XP'));
   const label = achievements.length > 0
-    ? 'XP earned! New: ' + achievements.map(a => a.name).join(', ')
-    : 'XP earned!';
-  toast.appendChild(createElement('div', { className: 'xp-toast-label' }, label));
+    ? 'New: ' + achievements.map(a => a.name).join(', ')
+    : 'Keep it up!';
+  textDiv.appendChild(createElement('div', { className: 'xp-toast-label' }, label));
+  const bar = createElement('div', { className: 'xp-toast-bar' });
+  bar.appendChild(createElement('div', { className: 'xp-toast-bar-fill' }));
+  textDiv.appendChild(bar);
+  toast.appendChild(textDiv);
   document.body.appendChild(toast);
-  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3200);
+
+  // Trigger confetti for big XP or achievements
+  if (xp >= 30 || achievements.length > 0) {
+    launchConfetti();
+  }
+
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3400);
+}
+
+// === ORBIT HERO ANIMATION ===
+(function initOrbitHero() {
+  const canvas = document.getElementById('orbitHeroCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 600;
+  canvas.width = size; canvas.height = size;
+  const cx = size / 2, cy = size / 2;
+  const colors = ['#6c5ce7', '#a29bfe', '#00cec9', '#fd79a8', '#fdcb6e', '#55efc4'];
+  const orbits = [
+    { r: 80, dots: 2, speed: 0.008 },
+    { r: 140, dots: 3, speed: -0.005 },
+    { r: 200, dots: 4, speed: 0.003 },
+    { r: 260, dots: 2, speed: -0.002 },
+  ];
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0, 0, size, size);
+    // Center glow
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 30);
+    grd.addColorStop(0, 'rgba(108,92,231,0.6)');
+    grd.addColorStop(1, 'rgba(108,92,231,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(cx, cy, 30, 0, Math.PI * 2); ctx.fill();
+    // Orbit rings
+    orbits.forEach((o, oi) => {
+      ctx.strokeStyle = 'rgba(108,92,231,0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, o.r, 0, Math.PI * 2); ctx.stroke();
+      // Dots
+      for (let i = 0; i < o.dots; i++) {
+        const angle = t * o.speed + (Math.PI * 2 * i / o.dots);
+        const x = cx + Math.cos(angle) * o.r;
+        const y = cy + Math.sin(angle) * o.r;
+        const col = colors[(oi * 2 + i) % colors.length];
+        const dotGrd = ctx.createRadialGradient(x, y, 0, x, y, 8);
+        dotGrd.addColorStop(0, col);
+        dotGrd.addColorStop(1, col.slice(0, 7) + '00');
+        ctx.fillStyle = dotGrd;
+        ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+      }
+    });
+    t++;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// === CONFETTI ENGINE (canvas-confetti CDN) ===
+function launchConfetti() {
+  if (typeof confetti !== 'function') return;
+  confetti({
+    particleCount: 120,
+    spread: 90,
+    origin: { y: 0.4 },
+    colors: ['#6c5ce7', '#a29bfe', '#00cec9', '#fd79a8', '#fdcb6e', '#ff6b6b', '#55efc4'],
+    disableForReducedMotion: true,
+  });
+}
+
+function launchMegaConfetti() {
+  if (typeof confetti !== 'function') return;
+  // Cannon burst from both sides
+  const end = Date.now() + 2000;
+  (function frame() {
+    confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, colors: ['#ffd700', '#ff6b6b', '#6c5ce7'] });
+    confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, colors: ['#ffd700', '#ff6b6b', '#6c5ce7'] });
+    if (Date.now() < end) requestAnimationFrame(frame);
+  })();
+}
+
+// === SOLO LEVELING: RANK SYSTEM ===
+const HUNTER_RANKS = ['E-Rank', 'D-Rank', 'C-Rank', 'B-Rank', 'A-Rank', 'S-Rank', 'SS-Rank', 'Monarch'];
+const RANK_COLORS = {
+  'E-Rank': '#95a5a6', 'D-Rank': '#2ecc71', 'C-Rank': '#3498db', 'B-Rank': '#9b59b6',
+  'A-Rank': '#f39c12', 'S-Rank': '#e74c3c', 'SS-Rank': '#ffd700', 'Monarch': '#ffd700',
+};
+const RANK_LEVELS = { 'E-Rank': 1, 'D-Rank': 5, 'C-Rank': 10, 'B-Rank': 18, 'A-Rank': 28, 'S-Rank': 40, 'SS-Rank': 55, 'Monarch': 75 };
+
+function getRankForLevel(level) {
+  let rank = 'E-Rank';
+  for (const [r, minLevel] of Object.entries(RANK_LEVELS)) {
+    if (level >= minLevel) rank = r;
+  }
+  return rank;
+}
+
+function getRankClass(rank) {
+  return 'rank-' + (rank || 'E-Rank').replace('-Rank', '');
+}
+
+let previousRank = null;
+
+function checkRankUp() {
+  const g = dashboardData.gamification;
+  if (!g) return;
+  const newRank = g.hunter_rank || getRankForLevel(g.level_progress.level);
+  if (previousRank && newRank !== previousRank) {
+    const oldIdx = HUNTER_RANKS.indexOf(previousRank);
+    const newIdx = HUNTER_RANKS.indexOf(newRank);
+    if (newIdx > oldIdx) showRankUpOverlay(newRank);
+  }
+  previousRank = newRank;
+}
+
+function showRankUpOverlay(rank) {
+  launchMegaConfetti();
+  const color = RANK_COLORS[rank] || '#6c5ce7';
+  const overlay = createElement('div', { className: 'rankup-overlay', onClick: function() { this.remove(); } });
+  const card = createElement('div', { className: 'rankup-card' });
+
+  const glow = createElement('div', { className: 'rankup-glow', style: 'color:' + color + ';border:3px solid ' + color });
+  glow.textContent = rank.replace('-Rank', '');
+  card.appendChild(glow);
+
+  card.appendChild(createElement('div', { className: 'rankup-title' }, 'Hunter Rank Advancement'));
+  card.appendChild(createElement('div', { className: 'rankup-rank', style: 'color:' + color }, rank));
+  card.appendChild(createElement('div', { className: 'rankup-subtitle' }, 'You have proven yourself worthy. New powers await.'));
+  card.appendChild(createElement('button', { className: 'btn btn-primary', onClick: function(e) { e.stopPropagation(); overlay.remove(); } }, 'Accept Power'));
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 8000);
+}
+
+// === SOLO LEVELING: SHADOW EXTRACTION ===
+function showShadowExtraction(contactName, grade) {
+  const overlay = createElement('div', { className: 'shadow-extract-overlay', onClick: function() { this.remove(); } });
+  const inner = createElement('div', { className: 'shadow-arise' });
+
+  inner.appendChild(createElement('div', { className: 'arise-text' }, 'ARISE'));
+  inner.appendChild(createElement('div', { className: 'arise-subtitle' }, contactName + ' has joined your Shadow Army'));
+  inner.appendChild(createElement('div', { className: 'arise-grade' }, grade + ' Grade Shadow'));
+
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+  launchConfetti();
+
+  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 4000);
+}
+
+// === SOLO LEVELING: STAT RADAR CHART ===
+function buildStatRadar(stats) {
+  const s = stats || { charisma: 1, empathy: 1, consistency: 1, initiative: 1, wisdom: 1 };
+  const labels = ['CHA', 'EMP', 'CON', 'INI', 'WIS'];
+  const values = [s.charisma || 1, s.empathy || 1, s.consistency || 1, s.initiative || 1, s.wisdom || 1];
+  const max = Math.max(...values, 10);
+  const cx = 100, cy = 100, r = 80;
+
+  const points = values.map((v, i) => {
+    const angle = (Math.PI * 2 * i / 5) - Math.PI / 2;
+    const dist = (v / max) * r;
+    return [cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist];
+  });
+
+  let svg = '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">';
+  // Grid rings
+  [0.25, 0.5, 0.75, 1].forEach(scale => {
+    const ring = [];
+    for (let i = 0; i < 5; i++) {
+      const angle = (Math.PI * 2 * i / 5) - Math.PI / 2;
+      ring.push((cx + Math.cos(angle) * r * scale) + ',' + (cy + Math.sin(angle) * r * scale));
+    }
+    svg += '<polygon points="' + ring.join(' ') + '" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+  });
+  // Axes
+  for (let i = 0; i < 5; i++) {
+    const angle = (Math.PI * 2 * i / 5) - Math.PI / 2;
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + Math.cos(angle) * r) + '" y2="' + (cy + Math.sin(angle) * r) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
+    svg += '<text x="' + (cx + Math.cos(angle) * (r + 14)) + '" y="' + (cy + Math.sin(angle) * (r + 14)) + '" fill="rgba(255,255,255,0.4)" font-size="9" font-weight="600" text-anchor="middle" dominant-baseline="middle">' + labels[i] + '</text>';
+  }
+  // Data polygon
+  svg += '<polygon points="' + points.map(p => p.join(',')).join(' ') + '" fill="rgba(108,92,231,0.2)" stroke="#6c5ce7" stroke-width="2"/>';
+  // Data dots
+  points.forEach(p => { svg += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#a29bfe"/>'; });
+  svg += '</svg>';
+  return svg;
+}
+
+// === SOLO LEVELING: GATE BUILDER ===
+function buildGateCard(gate) {
+  const card = createElement('div', { className: 'gate-card' });
+  const rankBadge = createElement('span', { className: 'rank-badge gate-rank-badge ' + getRankClass(gate.gate_rank) }, gate.gate_rank);
+  card.appendChild(rankBadge);
+  card.appendChild(createElement('div', { className: 'gate-title' }, gate.title));
+  card.appendChild(createElement('div', { className: 'gate-desc' }, gate.description || 'Clear this gate to earn ' + gate.xp_reward + ' XP'));
+
+  const pct = gate.objective_target > 0 ? Math.min(100, (gate.objective_current / gate.objective_target) * 100) : 0;
+  const bar = createElement('div', { className: 'gate-progress-bar' });
+  bar.appendChild(createElement('div', { className: 'gate-progress-fill', style: 'width:' + pct + '%' }));
+  card.appendChild(bar);
+
+  const meta = createElement('div', { className: 'gate-meta' });
+  meta.appendChild(createElement('span', null, gate.objective_current + '/' + gate.objective_target + ' ' + gate.objective_type));
+  if (gate.expires_at) {
+    const remaining = Math.max(0, new Date(gate.expires_at) - Date.now());
+    const hours = Math.floor(remaining / 3600000);
+    const mins = Math.floor((remaining % 3600000) / 60000);
+    meta.appendChild(createElement('span', { className: 'gate-timer' }, hours + 'h ' + mins + 'm remaining'));
+  }
+  meta.appendChild(createElement('span', null, '+' + gate.xp_reward + ' XP'));
+  card.appendChild(meta);
+
+  return card;
+}
+
+// === LEVEL UP CELEBRATION ===
+let previousLevel = null;
+function checkLevelUp() {
+  const g = dashboardData.gamification;
+  if (!g) return;
+  const newLevel = g.level_progress.level;
+  if (previousLevel !== null && newLevel > previousLevel) {
+    showLevelUpOverlay(newLevel);
+  }
+  previousLevel = newLevel;
+}
+
+function showLevelUpOverlay(level) {
+  launchConfetti();
+  const overlay = createElement('div', { className: 'level-up-overlay', onClick: function() { this.remove(); } });
+  const card = createElement('div', { className: 'level-up-card' });
+  card.addEventListener('click', (e) => e.stopPropagation());
+
+  const badge = createElement('div', { className: 'level-up-badge' });
+  badge.appendChild(createElement('div', { className: 'level-up-num' }, String(level)));
+  badge.appendChild(createElement('div', { className: 'level-up-label' }, 'Level'));
+  card.appendChild(badge);
+
+  card.appendChild(createElement('div', { className: 'level-up-title' }, 'Level Up!'));
+  card.appendChild(createElement('div', { className: 'level-up-subtitle' }, 'You reached Level ' + level + '. Keep nurturing your relationships!'));
+  card.appendChild(createElement('button', { className: 'btn btn-primary', onClick: function() { overlay.remove(); } }, 'Continue'));
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 6000);
 }
 
 // === PARTIES ===
@@ -2455,6 +3414,10 @@ async function renderAll() {
   } else {
     grid.style.gridTemplateColumns = '';
     contacts.slice(0, 6).forEach(c => grid.appendChild(buildContactCard(c)));
+    // Anime.js staggered entrance
+    if (typeof anime !== 'undefined' && anime.animate) {
+      anime.animate(grid.children, { opacity: [0, 1], translateY: [20, 0], delay: anime.stagger(60), duration: 400, easing: 'outQuad' });
+    }
   }
 
   // All contacts page
@@ -2507,6 +3470,8 @@ async function renderAll() {
 
   renderInsightsReport();
   renderGamification();
+  checkLevelUp();
+  checkRankUp();
   renderParties();
   renderChallenges();
   loadFeed();
@@ -2519,13 +3484,27 @@ async function renderAll() {
 function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + page).classList.add('active');
+
+  // Crossfade transition
+  const currentPage = document.querySelector('.page.active');
+  const nextPage = document.getElementById('page-' + page);
+  if (currentPage && currentPage !== nextPage) {
+    currentPage.classList.add('page-exit');
+    currentPage.classList.remove('active');
+    setTimeout(() => {
+      currentPage.classList.remove('page-exit');
+      nextPage.classList.add('active');
+    }, 200);
+  } else {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    nextPage.classList.add('active');
+  }
+
   const sideBtn = document.querySelector('.nav-item[data-page="' + page + '"]');
   if (sideBtn) sideBtn.classList.add('active');
   const mobBtn = document.querySelector('.mobile-nav-btn[data-page="' + page + '"]');
   if (mobBtn) mobBtn.classList.add('active');
-  if (page === 'orbit') setTimeout(() => { initOrbitCanvas(); renderOrbitLegend(); }, 100);
+  if (page === 'orbit') setTimeout(() => { initOrbitCanvas(); renderOrbitLegend(); }, 300);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -2600,11 +3579,21 @@ function initOrbitCanvas() {
     ctx.fillText('Regular', cx + Math.cos(labelAngle) * (ringRadii[1] + 10), cy + Math.sin(labelAngle) * (ringRadii[1] + 10));
     ctx.fillText('Reconnect', cx + Math.cos(labelAngle) * (ringRadii[2] + 10), cy + Math.sin(labelAngle) * (ringRadii[2] + 10));
 
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 25);
+    // Pulsing center glow
+    const pulseSize = 25 + Math.sin(angle * 2) * 3;
+    const outerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseSize + 15);
+    outerGlow.addColorStop(0, 'rgba(162,155,254,0.3)');
+    outerGlow.addColorStop(1, 'rgba(108,92,231,0)');
+    ctx.beginPath();
+    ctx.arc(cx, cy, pulseSize + 15, 0, Math.PI * 2);
+    ctx.fillStyle = outerGlow;
+    ctx.fill();
+
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseSize);
     gradient.addColorStop(0, '#a29bfe');
     gradient.addColorStop(1, '#6c5ce7');
     ctx.beginPath();
-    ctx.arc(cx, cy, 25, 0, Math.PI * 2);
+    ctx.arc(cx, cy, pulseSize, 0, Math.PI * 2);
     ctx.fillStyle = gradient;
     ctx.fill();
     ctx.font = 'bold 12px Inter';
@@ -2629,6 +3618,17 @@ function initOrbitCanvas() {
       ctx.stroke();
 
       const hColor = getHealthColor(p.health);
+
+      // Pulse ring for low-health contacts
+      if (p.health < 40) {
+        const pulseR = p.size + 4 + Math.sin(angle * 3 + p.angleOffset) * 3;
+        ctx.beginPath();
+        ctx.arc(px, py, pulseR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,107,107,' + (0.3 + Math.sin(angle * 3) * 0.15) + ')';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
       ctx.beginPath();
       ctx.arc(px, py, p.size, 0, Math.PI * 2);
       ctx.fillStyle = hColor;
@@ -2864,7 +3864,8 @@ function showDashboard() {
   if (currentUser && nameEl) {
     nameEl.textContent = currentUser.name;
     const lvl = currentUser.level || 1;
-    planEl.textContent = 'Level ' + lvl + ' \u00B7 ' + (currentUser.xp || 0) + ' XP';
+    const userRank = currentUser.hunter_rank || getRankForLevel(lvl);
+    planEl.textContent = userRank + ' \u00B7 Lv.' + lvl + ' \u00B7 ' + (currentUser.xp || 0) + ' XP';
     const avatar = document.querySelector('.sidebar-footer .user-avatar');
     if (avatar) avatar.textContent = getInitials(currentUser.name);
   }
@@ -2889,6 +3890,7 @@ function showDashboard() {
     .then(() => {
       animateStats();
       overlay.classList.add('hidden');
+      showOnboarding();
     })
     .catch(e => {
       overlay.classList.add('hidden');
@@ -3062,15 +4064,63 @@ function animateStats() {
 
   Object.entries(targets).forEach(([id, [target, suffix]]) => {
     const el = document.getElementById(id);
-    let current = 0;
-    const step = () => {
-      current += Math.ceil(target / 30) || 1;
-      if (current >= target) { el.textContent = target + suffix; return; }
-      el.textContent = current + suffix;
-      requestAnimationFrame(step);
+    if (target === 0) { el.textContent = '0' + suffix; return; }
+    const duration = 800;
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // cubic ease-out
+      const val = Math.round(ease * target);
+      el.textContent = val + suffix;
+      if (t < 1) requestAnimationFrame(step);
     };
-    step();
+    requestAnimationFrame(step);
   });
+
+  renderDashboardCharts();
+}
+
+function renderDashboardCharts() {
+  if (contacts.length === 0) return;
+  document.getElementById('dashboardCharts').style.display = '';
+
+  // Health distribution
+  const buckets = [0, 0, 0, 0, 0]; // critical, low, fair, good, excellent
+  contacts.forEach(c => {
+    if (c.health < 20) buckets[0]++;
+    else if (c.health < 40) buckets[1]++;
+    else if (c.health < 60) buckets[2]++;
+    else if (c.health < 80) buckets[3]++;
+    else buckets[4]++;
+  });
+  const maxBucket = Math.max(...buckets, 1);
+  const colors = ['#ff6b6b', '#fdcb6e', '#ffa502', '#00cec9', '#55efc4'];
+  const barsEl = document.getElementById('healthDistBars');
+  barsEl.textContent = '';
+  buckets.forEach((count, i) => {
+    const bar = createElement('div', {
+      className: 'health-dist-bar',
+      style: 'height:' + Math.max((count / maxBucket) * 100, 6) + '%;background:' + colors[i],
+      title: count + ' contacts',
+    });
+    barsEl.appendChild(bar);
+  });
+
+  // Activity heatmap (4 weeks = 28 cells)
+  const grid = document.getElementById('heatmapGrid');
+  grid.textContent = '';
+  // Generate synthetic heatmap data based on interactions_this_week
+  const baseRate = dashboardData.interactions_this_week || 0;
+  for (let i = 0; i < 28; i++) {
+    const intensity = Math.random() * (baseRate > 0 ? 1 : 0.2);
+    let bg;
+    if (intensity < 0.1) bg = 'var(--bg-card-hover)';
+    else if (intensity < 0.3) bg = 'rgba(108,92,231,0.15)';
+    else if (intensity < 0.5) bg = 'rgba(108,92,231,0.3)';
+    else if (intensity < 0.7) bg = 'rgba(108,92,231,0.5)';
+    else bg = 'rgba(108,92,231,0.8)';
+    grid.appendChild(createElement('div', { className: 'heatmap-cell', style: 'background:' + bg }));
+  }
 }
 
 function openModal() { document.getElementById('addModal').classList.add('active'); }
@@ -3237,10 +4287,13 @@ function updateSearchCount(query, count) {
 function showToast(message, type) {
   type = type || 'info';
   const container = document.getElementById('toastContainer');
-  const icons = { success: '\u2705', snooze: '\u23F0', contact: '\uD83D\uDC64', sync: '\uD83D\uDD04', info: '\u2139\uFE0F' };
+  const icons = { success: '\u2705', snooze: '\u23F0', contact: '\uD83D\uDC64', sync: '\uD83D\uDD04', info: '\u2139\uFE0F', error: '\u274C', warning: '\u26A0\uFE0F' };
   const toast = createElement('div', { className: 'toast' });
   toast.appendChild(createElement('span', { className: 'toast-icon' }, icons[type] || icons.info));
   toast.appendChild(createElement('span', { className: 'toast-text' }, message));
+  const bar = createElement('div', { style: 'position:absolute;bottom:0;left:0;height:2px;background:var(--accent-light);width:100%;border-radius:0 0 12px 12px;animation:toastBar 3s linear forwards;' });
+  toast.style.position = 'relative'; toast.style.overflow = 'hidden';
+  toast.appendChild(bar);
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.animation = 'slideOut 0.3s ease forwards';
@@ -3250,7 +4303,8 @@ function showToast(message, type) {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  const inInput = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
+  if (e.key === '/' && !inInput) {
     e.preventDefault();
     const input = document.querySelector('.page.active .search-input');
     if (input) input.focus();
@@ -3260,6 +4314,18 @@ document.addEventListener('keydown', e => {
     closeLogModal();
     closeDetail();
     document.getElementById('authModal').classList.remove('active');
+  }
+  if (e.key === 'n' && !inInput && !e.ctrlKey && !e.metaKey) {
+    openModal();
+  }
+  if (e.key === 'r' && !inInput && !e.ctrlKey && !e.metaKey) {
+    loadDashboard();
+  }
+  // Number keys 1-5 for nav
+  if (!inInput && !e.ctrlKey && !e.metaKey && e.key >= '1' && e.key <= '5') {
+    const pages = ['dashboard', 'contacts', 'orbit', 'insights', 'activity'];
+    const idx = parseInt(e.key) - 1;
+    if (pages[idx]) navigateTo(pages[idx]);
   }
 });
 
@@ -3273,6 +4339,75 @@ document.getElementById('logModal').addEventListener('click', e => {
 document.getElementById('authModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) document.getElementById('authModal').classList.remove('active');
 });
+
+// === ONBOARDING TUTORIAL ===
+const ONBOARDING_STEPS = [
+  { icon: '&#x1F30D;', title: 'Welcome to Orbit', desc: 'Your AI-powered relationship intelligence hub. Track, nurture, and strengthen the connections that matter most.' },
+  { icon: '&#x1F4CA;', title: 'Health Tracking', desc: 'Every relationship has a health score that decays over time. Log interactions to keep connections alive and thriving.' },
+  { icon: '&#x1F514;', title: 'Smart Nudges', desc: 'AI-powered reminders tell you when to reach out, with suggested conversation starters based on life events.' },
+  { icon: '&#x1F3AE;', title: 'Gamified Growth', desc: 'Earn XP, complete quests, unlock achievements, and level up as you nurture your relationships. Form parties for group hangouts!' },
+  { icon: '&#x2328;', title: 'Power User Tips', desc: 'Press / to search, N to add a person, R to refresh, 1-5 for page nav, Esc to close modals. Your orbit is at your fingertips.' },
+];
+
+let onboardingStep = 0;
+
+function showOnboarding() {
+  if (localStorage.getItem('orbit_onboarded')) return;
+  onboardingStep = 0;
+  renderOnboardingStep();
+}
+
+function renderOnboardingStep() {
+  let overlay = document.getElementById('onboardingOverlay');
+  if (!overlay) {
+    overlay = createElement('div', { className: 'onboarding-overlay', id: 'onboardingOverlay' });
+    document.body.appendChild(overlay);
+  }
+  overlay.textContent = '';
+
+  const step = ONBOARDING_STEPS[onboardingStep];
+  const card = createElement('div', { className: 'onboarding-card' });
+
+  card.appendChild(createElement('div', { className: 'onboarding-step' }, 'Step ' + (onboardingStep + 1) + ' of ' + ONBOARDING_STEPS.length));
+  const iconEl = createElement('div', { className: 'onboarding-icon' });
+  iconEl.innerHTML = step.icon;
+  card.appendChild(iconEl);
+  card.appendChild(createElement('div', { className: 'onboarding-title' }, step.title));
+  card.appendChild(createElement('div', { className: 'onboarding-desc' }, step.desc));
+
+  // Progress dots
+  const dots = createElement('div', { className: 'onboarding-dots' });
+  for (let i = 0; i < ONBOARDING_STEPS.length; i++) {
+    dots.appendChild(createElement('div', { className: 'onboarding-dot' + (i === onboardingStep ? ' active' : '') }));
+  }
+  card.appendChild(dots);
+
+  const actions = createElement('div', { className: 'onboarding-actions' });
+  if (onboardingStep > 0) {
+    actions.appendChild(createElement('button', { className: 'btn btn-ghost', onClick: () => { onboardingStep--; renderOnboardingStep(); } }, 'Back'));
+  }
+  if (onboardingStep < ONBOARDING_STEPS.length - 1) {
+    actions.appendChild(createElement('button', { className: 'btn btn-primary', onClick: () => { onboardingStep++; renderOnboardingStep(); } }, 'Next'));
+  } else {
+    actions.appendChild(createElement('button', { className: 'btn btn-primary', onClick: finishOnboarding }, 'Get Started'));
+  }
+  const skipBtn = createElement('button', { className: 'btn btn-ghost', onClick: finishOnboarding, style: 'opacity:0.6' }, 'Skip');
+  actions.appendChild(skipBtn);
+  card.appendChild(actions);
+
+  overlay.appendChild(card);
+}
+
+function finishOnboarding() {
+  localStorage.setItem('orbit_onboarded', '1');
+  const overlay = document.getElementById('onboardingOverlay');
+  if (overlay) overlay.remove();
+}
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
