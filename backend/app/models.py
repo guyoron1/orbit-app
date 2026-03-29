@@ -169,7 +169,6 @@ class User(Base):
     achievements = relationship("UserAchievement", back_populates="user", cascade="all, delete-orphan")
     parties = relationship("Party", back_populates="creator", cascade="all, delete-orphan")
     challenges_sent = relationship("Challenge", back_populates="challenger", foreign_keys="Challenge.challenger_id", cascade="all, delete-orphan")
-    challenges_received = relationship("Challenge", back_populates="challenged_contact", foreign_keys="Challenge.contact_id")
 
 
 class Contact(Base):
