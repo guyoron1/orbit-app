@@ -8,6 +8,7 @@ Provides:
 
 import os
 from datetime import datetime
+from typing import Optional
 
 import anthropic
 
@@ -25,7 +26,7 @@ def generate_conversation_starters(
     relationship_type: str,
     notes: str,
     days_since_contact: float,
-    last_interaction_type: str | None,
+    last_interaction_type: Optional[str],
     health: float,
     recent_interactions_summary: str,
 ) -> list[str]:

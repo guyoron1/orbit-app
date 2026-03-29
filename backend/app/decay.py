@@ -22,6 +22,7 @@ The learning loop:
 import math
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+from typing import Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -55,7 +56,7 @@ class HealthReport:
     decay_paused: bool         # True if a life event is pausing decay
 
 
-def compute_health(contact: Contact, db: Session, now: datetime | None = None) -> HealthReport:
+def compute_health(contact: Contact, db: Session, now: Optional[datetime] = None) -> HealthReport:
     """
     Compute the current relationship health for a contact.
     This is the core function — called on every dashboard load and by the nudge engine.
@@ -344,7 +345,7 @@ def _default_weights(contact: Contact) -> Weights:
 
 def _suggest_action(
     contact: Contact,
-    last_interaction: Interaction | None,
+    last_interaction: Optional[Interaction],
     days_silent: float,
     target_days: int,
 ) -> str:

@@ -481,12 +481,16 @@ def get_dashboard(
 
 
 # ══════════════════════════════════════════════
-# FRONTEND (serves index.html at root)
+# FRONTEND (serves index.html at root if present)
+# When deployed as monolith: index.html sits alongside backend/
+# When API-only mode: returns JSON health check instead
 # ══════════════════════════════════════════════
 
 FRONTEND_PATH = Path(__file__).resolve().parent.parent.parent / "index.html"
 
 
-@app.get("/", response_class=FileResponse)
+@app.get("/")
 def serve_frontend():
-    return FileResponse(FRONTEND_PATH, media_type="text/html")
+    if FRONTEND_PATH.exists():
+        return FileResponse(FRONTEND_PATH, media_type="text/html")
+    return {"status": "ok", "service": "Orbit API", "version": "0.3.0"}

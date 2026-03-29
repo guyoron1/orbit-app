@@ -1121,7 +1121,8 @@
 
 <script>
 // === CONFIG ===
-const API = '';  // same origin
+// When served from CDN, point to the backend. When served by backend itself, use same origin.
+const API = location.hostname.includes('railway.app') ? '' : 'https://orbit-app-production-fd37.up.railway.app';
 
 const COLORS = [
   'linear-gradient(135deg, #6c5ce7, #a29bfe)',
