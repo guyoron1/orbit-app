@@ -681,6 +681,79 @@
   .mobile-nav-btn.active { color: var(--accent-light); }
   .mobile-nav-btn svg { width: 20px; height: 20px; }
 
+  /* Parties */
+  .parties-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 32px; }
+  .party-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; position: relative;
+    transition: all 0.3s; overflow: hidden;
+  }
+  .party-card:hover { border-color: rgba(0,206,201,0.3); transform: translateY(-2px); }
+  .party-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--success), var(--accent-light));
+  }
+  .party-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .party-activity-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; background: rgba(0,206,201,0.12);
+  }
+  .party-info { flex: 1; }
+  .party-title { font-size: 14px; font-weight: 700; }
+  .party-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .party-members { display: flex; gap: -6px; margin: 10px 0; }
+  .party-member-avatar {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; border: 2px solid var(--bg-card);
+    margin-left: -4px;
+  }
+  .party-member-avatar:first-child { margin-left: 0; }
+  .party-member-avatar.invited { opacity: 0.5; }
+  .party-status-badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+    border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .party-status-badge.waiting {
+    background: rgba(253,203,110,0.15); color: var(--warning);
+  }
+  .party-status-badge.active {
+    background: rgba(0,206,201,0.15); color: var(--success);
+    animation: pulse-badge 2s ease infinite;
+  }
+  @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .party-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+  .party-xp { font-size: 12px; font-weight: 700; color: var(--accent-light); }
+  .party-actions { display: flex; gap: 6px; }
+
+  /* Challenges */
+  .challenges-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 32px; }
+  .challenge-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; position: relative;
+    transition: all 0.3s; overflow: hidden;
+  }
+  .challenge-card:hover { border-color: rgba(253,121,168,0.3); transform: translateY(-2px); }
+  .challenge-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #fd79a8, var(--warning));
+  }
+  .challenge-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .challenge-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; background: rgba(253,121,168,0.12);
+  }
+  .challenge-title { font-size: 14px; font-weight: 700; flex: 1; }
+  .challenge-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+  .challenge-footer { display: flex; align-items: center; justify-content: space-between; }
+  .challenge-target {
+    font-size: 11px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 4px;
+  }
+
   /* Responsive — Tablet */
   @media (max-width: 1024px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -688,6 +761,8 @@
     .nudges { grid-template-columns: 1fr; }
     .insights { grid-template-columns: 1fr; }
     .quests-grid { grid-template-columns: repeat(2, 1fr); }
+    .parties-grid { grid-template-columns: 1fr; }
+    .challenges-grid { grid-template-columns: 1fr; }
   }
 
   /* Responsive — Mobile */
@@ -702,6 +777,8 @@
     .contacts-grid { grid-template-columns: 1fr; }
     .nudges { grid-template-columns: 1fr; }
     .quests-grid { grid-template-columns: 1fr; }
+    .parties-grid { grid-template-columns: 1fr; }
+    .challenges-grid { grid-template-columns: 1fr; }
     .xp-section { flex-direction: column; align-items: stretch; gap: 12px; }
     .xp-streak { justify-content: center; }
     .header h1 { font-size: 22px; }
@@ -962,6 +1039,24 @@
         <div class="quests-grid" id="questsGrid"></div>
       </div>
 
+      <!-- Parties / Hangouts -->
+      <div id="partiesSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Active Parties</div>
+          <a class="section-link" onclick="openCreateParty()">+ Create Party</a>
+        </div>
+        <div class="parties-grid" id="partiesGrid"></div>
+      </div>
+
+      <!-- Challenges -->
+      <div id="challengesSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Challenges</div>
+          <a class="section-link" onclick="openCreateChallenge()">+ Send Challenge</a>
+        </div>
+        <div class="challenges-grid" id="challengesGrid"></div>
+      </div>
+
       <!-- Gamification: Recent Achievements -->
       <div id="achievementsSection" style="display:none">
         <div class="section-header">
@@ -1173,6 +1268,99 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeLogModal()">Cancel</button>
       <button class="btn btn-primary" id="logSubmitBtn" onclick="submitLogInteraction()">Log Interaction</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE PARTY MODAL -->
+<div class="modal-overlay" id="partyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Create a Party</div>
+      <button class="modal-close" onclick="closePartyModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">What are you doing?</label>
+        <div class="form-tags" id="partyActivityTags">
+          <div class="form-tag selected" data-val="run" onclick="selectTag(this)">Run</div>
+          <div class="form-tag" data-val="gym" onclick="selectTag(this)">Gym</div>
+          <div class="form-tag" data-val="hike" onclick="selectTag(this)">Hike</div>
+          <div class="form-tag" data-val="dinner" onclick="selectTag(this)">Dinner</div>
+          <div class="form-tag" data-val="drinks" onclick="selectTag(this)">Drinks</div>
+          <div class="form-tag" data-val="concert" onclick="selectTag(this)">Concert</div>
+          <div class="form-tag" data-val="gaming" onclick="selectTag(this)">Gaming</div>
+          <div class="form-tag" data-val="sports" onclick="selectTag(this)">Sports</div>
+          <div class="form-tag" data-val="movie" onclick="selectTag(this)">Movie</div>
+          <div class="form-tag" data-val="custom" onclick="selectTag(this)">Other</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Party Name</label>
+        <input type="text" class="form-input" placeholder="Saturday morning run" id="partyTitle">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input type="text" class="form-input" placeholder="Central Park" id="partyLocation">
+        </div>
+        <div class="form-group">
+          <label class="form-label">When</label>
+          <input type="datetime-local" class="form-input" id="partyWhen">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Invite People</label>
+        <div id="partyInviteList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" placeholder="What's the plan?" id="partyDesc"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePartyModal()">Cancel</button>
+      <button class="btn btn-primary" id="partySubmitBtn" onclick="submitCreateParty()">Create Party</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEND CHALLENGE MODAL -->
+<div class="modal-overlay" id="challengeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Challenge a Friend</div>
+      <button class="modal-close" onclick="closeChallengeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Who do you challenge?</label>
+        <select class="form-select" id="challengeContact"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Activity</label>
+        <div class="form-tags" id="challengeActivityTags">
+          <div class="form-tag selected" data-val="run" onclick="selectTag(this)">Run</div>
+          <div class="form-tag" data-val="gym" onclick="selectTag(this)">Gym</div>
+          <div class="form-tag" data-val="hike" onclick="selectTag(this)">Hike</div>
+          <div class="form-tag" data-val="dinner" onclick="selectTag(this)">Dinner</div>
+          <div class="form-tag" data-val="sports" onclick="selectTag(this)">Sports</div>
+          <div class="form-tag" data-val="gaming" onclick="selectTag(this)">Gaming</div>
+          <div class="form-tag" data-val="custom" onclick="selectTag(this)">Other</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Challenge Title</label>
+        <input type="text" class="form-input" placeholder="5K run this weekend!" id="challengeTitle">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" placeholder="Details, rules, stakes..." id="challengeDesc"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeChallengeModal()">Cancel</button>
+      <button class="btn btn-primary" id="challengeSubmitBtn" onclick="submitCreateChallenge()">Send Challenge</button>
     </div>
   </div>
 </div>
@@ -1682,6 +1870,255 @@ function showXPToast(xp, achievements) {
   setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3200);
 }
 
+// === PARTIES ===
+const ACTIVITY_ICONS = {
+  run: '\u{1F3C3}', gym: '\u{1F4AA}', hike: '\u{26F0}\uFE0F', concert: '\u{1F3B5}',
+  dinner: '\u{1F37D}\uFE0F', drinks: '\u{1F37B}', gaming: '\u{1F3AE}', movie: '\u{1F3AC}',
+  sports: '\u{26BD}', study: '\u{1F4DA}', custom: '\u{2728}',
+};
+
+function renderParties() {
+  const g = dashboardData.gamification;
+  if (!g) return;
+  const sec = document.getElementById('partiesSection');
+  const grid = document.getElementById('partiesGrid');
+
+  const parties = g.active_parties || [];
+  if (parties.length > 0) {
+    sec.style.display = '';
+    grid.textContent = '';
+    parties.forEach(p => grid.appendChild(buildPartyCard(p)));
+  } else {
+    sec.style.display = '';
+    grid.textContent = '';
+    grid.appendChild(buildEmptyState(
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      'No active parties',
+      'Create a party to plan activities with friends!',
+      createElement('button', { className: 'btn btn-primary', onClick: () => openCreateParty() }, 'Create Party')
+    ));
+    grid.style.gridTemplateColumns = '1fr';
+  }
+}
+
+function buildPartyCard(p) {
+  const card = createElement('div', { className: 'party-card' });
+
+  const header = createElement('div', { className: 'party-header' });
+  const icon = createElement('div', { className: 'party-activity-icon' }, ACTIVITY_ICONS[p.activity_type] || '\u{2728}');
+  const info = createElement('div', { className: 'party-info' });
+  info.appendChild(createElement('div', { className: 'party-title' }, p.title));
+  const metaText = p.location ? p.activity_type + ' \u00B7 ' + p.location : p.activity_type;
+  info.appendChild(createElement('div', { className: 'party-meta' }, metaText));
+  header.appendChild(icon);
+  header.appendChild(info);
+  const statusBadge = createElement('div', { className: 'party-status-badge ' + p.status }, p.status === 'waiting' ? 'Lobby' : p.status);
+  header.appendChild(statusBadge);
+  card.appendChild(header);
+
+  // Members
+  if (p.members && p.members.length > 0) {
+    const membersDiv = createElement('div', { className: 'party-members' });
+    p.members.forEach((m, i) => {
+      const initials = m.contact_name.split(' ').map(w => w[0]).join('').slice(0, 2);
+      const av = createElement('div', {
+        className: 'party-member-avatar ' + (m.status === 'invited' ? 'invited' : ''),
+        style: 'background:' + COLORS[(m.contact_id || i) % COLORS.length],
+        title: m.contact_name + ' (' + m.status + ')',
+      }, initials);
+      membersDiv.appendChild(av);
+    });
+    card.appendChild(membersDiv);
+  }
+
+  const footer = createElement('div', { className: 'party-footer' });
+  const joined = (p.members || []).filter(m => m.status === 'joined').length;
+  footer.appendChild(createElement('div', { className: 'party-xp' }, '+' + p.xp_reward + ' XP' + (joined >= 1 ? ' (1.5x group bonus!)' : '')));
+
+  const actions = createElement('div', { className: 'party-actions' });
+  if (p.status === 'waiting') {
+    actions.appendChild(createElement('button', {
+      className: 'quest-btn complete',
+      onClick: (e) => { e.stopPropagation(); completeParty(p.id); }
+    }, 'Done!'));
+    actions.appendChild(createElement('button', {
+      className: 'quest-btn skip',
+      onClick: (e) => { e.stopPropagation(); cancelParty(p.id); }
+    }, 'Cancel'));
+  } else if (p.status === 'active') {
+    actions.appendChild(createElement('button', {
+      className: 'quest-btn complete',
+      onClick: (e) => { e.stopPropagation(); completeParty(p.id); }
+    }, 'Complete'));
+  }
+  footer.appendChild(actions);
+  card.appendChild(footer);
+
+  return card;
+}
+
+async function completeParty(partyId) {
+  try {
+    const result = await api('/parties/' + partyId + '/complete', { method: 'POST' });
+    showXPToast(result.xp_earned, []);
+    await loadDashboard();
+    await renderAll();
+  } catch (e) { showToast('Error: ' + e.message, 'info'); }
+}
+
+async function cancelParty(partyId) {
+  try {
+    await api('/parties/' + partyId + '/cancel', { method: 'POST' });
+    await loadDashboard();
+    await renderAll();
+  } catch (e) { showToast('Error: ' + e.message, 'info'); }
+}
+
+function openCreateParty() {
+  document.getElementById('partyModal').classList.add('active');
+  // Populate invite list with contacts
+  const list = document.getElementById('partyInviteList');
+  list.textContent = '';
+  contacts.forEach(c => {
+    const tag = createElement('div', {
+      className: 'form-tag',
+      'data-val': String(c.id),
+      onClick: function() { this.classList.toggle('selected'); },
+    }, c.name);
+    list.appendChild(tag);
+  });
+}
+
+function closePartyModal() {
+  document.getElementById('partyModal').classList.remove('active');
+}
+
+async function submitCreateParty() {
+  const activity = document.querySelector('#partyActivityTags .form-tag.selected')?.dataset?.val || 'custom';
+  const title = document.getElementById('partyTitle').value;
+  if (!title) { showToast('Give your party a name!', 'info'); return; }
+
+  const location = document.getElementById('partyLocation').value;
+  const when = document.getElementById('partyWhen').value;
+  const desc = document.getElementById('partyDesc').value;
+  const invitedIds = Array.from(document.querySelectorAll('#partyInviteList .form-tag.selected'))
+    .map(t => parseInt(t.dataset.val));
+
+  const btn = document.getElementById('partySubmitBtn');
+  btn.disabled = true; btn.textContent = 'Creating...';
+
+  try {
+    await api('/parties', {
+      method: 'POST',
+      body: JSON.stringify({
+        title, activity_type: activity, description: desc,
+        location, scheduled_at: when || null, contact_ids: invitedIds,
+      }),
+    });
+    showToast('Party created! Invite your friends!', 'success');
+    closePartyModal();
+    document.getElementById('partyTitle').value = '';
+    document.getElementById('partyLocation').value = '';
+    document.getElementById('partyDesc').value = '';
+    await loadDashboard();
+    await renderAll();
+  } catch (e) { showToast('Error: ' + e.message, 'info'); }
+  finally { btn.disabled = false; btn.textContent = 'Create Party'; }
+}
+
+// === CHALLENGES ===
+function renderChallenges() {
+  const g = dashboardData.gamification;
+  if (!g) return;
+  const sec = document.getElementById('challengesSection');
+  const grid = document.getElementById('challengesGrid');
+
+  const challenges = g.active_challenges || [];
+  if (challenges.length > 0) {
+    sec.style.display = '';
+    grid.textContent = '';
+    challenges.forEach(c => grid.appendChild(buildChallengeCard(c)));
+  } else {
+    sec.style.display = 'none';
+  }
+}
+
+function buildChallengeCard(c) {
+  const card = createElement('div', { className: 'challenge-card' });
+
+  const header = createElement('div', { className: 'challenge-header' });
+  header.appendChild(createElement('div', { className: 'challenge-icon' }, ACTIVITY_ICONS[c.activity_type] || '\u{26A1}'));
+  header.appendChild(createElement('div', { className: 'challenge-title' }, c.title));
+  card.appendChild(header);
+
+  if (c.description) card.appendChild(createElement('div', { className: 'challenge-desc' }, c.description));
+
+  const footer = createElement('div', { className: 'challenge-footer' });
+  footer.appendChild(createElement('div', { className: 'challenge-target' }, 'vs ' + c.contact_name));
+
+  const actions = createElement('div', { className: 'party-actions' });
+  if (c.status === 'pending' || c.status === 'accepted') {
+    actions.appendChild(createElement('button', {
+      className: 'quest-btn complete',
+      onClick: (e) => { e.stopPropagation(); completeChallenge(c.id); }
+    }, 'Done!'));
+  }
+  footer.appendChild(createElement('div', { className: 'quest-xp' }, '+' + c.xp_reward + ' XP'));
+  footer.appendChild(actions);
+  card.appendChild(footer);
+
+  return card;
+}
+
+async function completeChallenge(challengeId) {
+  try {
+    const result = await api('/challenges/' + challengeId + '/complete', { method: 'POST' });
+    showXPToast(result.xp_earned, []);
+    await loadDashboard();
+    await renderAll();
+  } catch (e) { showToast('Error: ' + e.message, 'info'); }
+}
+
+function openCreateChallenge() {
+  document.getElementById('challengeModal').classList.add('active');
+  const sel = document.getElementById('challengeContact');
+  sel.textContent = '';
+  sel.appendChild(createElement('option', { value: '' }, 'Select a friend...'));
+  contacts.forEach(c => {
+    sel.appendChild(createElement('option', { value: String(c.id) }, c.name));
+  });
+}
+
+function closeChallengeModal() {
+  document.getElementById('challengeModal').classList.remove('active');
+}
+
+async function submitCreateChallenge() {
+  const contactId = parseInt(document.getElementById('challengeContact').value);
+  if (!contactId) { showToast('Pick someone to challenge!', 'info'); return; }
+  const activity = document.querySelector('#challengeActivityTags .form-tag.selected')?.dataset?.val || 'custom';
+  const title = document.getElementById('challengeTitle').value;
+  if (!title) { showToast('Give your challenge a name!', 'info'); return; }
+  const desc = document.getElementById('challengeDesc').value;
+
+  const btn = document.getElementById('challengeSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Sending...';
+
+  try {
+    await api('/challenges', {
+      method: 'POST',
+      body: JSON.stringify({ contact_id: contactId, title, description: desc, activity_type: activity }),
+    });
+    showToast('Challenge sent!', 'success');
+    closeChallengeModal();
+    document.getElementById('challengeTitle').value = '';
+    document.getElementById('challengeDesc').value = '';
+    await loadDashboard();
+    await renderAll();
+  } catch (e) { showToast('Error: ' + e.message, 'info'); }
+  finally { btn.disabled = false; btn.textContent = 'Send Challenge'; }
+}
+
 function renderInsightsReport() {
   const report = document.getElementById('weeklyReport');
   if (!report) return;
@@ -1800,6 +2237,8 @@ async function renderAll() {
 
   renderInsightsReport();
   renderGamification();
+  renderParties();
+  renderChallenges();
 }
 
 // === NAVIGATION ===

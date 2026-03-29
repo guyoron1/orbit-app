@@ -38,7 +38,9 @@ from slowapi.errors import RateLimitExceeded
 from .database import Base, engine, get_db
 from .models import (
     User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
-    NudgeStatus, QuestStatus, INTERACTION_DEPTH,
+    Party, PartyMember, Challenge,
+    NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus,
+    INTERACTION_DEPTH,
 )
 from .schemas import (
     UserCreate, UserOut,
@@ -51,6 +53,8 @@ from .schemas import (
     ConversationStartersOut, AISummaryOut,
     QuestOut, AchievementDef, XPAwardOut, LevelProgressOut,
     GamificationDashboardOut,
+    PartyCreate, PartyOut, PartyMemberOut,
+    ChallengeCreate, ChallengeOut,
 )
 from .decay import compute_health, update_weights_after_interaction
 from .auth import hash_password, verify_password, create_access_token, get_current_user
@@ -490,6 +494,320 @@ def get_level(user: User = Depends(get_current_user)):
 
 
 # ══════════════════════════════════════════════
+# PARTIES / HANGOUTS (protected)
+# ══════════════════════════════════════════════
+
+ACTIVITY_XP = {
+    "run": 60, "gym": 55, "hike": 65, "concert": 50,
+    "dinner": 45, "drinks": 40, "gaming": 35, "movie": 30,
+    "sports": 60, "study": 35, "custom": 40,
+}
+GROUP_XP_MULTIPLIER = 1.5  # bonus for group activities
+
+
+@app.post("/parties", response_model=PartyOut)
+@limiter.limit("20/minute")
+def create_party(
+    request: Request,
+    data: PartyCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    base_xp = ACTIVITY_XP.get(data.activity_type.value, 40)
+
+    party = Party(
+        creator_id=user.id,
+        title=data.title,
+        activity_type=data.activity_type,
+        description=data.description,
+        location=data.location,
+        scheduled_at=data.scheduled_at,
+        xp_reward=base_xp,
+    )
+    db.add(party)
+    db.commit()
+    db.refresh(party)
+
+    # Add invited contacts as members
+    for cid in data.contact_ids:
+        contact = db.query(Contact).filter(
+            Contact.id == cid, Contact.user_id == user.id
+        ).first()
+        if contact:
+            member = PartyMember(party_id=party.id, contact_id=cid, status="invited")
+            db.add(member)
+    db.commit()
+    db.refresh(party)
+
+    return _party_to_out(party, db)
+
+
+@app.get("/parties", response_model=list[PartyOut])
+def list_parties(
+    status: str = "all",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    q = db.query(Party).filter(Party.creator_id == user.id)
+    if status == "waiting":
+        q = q.filter(Party.status == PartyStatus.waiting)
+    elif status == "active":
+        q = q.filter(Party.status.in_([PartyStatus.waiting, PartyStatus.active]))
+    q = q.order_by(Party.created_at.desc())
+    return [_party_to_out(p, db) for p in q.limit(20).all()]
+
+
+@app.post("/parties/{party_id}/start")
+def start_party(
+    party_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    party = db.query(Party).filter(
+        Party.id == party_id, Party.creator_id == user.id,
+        Party.status == PartyStatus.waiting,
+    ).first()
+    if not party:
+        raise HTTPException(404, "Party not found or already started")
+    party.status = PartyStatus.active
+    db.commit()
+    return {"status": "active", "party_id": party_id}
+
+
+@app.post("/parties/{party_id}/complete")
+def complete_party(
+    party_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    party = db.query(Party).filter(
+        Party.id == party_id, Party.creator_id == user.id,
+        Party.status.in_([PartyStatus.waiting, PartyStatus.active]),
+    ).first()
+    if not party:
+        raise HTTPException(404, "Party not found or already completed")
+
+    party.status = PartyStatus.completed
+    party.completed_at = datetime.utcnow()
+
+    # Count joined members for group bonus
+    joined = [m for m in party.members if m.status == "joined"]
+    group_mult = GROUP_XP_MULTIPLIER if len(joined) >= 1 else 1.0
+    xp = int(party.xp_reward * group_mult)
+
+    # Award XP to creator
+    user.xp = (user.xp or 0) + xp
+    from .gamification import level_from_xp
+    user.level = level_from_xp(user.xp)
+
+    db.commit()
+    return {
+        "status": "completed",
+        "party_id": party_id,
+        "xp_earned": xp,
+        "group_bonus": group_mult > 1.0,
+        "members_joined": len(joined),
+    }
+
+
+@app.post("/parties/{party_id}/join/{contact_id}")
+def join_party(
+    party_id: int,
+    contact_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    party = db.query(Party).filter(
+        Party.id == party_id, Party.creator_id == user.id,
+    ).first()
+    if not party:
+        raise HTTPException(404, "Party not found")
+
+    member = db.query(PartyMember).filter(
+        PartyMember.party_id == party_id,
+        PartyMember.contact_id == contact_id,
+    ).first()
+    if not member:
+        # Add new member
+        contact = db.query(Contact).filter(
+            Contact.id == contact_id, Contact.user_id == user.id
+        ).first()
+        if not contact:
+            raise HTTPException(404, "Contact not found")
+        member = PartyMember(party_id=party_id, contact_id=contact_id)
+        db.add(member)
+
+    member.status = "joined"
+    member.joined_at = datetime.utcnow()
+    db.commit()
+    return {"status": "joined", "contact_id": contact_id}
+
+
+@app.post("/parties/{party_id}/cancel")
+def cancel_party(
+    party_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    party = db.query(Party).filter(
+        Party.id == party_id, Party.creator_id == user.id,
+        Party.status.in_([PartyStatus.waiting, PartyStatus.active]),
+    ).first()
+    if not party:
+        raise HTTPException(404, "Party not found")
+    party.status = PartyStatus.cancelled
+    db.commit()
+    return {"status": "cancelled", "party_id": party_id}
+
+
+def _party_to_out(party: Party, db: Session) -> PartyOut:
+    members = []
+    for m in party.members:
+        contact = db.query(Contact).filter(Contact.id == m.contact_id).first()
+        members.append(PartyMemberOut(
+            id=m.id, contact_id=m.contact_id,
+            contact_name=contact.name if contact else "Unknown",
+            status=m.status, joined_at=m.joined_at,
+        ))
+    return PartyOut(
+        id=party.id, creator_id=party.creator_id, title=party.title,
+        activity_type=party.activity_type, description=party.description,
+        location=party.location, scheduled_at=party.scheduled_at,
+        max_members=party.max_members, xp_reward=party.xp_reward,
+        status=party.status, completed_at=party.completed_at,
+        created_at=party.created_at, members=members,
+    )
+
+
+# ══════════════════════════════════════════════
+# CHALLENGES (protected)
+# ══════════════════════════════════════════════
+
+@app.post("/challenges", response_model=ChallengeOut)
+@limiter.limit("30/minute")
+def create_challenge(
+    request: Request,
+    data: ChallengeCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    contact = db.query(Contact).filter(
+        Contact.id == data.contact_id, Contact.user_id == user.id
+    ).first()
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+
+    xp = ACTIVITY_XP.get(data.activity_type.value, 40)
+
+    challenge = Challenge(
+        challenger_id=user.id,
+        contact_id=data.contact_id,
+        title=data.title,
+        description=data.description,
+        activity_type=data.activity_type,
+        xp_reward=xp,
+        expires_at=datetime.utcnow() + timedelta(days=7),
+    )
+    db.add(challenge)
+    db.commit()
+    db.refresh(challenge)
+
+    return ChallengeOut(
+        id=challenge.id, challenger_id=challenge.challenger_id,
+        contact_id=challenge.contact_id, contact_name=contact.name,
+        title=challenge.title, description=challenge.description,
+        activity_type=challenge.activity_type, xp_reward=challenge.xp_reward,
+        status=challenge.status, expires_at=challenge.expires_at,
+        completed_at=challenge.completed_at, created_at=challenge.created_at,
+    )
+
+
+@app.get("/challenges", response_model=list[ChallengeOut])
+def list_challenges(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    challenges = (
+        db.query(Challenge)
+        .filter(Challenge.challenger_id == user.id)
+        .order_by(Challenge.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    result = []
+    for c in challenges:
+        contact = db.query(Contact).filter(Contact.id == c.contact_id).first()
+        result.append(ChallengeOut(
+            id=c.id, challenger_id=c.challenger_id,
+            contact_id=c.contact_id, contact_name=contact.name if contact else "Unknown",
+            title=c.title, description=c.description,
+            activity_type=c.activity_type, xp_reward=c.xp_reward,
+            status=c.status, expires_at=c.expires_at,
+            completed_at=c.completed_at, created_at=c.created_at,
+        ))
+    return result
+
+
+@app.post("/challenges/{challenge_id}/accept")
+def accept_challenge(
+    challenge_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    challenge = db.query(Challenge).filter(
+        Challenge.id == challenge_id, Challenge.challenger_id == user.id,
+        Challenge.status == ChallengeStatus.pending,
+    ).first()
+    if not challenge:
+        raise HTTPException(404, "Challenge not found")
+    challenge.status = ChallengeStatus.accepted
+    db.commit()
+    return {"status": "accepted", "challenge_id": challenge_id}
+
+
+@app.post("/challenges/{challenge_id}/complete")
+def complete_challenge(
+    challenge_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    challenge = db.query(Challenge).filter(
+        Challenge.id == challenge_id, Challenge.challenger_id == user.id,
+        Challenge.status.in_([ChallengeStatus.pending, ChallengeStatus.accepted]),
+    ).first()
+    if not challenge:
+        raise HTTPException(404, "Challenge not found or already completed")
+
+    challenge.status = ChallengeStatus.completed
+    challenge.completed_at = datetime.utcnow()
+
+    xp = challenge.xp_reward
+    user.xp = (user.xp or 0) + xp
+    from .gamification import level_from_xp
+    user.level = level_from_xp(user.xp)
+
+    db.commit()
+    return {"status": "completed", "challenge_id": challenge_id, "xp_earned": xp}
+
+
+@app.post("/challenges/{challenge_id}/decline")
+def decline_challenge(
+    challenge_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    challenge = db.query(Challenge).filter(
+        Challenge.id == challenge_id, Challenge.challenger_id == user.id,
+        Challenge.status == ChallengeStatus.pending,
+    ).first()
+    if not challenge:
+        raise HTTPException(404, "Challenge not found")
+    challenge.status = ChallengeStatus.declined
+    db.commit()
+    return {"status": "declined", "challenge_id": challenge_id}
+
+
+# ══════════════════════════════════════════════
 # DASHBOARD (protected)
 # ══════════════════════════════════════════════
 
@@ -582,12 +900,47 @@ def get_dashboard(
     ]
     recent_achiev = [a for a in all_achiev if a.earned][-5:]
 
+    # Active parties
+    active_party_models = (
+        db.query(Party)
+        .filter(Party.creator_id == user.id, Party.status.in_([PartyStatus.waiting, PartyStatus.active]))
+        .order_by(Party.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    active_parties_out = [_party_to_out(p, db) for p in active_party_models]
+
+    # Active challenges
+    active_challenge_models = (
+        db.query(Challenge)
+        .filter(
+            Challenge.challenger_id == user.id,
+            Challenge.status.in_([ChallengeStatus.pending, ChallengeStatus.accepted]),
+        )
+        .order_by(Challenge.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    active_challenges_out = []
+    for c in active_challenge_models:
+        ct = db.query(Contact).filter(Contact.id == c.contact_id).first()
+        active_challenges_out.append(ChallengeOut(
+            id=c.id, challenger_id=c.challenger_id,
+            contact_id=c.contact_id, contact_name=ct.name if ct else "Unknown",
+            title=c.title, description=c.description,
+            activity_type=c.activity_type, xp_reward=c.xp_reward,
+            status=c.status, expires_at=c.expires_at,
+            completed_at=c.completed_at, created_at=c.created_at,
+        ))
+
     gamification = GamificationDashboardOut(
         level_progress=LevelProgressOut(**level_progress(user.xp or 0)),
         streak_days=user.streak_days or 0,
         active_quests=[QuestOut.model_validate(q) for q in active_quests],
         recent_achievements=recent_achiev,
         all_achievements=all_achiev,
+        active_parties=active_parties_out,
+        active_challenges=active_challenges_out,
     )
 
     return DashboardOut(

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from .models import (
     RelationshipType, ContactFrequency, InteractionType, LifeEventType,
     QuestType, QuestStatus, DifficultyTier,
+    ActivityType, PartyStatus, ChallengeStatus,
 )
 
 
@@ -231,6 +232,73 @@ class GamificationDashboardOut(BaseModel):
     active_quests: list[QuestOut]
     recent_achievements: list[AchievementDef]
     all_achievements: list[AchievementDef]
+    active_parties: list["PartyOut"] = []
+    active_challenges: list["ChallengeOut"] = []
+
+
+# ── Party / Hangout ──
+
+class PartyMemberOut(BaseModel):
+    id: int
+    contact_id: int
+    contact_name: str = ""
+    status: str
+    joined_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PartyCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    activity_type: ActivityType
+    description: str = Field("", max_length=1000)
+    location: str = Field("", max_length=200)
+    scheduled_at: Optional[datetime] = None
+    contact_ids: list[int] = []
+
+
+class PartyOut(BaseModel):
+    id: int
+    creator_id: int
+    title: str
+    activity_type: ActivityType
+    description: str
+    location: str
+    scheduled_at: Optional[datetime] = None
+    max_members: int
+    xp_reward: int
+    status: PartyStatus
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    members: list[PartyMemberOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+# ── Challenge ──
+
+class ChallengeCreate(BaseModel):
+    contact_id: int
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field("", max_length=1000)
+    activity_type: ActivityType
+
+
+class ChallengeOut(BaseModel):
+    id: int
+    challenger_id: int
+    contact_id: int
+    contact_name: str = ""
+    title: str
+    description: str
+    activity_type: ActivityType
+    xp_reward: int
+    status: ChallengeStatus
+    expires_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Dashboard aggregate ──

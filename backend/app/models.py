@@ -93,6 +93,35 @@ class DifficultyTier(str, enum.Enum):
     hard = "hard"
 
 
+class ActivityType(str, enum.Enum):
+    run = "run"
+    gym = "gym"
+    hike = "hike"
+    concert = "concert"
+    dinner = "dinner"
+    drinks = "drinks"
+    gaming = "gaming"
+    movie = "movie"
+    sports = "sports"
+    study = "study"
+    custom = "custom"
+
+
+class PartyStatus(str, enum.Enum):
+    waiting = "waiting"       # lobby open, waiting for members
+    active = "active"         # activity in progress
+    completed = "completed"   # done, XP awarded
+    cancelled = "cancelled"
+
+
+class ChallengeStatus(str, enum.Enum):
+    pending = "pending"       # sent, awaiting response
+    accepted = "accepted"     # accepted, in progress
+    completed = "completed"   # challenger marked done
+    declined = "declined"
+    expired = "expired"
+
+
 # ── Interaction depth scores ──
 # Used by the decay algorithm to weight interaction quality.
 # Higher = more meaningful contact.
@@ -138,6 +167,9 @@ class User(Base):
     nudges = relationship("Nudge", back_populates="user", cascade="all, delete-orphan")
     quests = relationship("Quest", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("UserAchievement", back_populates="user", cascade="all, delete-orphan")
+    parties = relationship("Party", back_populates="creator", cascade="all, delete-orphan")
+    challenges_sent = relationship("Challenge", back_populates="challenger", foreign_keys="Challenge.challenger_id", cascade="all, delete-orphan")
+    challenges_received = relationship("Challenge", back_populates="challenged_contact", foreign_keys="Challenge.contact_id")
 
 
 class Contact(Base):
@@ -273,3 +305,64 @@ class UserAchievement(Base):
     earned_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="achievements")
+
+
+class Party(Base):
+    """
+    MapleStory-style party for group activities.
+    Creator forms a party, invites contacts, activity happens, everyone gets XP.
+    """
+    __tablename__ = "parties"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    activity_type = Column(Enum(ActivityType), nullable=False)
+    description = Column(Text, default="")
+    location = Column(String(255), default="")
+    scheduled_at = Column(DateTime, nullable=True)
+    max_members = Column(Integer, default=10)
+    xp_reward = Column(Integer, default=50)
+    status = Column(Enum(PartyStatus), default=PartyStatus.waiting)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User", back_populates="parties")
+    members = relationship("PartyMember", back_populates="party", cascade="all, delete-orphan")
+
+
+class PartyMember(Base):
+    """Contacts invited to a party. Tracks RSVP status."""
+    __tablename__ = "party_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    party_id = Column(Integer, ForeignKey("parties.id"), nullable=False, index=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=False)
+    status = Column(String(20), default="invited")  # invited, joined, declined
+    joined_at = Column(DateTime, nullable=True)
+
+    party = relationship("Party", back_populates="members")
+    contact = relationship("Contact")
+
+
+class Challenge(Base):
+    """
+    Challenge a friend to do something together.
+    "I challenge you to a 5K run this week!"
+    """
+    __tablename__ = "challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    challenger_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    activity_type = Column(Enum(ActivityType), nullable=False)
+    xp_reward = Column(Integer, default=40)
+    status = Column(Enum(ChallengeStatus), default=ChallengeStatus.pending)
+    expires_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    challenger = relationship("User", back_populates="challenges_sent", foreign_keys=[challenger_id])
+    challenged_contact = relationship("Contact", foreign_keys=[contact_id])
