@@ -11,10 +11,10 @@ Core tables:
 """
 
 import enum
-from datetime import datetime
+from datetime import datetime, date
 
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Enum, Text, Boolean
+    Column, Integer, String, Float, DateTime, Date, ForeignKey, Enum, Text, Boolean
 )
 from sqlalchemy.orm import relationship
 
@@ -68,6 +68,31 @@ class LifeEventType(str, enum.Enum):
     custom = "custom"
 
 
+class QuestStatus(str, enum.Enum):
+    active = "active"
+    completed = "completed"
+    expired = "expired"
+    skipped = "skipped"
+
+
+class QuestType(str, enum.Enum):
+    coffee = "coffee"
+    call = "call"
+    outdoor = "outdoor"
+    dinner = "dinner"
+    reconnect = "reconnect"
+    social = "social"
+    explore = "explore"
+    streak = "streak"
+    expand = "expand"
+
+
+class DifficultyTier(str, enum.Enum):
+    easy = "easy"
+    medium = "medium"
+    hard = "hard"
+
+
 # ── Interaction depth scores ──
 # Used by the decay algorithm to weight interaction quality.
 # Higher = more meaningful contact.
@@ -103,8 +128,16 @@ class User(Base):
     plan = Column(String(20), default="free")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Gamification
+    xp = Column(Integer, default=0)
+    level = Column(Integer, default=1)
+    streak_days = Column(Integer, default=0)
+    last_active_date = Column(Date, nullable=True)
+
     contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")
     nudges = relationship("Nudge", back_populates="user", cascade="all, delete-orphan")
+    quests = relationship("Quest", back_populates="user", cascade="all, delete-orphan")
+    achievements = relationship("UserAchievement", back_populates="user", cascade="all, delete-orphan")
 
 
 class Contact(Base):
@@ -118,11 +151,16 @@ class Contact(Base):
     notes = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Gamification
+    relationship_xp = Column(Integer, default=0)
+    relationship_level = Column(String(20), default="new")
+
     user = relationship("User", back_populates="contacts")
     interactions = relationship("Interaction", back_populates="contact", cascade="all, delete-orphan")
     weights = relationship("Weights", back_populates="contact", uselist=False, cascade="all, delete-orphan")
     life_events = relationship("LifeEvent", back_populates="contact", cascade="all, delete-orphan")
     nudges = relationship("Nudge", back_populates="contact", cascade="all, delete-orphan")
+    quests = relationship("Quest", back_populates="contact", cascade="all, delete-orphan")
 
 
 class Interaction(Base):
@@ -204,3 +242,34 @@ class LifeEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="life_events")
+
+
+class Quest(Base):
+    __tablename__ = "quests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    quest_type = Column(Enum(QuestType), nullable=False)
+    difficulty = Column(Enum(DifficultyTier), default=DifficultyTier.easy)
+    xp_reward = Column(Integer, default=20)
+    status = Column(Enum(QuestStatus), default=QuestStatus.active)
+    expires_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="quests")
+    contact = relationship("Contact", back_populates="quests")
+
+
+class UserAchievement(Base):
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    achievement_key = Column(String(50), nullable=False)
+    earned_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="achievements")

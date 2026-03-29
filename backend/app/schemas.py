@@ -2,7 +2,10 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from .models import RelationshipType, ContactFrequency, InteractionType, LifeEventType
+from .models import (
+    RelationshipType, ContactFrequency, InteractionType, LifeEventType,
+    QuestType, QuestStatus, DifficultyTier,
+)
 
 
 # ── Auth ──
@@ -40,6 +43,9 @@ class UserOut(BaseModel):
     timezone: str
     plan: str
     created_at: datetime
+    xp: int = 0
+    level: int = 1
+    streak_days: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -61,6 +67,8 @@ class ContactOut(BaseModel):
     target_frequency: ContactFrequency
     notes: str
     created_at: datetime
+    relationship_xp: int = 0
+    relationship_level: str = "new"
 
     model_config = {"from_attributes": True}
 
@@ -168,6 +176,63 @@ class AISummaryOut(BaseModel):
     summary: str
 
 
+# ── Quests ──
+
+class QuestOut(BaseModel):
+    id: int
+    user_id: int
+    contact_id: Optional[int] = None
+    title: str
+    description: str
+    quest_type: QuestType
+    difficulty: DifficultyTier
+    xp_reward: int
+    status: QuestStatus
+    expires_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Achievements ──
+
+class AchievementDef(BaseModel):
+    key: str
+    name: str
+    description: str
+    icon: str
+    xp_bonus: int
+    earned: bool = False
+    earned_at: Optional[datetime] = None
+
+
+class XPAwardOut(BaseModel):
+    xp_earned: int
+    base_xp: int
+    duration_bonus: int
+    new_level: int
+    new_achievements: list[dict]
+
+
+class LevelProgressOut(BaseModel):
+    level: int
+    current_xp: int
+    level_xp: int
+    level_xp_needed: int
+    progress: float
+
+
+# ── Gamification Dashboard ──
+
+class GamificationDashboardOut(BaseModel):
+    level_progress: LevelProgressOut
+    streak_days: int
+    active_quests: list[QuestOut]
+    recent_achievements: list[AchievementDef]
+    all_achievements: list[AchievementDef]
+
+
 # ── Dashboard aggregate ──
 
 class DashboardOut(BaseModel):
@@ -178,3 +243,4 @@ class DashboardOut(BaseModel):
     health_reports: list[HealthReportOut]
     top_nudges: list[NudgeOut]
     ai_summary: str = ""
+    gamification: Optional[GamificationDashboardOut] = None

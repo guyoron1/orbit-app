@@ -556,6 +556,113 @@
     height: 100px; border-radius: var(--radius); border: 1px solid var(--border);
   }
 
+  /* Gamification — XP Bar */
+  .xp-section {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .xp-level-badge {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; flex-shrink: 0;
+    box-shadow: 0 4px 20px var(--accent-glow);
+  }
+  .xp-level-num { font-size: 20px; font-weight: 900; line-height: 1; }
+  .xp-level-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
+  .xp-info { flex: 1; }
+  .xp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .xp-title { font-size: 14px; font-weight: 700; }
+  .xp-numbers { font-size: 12px; color: var(--text-secondary); }
+  .xp-bar-bg {
+    height: 8px; background: rgba(255,255,255,0.06); border-radius: 8px;
+    overflow: hidden;
+  }
+  .xp-bar-fill {
+    height: 100%; border-radius: 8px; transition: width 1s ease;
+    background: linear-gradient(90deg, var(--accent), #a29bfe, var(--success));
+    background-size: 200% 100%;
+    animation: xpShine 3s ease infinite;
+  }
+  @keyframes xpShine { 0%{background-position:200% 0} 50%{background-position:0 0} 100%{background-position:200% 0} }
+  .xp-streak {
+    display: flex; align-items: center; gap: 6px; padding: 8px 14px;
+    background: rgba(253,203,110,0.1); border: 1px solid rgba(253,203,110,0.2);
+    border-radius: var(--radius-sm); flex-shrink: 0;
+  }
+  .xp-streak-fire { font-size: 20px; }
+  .xp-streak-num { font-size: 18px; font-weight: 800; color: var(--warning); }
+  .xp-streak-label { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+
+  /* Quests */
+  .quests-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+  .quest-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; position: relative;
+    transition: all 0.3s; overflow: hidden;
+  }
+  .quest-card:hover { border-color: rgba(108,92,231,0.3); transform: translateY(-2px); }
+  .quest-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .quest-card.easy::before { background: var(--success); }
+  .quest-card.medium::before { background: var(--warning); }
+  .quest-card.hard::before { background: var(--danger); }
+  .quest-difficulty {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .quest-difficulty.easy { color: var(--success); }
+  .quest-difficulty.medium { color: var(--warning); }
+  .quest-difficulty.hard { color: var(--danger); }
+  .quest-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .quest-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px; }
+  .quest-footer { display: flex; align-items: center; justify-content: space-between; }
+  .quest-xp {
+    font-size: 12px; font-weight: 700; color: var(--accent-light);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .quest-actions { display: flex; gap: 6px; }
+  .quest-btn {
+    padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: none; font-family: inherit; transition: all 0.2s;
+  }
+  .quest-btn.complete { background: var(--accent); color: white; }
+  .quest-btn.complete:hover { background: #7d6ff0; }
+  .quest-btn.skip { background: var(--glass); color: var(--text-secondary); border: 1px solid var(--border); }
+
+  /* Achievements */
+  .achievements-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 32px; }
+  .achievement-badge {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); transition: all 0.3s;
+  }
+  .achievement-badge.earned {
+    border-color: rgba(108,92,231,0.3);
+    background: linear-gradient(135deg, rgba(108,92,231,0.08), rgba(0,206,201,0.04));
+  }
+  .achievement-badge.locked { opacity: 0.4; }
+  .achievement-icon { font-size: 18px; }
+  .achievement-info {}
+  .achievement-name { font-size: 12px; font-weight: 700; }
+  .achievement-desc { font-size: 10px; color: var(--text-muted); }
+
+  /* XP Toast */
+  .xp-toast {
+    position: fixed; top: 80px; right: 24px; z-index: 250;
+    background: linear-gradient(135deg, rgba(108,92,231,0.95), rgba(162,155,254,0.95));
+    border-radius: var(--radius-sm); padding: 14px 20px;
+    box-shadow: 0 8px 32px var(--accent-glow);
+    animation: xpToastIn 0.4s ease, xpToastOut 0.4s ease 2.6s forwards;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .xp-toast-amount { font-size: 22px; font-weight: 900; }
+  .xp-toast-label { font-size: 12px; font-weight: 600; opacity: 0.9; }
+  @keyframes xpToastIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes xpToastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
+
   /* Mobile bottom nav */
   .mobile-nav {
     display: none; position: fixed; bottom: 0; left: 0; right: 0;
@@ -580,6 +687,7 @@
     .contacts-grid { grid-template-columns: repeat(2, 1fr); }
     .nudges { grid-template-columns: 1fr; }
     .insights { grid-template-columns: 1fr; }
+    .quests-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* Responsive — Mobile */
@@ -593,6 +701,9 @@
     .stat-label { font-size: 10px; }
     .contacts-grid { grid-template-columns: 1fr; }
     .nudges { grid-template-columns: 1fr; }
+    .quests-grid { grid-template-columns: 1fr; }
+    .xp-section { flex-direction: column; align-items: stretch; gap: 12px; }
+    .xp-streak { justify-content: center; }
     .header h1 { font-size: 22px; }
     .header-top { flex-direction: column; align-items: flex-start; gap: 12px; }
     .header-actions { width: 100%; }
@@ -818,6 +929,50 @@
           <div class="stat-change up" id="stat-total-change">&nbsp;</div>
         </div>
       </div>
+      <!-- Gamification: XP & Level -->
+      <div class="xp-section" id="xpSection" style="display:none">
+        <div class="xp-level-badge">
+          <div class="xp-level-num" id="xpLevelNum">1</div>
+          <div class="xp-level-label">Level</div>
+        </div>
+        <div class="xp-info">
+          <div class="xp-header">
+            <div class="xp-title" id="xpTitle">Level 1</div>
+            <div class="xp-numbers" id="xpNumbers">0 / 100 XP</div>
+          </div>
+          <div class="xp-bar-bg">
+            <div class="xp-bar-fill" id="xpBarFill" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="xp-streak" id="xpStreak" style="display:none">
+          <div class="xp-streak-fire">&#x1F525;</div>
+          <div>
+            <div class="xp-streak-num" id="xpStreakNum">0</div>
+            <div class="xp-streak-label">day streak</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gamification: Active Quests -->
+      <div id="questsSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Active Quests</div>
+          <a class="section-link" id="questsRefresh" onclick="refreshQuests()">Refresh</a>
+        </div>
+        <div class="quests-grid" id="questsGrid"></div>
+      </div>
+
+      <!-- Gamification: Recent Achievements -->
+      <div id="achievementsSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Achievements</div>
+          <a class="section-link" id="achievementsLink">
+            <span id="achievementCount">0</span> / <span id="achievementTotal">16</span> earned
+          </a>
+        </div>
+        <div class="achievements-row" id="achievementsRow"></div>
+      </div>
+
       <div class="section-header">
         <div class="section-title">Smart Nudges</div>
         <a class="section-link" onclick="navigateTo('insights')">View all</a>
@@ -1121,7 +1276,6 @@
 
 <script>
 // === CONFIG ===
-// When served from CDN, point to the backend. When served by backend itself, use same origin.
 const API = location.hostname.includes('railway.app') ? '' : 'https://orbit-app-production-fd37.up.railway.app';
 
 const COLORS = [
@@ -1388,6 +1542,146 @@ function buildTimelineItem(interaction) {
   return item;
 }
 
+// === GAMIFICATION ===
+const ACHIEVEMENT_ICONS = {
+  first_contact: '\u{1F680}', social_5: '\u{1F98B}', social_10: '\u{1F517}',
+  first_interaction: '\u{1F44B}', interactions_10: '\u{1F4AC}', interactions_50: '\u{1F3C6}',
+  streak_3: '\u{1F525}', streak_7: '\u{1F525}', streak_30: '\u{2604}\uFE0F',
+  quest_1: '\u{1F9ED}', quest_5: '\u{1F5FA}\uFE0F', quest_10: '\u{1F451}',
+  level_5: '\u{2B50}', level_10: '\u{1FA90}',
+  in_person_5: '\u{1F91D}', inner_circle: '\u{2764}\uFE0F',
+};
+const DIFFICULTY_ICONS = { easy: '\u{2615}', medium: '\u{26A1}', hard: '\u{1F525}' };
+
+function renderGamification() {
+  const g = dashboardData.gamification;
+  if (!g) return;
+
+  // XP bar
+  const xpSec = document.getElementById('xpSection');
+  xpSec.style.display = '';
+  const lp = g.level_progress;
+  document.getElementById('xpLevelNum').textContent = lp.level;
+  document.getElementById('xpTitle').textContent = 'Level ' + lp.level;
+  document.getElementById('xpNumbers').textContent = lp.level_xp + ' / ' + lp.level_xp_needed + ' XP';
+  document.getElementById('xpBarFill').style.width = Math.round(lp.progress * 100) + '%';
+
+  // Streak
+  const streakEl = document.getElementById('xpStreak');
+  if (g.streak_days > 0) {
+    streakEl.style.display = '';
+    document.getElementById('xpStreakNum').textContent = g.streak_days;
+  } else {
+    streakEl.style.display = 'none';
+  }
+
+  // Quests
+  const questsSec = document.getElementById('questsSection');
+  const questsGrid = document.getElementById('questsGrid');
+  if (g.active_quests && g.active_quests.length > 0) {
+    questsSec.style.display = '';
+    questsGrid.textContent = '';
+    g.active_quests.forEach(q => questsGrid.appendChild(buildQuestCard(q)));
+  } else {
+    questsSec.style.display = 'none';
+  }
+
+  // Achievements
+  const achieveSec = document.getElementById('achievementsSection');
+  const achieveRow = document.getElementById('achievementsRow');
+  achieveSec.style.display = '';
+  achieveRow.textContent = '';
+  const earnedCount = g.all_achievements.filter(a => a.earned).length;
+  document.getElementById('achievementCount').textContent = earnedCount;
+  document.getElementById('achievementTotal').textContent = g.all_achievements.length;
+
+  // Show earned first, then locked
+  const sorted = [...g.all_achievements].sort((a, b) => (b.earned ? 1 : 0) - (a.earned ? 1 : 0));
+  sorted.forEach(a => achieveRow.appendChild(buildAchievementBadge(a)));
+}
+
+function buildQuestCard(q) {
+  const card = createElement('div', { className: 'quest-card ' + q.difficulty });
+
+  const diff = createElement('div', { className: 'quest-difficulty ' + q.difficulty });
+  diff.textContent = (DIFFICULTY_ICONS[q.difficulty] || '') + ' ' + q.difficulty;
+  card.appendChild(diff);
+
+  card.appendChild(createElement('div', { className: 'quest-title' }, q.title));
+  card.appendChild(createElement('div', { className: 'quest-desc' }, q.description));
+
+  const footer = createElement('div', { className: 'quest-footer' });
+  footer.appendChild(createElement('div', { className: 'quest-xp' }, '+' + q.xp_reward + ' XP'));
+
+  const actions = createElement('div', { className: 'quest-actions' });
+  const completeBtn = createElement('button', {
+    className: 'quest-btn complete',
+    onClick: (e) => { e.stopPropagation(); completeQuest(q.id); }
+  }, 'Done');
+  const skipBtn = createElement('button', {
+    className: 'quest-btn skip',
+    onClick: (e) => { e.stopPropagation(); skipQuest(q.id); }
+  }, 'Skip');
+  actions.appendChild(completeBtn);
+  actions.appendChild(skipBtn);
+  footer.appendChild(actions);
+  card.appendChild(footer);
+
+  return card;
+}
+
+function buildAchievementBadge(a) {
+  const badge = createElement('div', { className: 'achievement-badge ' + (a.earned ? 'earned' : 'locked') });
+  const icon = ACHIEVEMENT_ICONS[a.key] || '\u{1F3C5}';
+  badge.appendChild(createElement('div', { className: 'achievement-icon' }, icon));
+  const info = createElement('div', { className: 'achievement-info' });
+  info.appendChild(createElement('div', { className: 'achievement-name' }, a.name));
+  info.appendChild(createElement('div', { className: 'achievement-desc' }, a.description));
+  badge.appendChild(info);
+  return badge;
+}
+
+async function completeQuest(questId) {
+  try {
+    const result = await api('/quests/' + questId + '/complete', { method: 'POST' });
+    showXPToast(result.xp_earned, result.new_achievements || []);
+    await loadDashboard();
+    await renderAll();
+  } catch (e) {
+    showToast('Could not complete quest', 'error');
+  }
+}
+
+async function skipQuest(questId) {
+  try {
+    await api('/quests/' + questId + '/skip', { method: 'POST' });
+    await loadDashboard();
+    await renderAll();
+  } catch (e) {
+    showToast('Could not skip quest', 'error');
+  }
+}
+
+async function refreshQuests() {
+  await loadDashboard();
+  await renderAll();
+  showToast('Quests refreshed!', 'success');
+}
+
+function showXPToast(xp, achievements) {
+  const existing = document.querySelector('.xp-toast');
+  if (existing) existing.remove();
+
+  const toast = createElement('div', { className: 'xp-toast' });
+  toast.appendChild(createElement('div', { className: 'xp-toast-amount' }, '+' + xp));
+  const label = achievements.length > 0
+    ? 'XP earned! New: ' + achievements.map(a => a.name).join(', ')
+    : 'XP earned!';
+  toast.appendChild(createElement('div', { className: 'xp-toast-label' }, label));
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3200);
+}
+
 function renderInsightsReport() {
   const report = document.getElementById('weeklyReport');
   if (!report) return;
@@ -1505,6 +1799,7 @@ async function renderAll() {
   }
 
   renderInsightsReport();
+  renderGamification();
 }
 
 // === NAVIGATION ===
@@ -1855,7 +2150,8 @@ function showDashboard() {
   const planEl = document.querySelector('.user-plan');
   if (currentUser && nameEl) {
     nameEl.textContent = currentUser.name;
-    planEl.textContent = (currentUser.plan || 'free').charAt(0).toUpperCase() + (currentUser.plan || 'free').slice(1) + ' Plan';
+    const lvl = currentUser.level || 1;
+    planEl.textContent = 'Level ' + lvl + ' \u00B7 ' + (currentUser.xp || 0) + ' XP';
     const avatar = document.querySelector('.sidebar-footer .user-avatar');
     if (avatar) avatar.textContent = getInitials(currentUser.name);
   }

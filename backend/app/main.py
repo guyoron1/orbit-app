@@ -37,8 +37,8 @@ from slowapi.errors import RateLimitExceeded
 
 from .database import Base, engine, get_db
 from .models import (
-    User, Contact, Interaction, Weights, Nudge, LifeEvent,
-    NudgeStatus, INTERACTION_DEPTH,
+    User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
+    NudgeStatus, QuestStatus, INTERACTION_DEPTH,
 )
 from .schemas import (
     UserCreate, UserOut,
@@ -49,10 +49,16 @@ from .schemas import (
     NudgeOut, DashboardOut,
     SignupRequest, LoginRequest, TokenResponse,
     ConversationStartersOut, AISummaryOut,
+    QuestOut, AchievementDef, XPAwardOut, LevelProgressOut,
+    GamificationDashboardOut,
 )
 from .decay import compute_health, update_weights_after_interaction
 from .auth import hash_password, verify_password, create_access_token, get_current_user
 from .ai import generate_conversation_starters, generate_relationship_summary
+from .gamification import (
+    award_interaction_xp, generate_quests, complete_quest,
+    level_progress, ACHIEVEMENT_DEFS,
+)
 
 
 # ── Rate limiter ──
@@ -219,6 +225,9 @@ def log_interaction(
     db.refresh(interaction)
 
     update_weights_after_interaction(contact, interaction, db)
+
+    # Award gamification XP
+    award_interaction_xp(user, contact, interaction, db)
 
     return interaction
 
@@ -398,6 +407,89 @@ def snooze_nudge(
 
 
 # ══════════════════════════════════════════════
+# GAMIFICATION (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/quests", response_model=list[QuestOut])
+def list_quests(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    # Auto-generate quests if needed
+    generate_quests(user, db)
+    return (
+        db.query(Quest)
+        .filter(Quest.user_id == user.id, Quest.status == QuestStatus.active)
+        .all()
+    )
+
+
+@app.post("/quests/{quest_id}/complete", response_model=XPAwardOut)
+def complete_quest_endpoint(
+    quest_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    quest = db.query(Quest).filter(
+        Quest.id == quest_id, Quest.user_id == user.id,
+        Quest.status == QuestStatus.active,
+    ).first()
+    if not quest:
+        raise HTTPException(404, "Quest not found or already completed")
+
+    result = complete_quest(quest, user, db)
+    return XPAwardOut(
+        xp_earned=result["xp_earned"],
+        base_xp=result["xp_earned"],
+        duration_bonus=0,
+        new_level=result["new_level"],
+        new_achievements=result["new_achievements"],
+    )
+
+
+@app.post("/quests/{quest_id}/skip")
+def skip_quest(
+    quest_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    quest = db.query(Quest).filter(
+        Quest.id == quest_id, Quest.user_id == user.id,
+        Quest.status == QuestStatus.active,
+    ).first()
+    if not quest:
+        raise HTTPException(404, "Quest not found")
+    quest.status = QuestStatus.skipped
+    db.commit()
+    return {"status": "skipped", "quest_id": quest_id}
+
+
+@app.get("/achievements", response_model=list[AchievementDef])
+def list_achievements(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from .models import UserAchievement
+    earned = {
+        ua.achievement_key: ua.earned_at
+        for ua in db.query(UserAchievement).filter(UserAchievement.user_id == user.id).all()
+    }
+    return [
+        AchievementDef(
+            key=key, name=name, description=desc, icon=icon, xp_bonus=xp,
+            earned=key in earned,
+            earned_at=earned.get(key),
+        )
+        for key, name, desc, icon, xp in ACHIEVEMENT_DEFS
+    ]
+
+
+@app.get("/level", response_model=LevelProgressOut)
+def get_level(user: User = Depends(get_current_user)):
+    return LevelProgressOut(**level_progress(user.xp or 0))
+
+
+# ══════════════════════════════════════════════
 # DASHBOARD (protected)
 # ══════════════════════════════════════════════
 
@@ -469,6 +561,35 @@ def get_dashboard(
         interactions_this_week=interactions_week,
     )
 
+    # Gamification data
+    from .models import UserAchievement
+    generate_quests(user, db)
+    active_quests = (
+        db.query(Quest)
+        .filter(Quest.user_id == user.id, Quest.status == QuestStatus.active)
+        .all()
+    )
+    earned_map = {
+        ua.achievement_key: ua.earned_at
+        for ua in db.query(UserAchievement).filter(UserAchievement.user_id == user.id).all()
+    }
+    all_achiev = [
+        AchievementDef(
+            key=key, name=name, description=desc, icon=icon, xp_bonus=xp,
+            earned=key in earned_map, earned_at=earned_map.get(key),
+        )
+        for key, name, desc, icon, xp in ACHIEVEMENT_DEFS
+    ]
+    recent_achiev = [a for a in all_achiev if a.earned][-5:]
+
+    gamification = GamificationDashboardOut(
+        level_progress=LevelProgressOut(**level_progress(user.xp or 0)),
+        streak_days=user.streak_days or 0,
+        active_quests=[QuestOut.model_validate(q) for q in active_quests],
+        recent_achievements=recent_achiev,
+        all_achievements=all_achiev,
+    )
+
     return DashboardOut(
         total_contacts=len(contacts_list),
         inner_circle_count=len(inner_circle),
@@ -477,6 +598,7 @@ def get_dashboard(
         health_reports=reports,
         top_nudges=top_nudges,
         ai_summary=ai_summary,
+        gamification=gamification,
     )
 
 
