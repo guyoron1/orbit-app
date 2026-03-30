@@ -55,7 +55,7 @@ from .schemas import (
     HealthReportOut, WeightsOut,
     LifeEventCreate, LifeEventOut,
     NudgeOut, DashboardOut,
-    SignupRequest, LoginRequest, TokenResponse,
+    SignupRequest, LoginRequest, PasswordChangeRequest, TokenResponse,
     ConversationStartersOut, AISummaryOut,
     QuestOut, AchievementDef, XPAwardOut, LevelProgressOut,
     GamificationDashboardOut,
@@ -202,6 +202,44 @@ def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
         access_token=token,
         user=UserOut.model_validate(user),
     )
+
+
+@app.get("/auth/me", response_model=UserOut)
+def get_me(user: User = Depends(get_current_user)):
+    return user
+
+
+@app.patch("/auth/password")
+def change_password(
+    data: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(400, "Current password is incorrect")
+    user.password_hash = hash_password(data.new_password)
+    db.commit()
+    return {"status": "password_changed"}
+
+
+@app.delete("/auth/account")
+def delete_account(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    # Delete all user data in dependency order
+    db.query(Interaction).filter(Interaction.user_id == user.id).delete()
+    contacts = db.query(Contact).filter(Contact.user_id == user.id).all()
+    contact_ids = [c.id for c in contacts]
+    if contact_ids:
+        from .models import Weights, LifeEvent
+        db.query(Weights).filter(Weights.contact_id.in_(contact_ids)).delete(synchronize_session=False)
+        db.query(LifeEvent).filter(LifeEvent.contact_id.in_(contact_ids)).delete(synchronize_session=False)
+    db.query(Contact).filter(Contact.user_id == user.id).delete()
+    db.query(Gate).filter(Gate.creator_id == user.id).delete()
+    db.delete(user)
+    db.commit()
+    return {"status": "account_deleted"}
 
 
 # ══════════════════════════════════════════════

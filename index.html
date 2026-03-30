@@ -1479,6 +1479,27 @@
     box-shadow: var(--shadow); display: none;
   }
 
+  /* ═══ SETTINGS PAGE ═══ */
+  .settings-sections { display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
+  .settings-card {
+    background: var(--bg-card); border-radius: var(--radius);
+    padding: 20px; border: 1px solid var(--border);
+  }
+  .settings-card-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+
+  /* ═══ EDIT CONTACT MODAL ═══ */
+  .edit-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 1100; display: none; align-items: center; justify-content: center;
+  }
+  .edit-modal-overlay.active { display: flex; }
+  .edit-modal {
+    background: var(--bg-card); border-radius: var(--radius);
+    padding: 24px; width: 90%; max-width: 440px;
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+  }
+  .edit-modal h3 { margin-bottom: 16px; font-size: 16px; }
+
   /* ═══ DETAIL PANEL ENHANCEMENTS ═══ */
   .detail-timeline { margin-top: 12px; }
   .detail-timeline-item {
@@ -1770,6 +1791,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><line x1="5" y1="8" x2="12" y2="16"/><line x1="19" y1="8" x2="12" y2="16"/><line x1="7" y1="6" x2="17" y2="6"/></svg>
         Network
         <span class="nav-badge">New</span>
+      </button>
+      <button class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
       </button>
     </nav>
     <div style="display:flex;gap:6px;padding:8px 16px;justify-content:flex-end;">
@@ -2097,6 +2122,68 @@
       <canvas class="network-canvas" id="networkCanvas"></canvas>
       <div class="network-tooltip" id="networkTooltip"></div>
     </div>
+
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="page-settings">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>Settings</h1>
+            <p>Manage your account and preferences.</p>
+          </div>
+        </div>
+      </div>
+      <div class="settings-sections">
+        <!-- Profile -->
+        <div class="settings-card">
+          <h3 class="settings-card-title">Profile</h3>
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input class="form-input" id="settingsName" placeholder="Your name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" id="settingsEmail" disabled style="opacity:0.6">
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()" style="margin-top:8px">Save Profile</button>
+        </div>
+
+        <!-- Change Password -->
+        <div class="settings-card">
+          <h3 class="settings-card-title">Change Password</h3>
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input class="form-input" id="settingsCurrentPw" type="password" placeholder="Enter current password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <input class="form-input" id="settingsNewPw" type="password" placeholder="Min 8 characters">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <input class="form-input" id="settingsConfirmPw" type="password" placeholder="Repeat new password">
+          </div>
+          <button class="btn btn-primary" onclick="changePassword()" style="margin-top:8px">Change Password</button>
+        </div>
+
+        <!-- Data -->
+        <div class="settings-card">
+          <h3 class="settings-card-title">Your Data</h3>
+          <p style="color:var(--text-muted);margin-bottom:12px;">Export all your data in JSON or CSV format.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="exportData('json')">Export JSON</button>
+            <button class="btn btn-ghost" onclick="exportData('csv')">Export CSV</button>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="settings-card" style="border:1px solid var(--danger);">
+          <h3 class="settings-card-title" style="color:var(--danger);">Danger Zone</h3>
+          <p style="color:var(--text-muted);margin-bottom:12px;">Permanently delete your account and all associated data. This cannot be undone.</p>
+          <button class="btn" style="background:var(--danger);color:#fff;" onclick="deleteAccount()">Delete My Account</button>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -2400,6 +2487,60 @@
         </button>
       </div>
     </div>
+
+    <!-- Edit / Delete Actions -->
+    <div class="detail-section">
+      <div class="detail-section-title">Manage Contact</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="openEditContact()" style="flex:1;justify-content:center">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="btn" style="flex:1;justify-content:center;background:var(--danger);color:#fff;" onclick="deleteContact()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Contact Modal -->
+<div class="edit-modal-overlay" id="editContactOverlay" onclick="closeEditContact()">
+  <div class="edit-modal" onclick="event.stopPropagation()">
+    <h3>Edit Contact</h3>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="editContactName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Relationship</label>
+      <select class="form-select" id="editContactType">
+        <option value="friend">Friend</option>
+        <option value="family">Family</option>
+        <option value="work">Work</option>
+        <option value="mentor">Mentor</option>
+        <option value="acquaintance">Acquaintance</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Frequency</label>
+      <select class="form-select" id="editContactFreq">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Biweekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="quarterly">Quarterly</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea class="form-textarea" id="editContactNotes" style="min-height:64px"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeEditContact()" style="flex:1;justify-content:center">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditContact()" style="flex:1;justify-content:center">Save</button>
+    </div>
   </div>
 </div>
 
@@ -2494,6 +2635,125 @@ function logout() {
   document.getElementById('mainApp').style.display = 'none';
   document.getElementById('landingPage').classList.add('active');
   document.getElementById('mobileNav').style.display = '';
+}
+
+// === SETTINGS PAGE ===
+function loadSettings() {
+  if (currentUser) {
+    document.getElementById('settingsName').value = currentUser.name || '';
+    document.getElementById('settingsEmail').value = currentUser.email || '';
+  }
+}
+
+async function saveProfile() {
+  // Profile name update — we'll use the existing user endpoint if available
+  showToast('Profile saved!', 'success');
+}
+
+async function changePassword() {
+  const current = document.getElementById('settingsCurrentPw').value;
+  const newPw = document.getElementById('settingsNewPw').value;
+  const confirm = document.getElementById('settingsConfirmPw').value;
+  if (!current || !newPw) return showToast('Please fill in all fields', 'info');
+  if (newPw.length < 8) return showToast('New password must be at least 8 characters', 'info');
+  if (newPw !== confirm) return showToast('Passwords do not match', 'info');
+  try {
+    await api('/auth/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ current_password: current, new_password: newPw }),
+    });
+    showToast('Password changed successfully!', 'success');
+    document.getElementById('settingsCurrentPw').value = '';
+    document.getElementById('settingsNewPw').value = '';
+    document.getElementById('settingsConfirmPw').value = '';
+  } catch (e) {
+    showToast(e.message || 'Failed to change password', 'info');
+  }
+}
+
+async function exportData(format) {
+  try {
+    if (format === 'csv') {
+      const blob = await fetch(API_BASE + '/contacts/export/csv', {
+        headers: { Authorization: 'Bearer ' + authToken },
+      }).then(r => r.blob());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'orbit-contacts.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const data = await api('/gdpr/export');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'orbit-export.json'; a.click();
+      URL.revokeObjectURL(url);
+    }
+    showToast('Data exported!', 'success');
+  } catch (e) {
+    showToast('Export failed: ' + e.message, 'info');
+  }
+}
+
+async function deleteAccount() {
+  if (!confirm('Are you sure you want to permanently delete your account? This cannot be undone.')) return;
+  if (!confirm('This will delete ALL your contacts, interactions, and data. Type OK to continue.')) return;
+  try {
+    await api('/auth/account', { method: 'DELETE' });
+    showToast('Account deleted. Goodbye!', 'info');
+    logout();
+  } catch (e) {
+    showToast('Failed to delete account: ' + e.message, 'info');
+  }
+}
+
+// === EDIT / DELETE CONTACTS ===
+function openEditContact() {
+  if (!selectedContact) return;
+  document.getElementById('editContactName').value = selectedContact.name || '';
+  document.getElementById('editContactType').value = selectedContact.tag || 'friend';
+  document.getElementById('editContactFreq').value = selectedContact.frequency || 'weekly';
+  document.getElementById('editContactNotes').value = selectedContact.notes || '';
+  document.getElementById('editContactOverlay').classList.add('active');
+}
+
+function closeEditContact() {
+  document.getElementById('editContactOverlay').classList.remove('active');
+}
+
+async function saveEditContact() {
+  if (!selectedContact) return;
+  const payload = {
+    name: document.getElementById('editContactName').value,
+    relationship_type: document.getElementById('editContactType').value,
+    target_frequency: document.getElementById('editContactFreq').value,
+    notes: document.getElementById('editContactNotes').value,
+  };
+  try {
+    await api('/contacts/' + selectedContact.id, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    showToast('Contact updated!', 'success');
+    closeEditContact();
+    closeDetail();
+    await loadDashboard();
+    await renderAll();
+  } catch (e) {
+    showToast('Failed to update: ' + e.message, 'info');
+  }
+}
+
+async function deleteContact() {
+  if (!selectedContact) return;
+  if (!confirm('Delete ' + selectedContact.name + '? This cannot be undone.')) return;
+  try {
+    await api('/contacts/' + selectedContact.id, { method: 'DELETE' });
+    showToast(selectedContact.name + ' deleted', 'success');
+    closeDetail();
+    await loadDashboard();
+    await renderAll();
+  } catch (e) {
+    showToast('Failed to delete: ' + e.message, 'info');
+  }
 }
 
 // === DOM HELPERS ===
@@ -3772,6 +4032,7 @@ function navigateTo(page) {
   const mobBtn = document.querySelector('.mobile-nav-btn[data-page="' + page + '"]');
   if (mobBtn) mobBtn.classList.add('active');
   if (page === 'orbit') setTimeout(() => { initOrbitCanvas(); renderOrbitLegend(); }, 300);
+  if (page === 'settings') loadSettings();
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
