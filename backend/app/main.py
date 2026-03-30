@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Orbit API",
     description="Relationship Intelligence Backend",
-    version="0.2.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 

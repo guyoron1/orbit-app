@@ -4,13 +4,14 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
+# Cache bust — forces Docker to re-copy backend files
+ARG CACHE_BUST=v5-full-endpoints
+RUN echo "${CACHE_BUST}"
+
 COPY backend/ ./backend/
 COPY index.html .
 COPY manifest.json .
 COPY sw.js .
-
-# Force cache bust for new party/challenge features
-RUN echo "deploy-v5-fix-endpoints-httpx"
 
 WORKDIR /app/backend
 RUN python seed.py
