@@ -2332,9 +2332,10 @@ def export_all_user_data(
 # When API-only mode: returns JSON health check instead
 # ══════════════════════════════════════════════
 
-FRONTEND_PATH = Path(__file__).resolve().parent.parent.parent / "index.html"
-MANIFEST_PATH = Path(__file__).resolve().parent.parent.parent / "manifest.json"
-SW_PATH = Path(__file__).resolve().parent.parent.parent / "sw.js"
+_STATIC_ROOT = Path(__file__).resolve().parent.parent.parent
+FRONTEND_PATH = _STATIC_ROOT / "index.html"
+MANIFEST_PATH = _STATIC_ROOT / "manifest.json"
+SW_PATH = _STATIC_ROOT / "sw.js"
 
 
 @app.get("/manifest.json")
@@ -2345,6 +2346,16 @@ def serve_manifest():
 @app.get("/sw.js")
 def serve_sw():
     return FileResponse(SW_PATH, media_type="application/javascript")
+
+
+@app.get("/icon-192.png")
+def serve_icon_192():
+    return FileResponse(_STATIC_ROOT / "icon-192.png", media_type="image/png")
+
+
+@app.get("/icon-512.png")
+def serve_icon_512():
+    return FileResponse(_STATIC_ROOT / "icon-512.png", media_type="image/png")
 
 
 @app.get("/health")

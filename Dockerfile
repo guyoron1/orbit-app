@@ -12,6 +12,8 @@ COPY backend/ ./backend/
 COPY index.html .
 COPY manifest.json .
 COPY sw.js .
+COPY icon-192.png .
+COPY icon-512.png .
 
 WORKDIR /app/backend
 COPY backend/start.sh ./start.sh
