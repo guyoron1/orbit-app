@@ -1259,17 +1259,23 @@ def strava_status(
     return StravaStatusOut(connected=False)
 
 
+_strava_state_store: dict[str, int] = {}  # state_token -> user_id (short-lived)
+
+
 @app.get("/strava/connect")
 def strava_connect(user: User = Depends(get_current_user)):
     if not STRAVA_CLIENT_ID:
         raise HTTPException(503, "Strava integration not configured")
+    import secrets
+    state_token = secrets.token_urlsafe(32)
+    _strava_state_store[state_token] = user.id
     auth_url = (
         f"https://www.strava.com/oauth/authorize"
         f"?client_id={STRAVA_CLIENT_ID}"
         f"&redirect_uri={STRAVA_REDIRECT_URI}"
         f"&response_type=code"
         f"&scope=activity:read_all"
-        f"&state={user.id}"
+        f"&state={state_token}"
     )
     return {"auth_url": auth_url}
 
@@ -1285,6 +1291,11 @@ def strava_callback(
     if not STRAVA_CLIENT_ID or not STRAVA_CLIENT_SECRET:
         raise HTTPException(503, "Strava integration not configured")
 
+    # Validate CSRF state token
+    user_id = _strava_state_store.pop(state, None)
+    if user_id is None:
+        raise HTTPException(400, "Invalid or expired OAuth state")
+
     # Exchange code for token
     resp = httpx.post("https://www.strava.com/oauth/token", data={
         "client_id": STRAVA_CLIENT_ID,
@@ -1296,7 +1307,6 @@ def strava_callback(
         raise HTTPException(400, "Strava auth failed")
 
     data = resp.json()
-    user_id = int(state)
 
     # Upsert connection
     existing = db.query(StravaConnection).filter(StravaConnection.user_id == user_id).first()
