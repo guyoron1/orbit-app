@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v7-simple-cmd
+ARG CACHE_BUST=v8-start-sh
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/
@@ -16,4 +16,5 @@ COPY icon-192.png .
 COPY icon-512.png .
 
 WORKDIR /app/backend
-CMD python -c "from seed import seed; seed()" && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+RUN chmod +x start.sh
+CMD ["./start.sh"]
