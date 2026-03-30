@@ -14,7 +14,6 @@ COPY manifest.json .
 COPY sw.js .
 
 WORKDIR /app/backend
-RUN python seed.py
-
-WORKDIR /app/backend
-CMD python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+COPY backend/start.sh ./start.sh
+RUN chmod +x start.sh
+CMD ["./start.sh"]

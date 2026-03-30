@@ -22,6 +22,7 @@ from app.decay import update_weights_after_interaction
 
 def seed():
     """Seed the database with demo data. Only runs if database is empty."""
+    # Schema is managed by Alembic migrations; create_all is a fallback for local dev
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
