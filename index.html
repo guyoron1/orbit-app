@@ -1495,6 +1495,32 @@
     box-shadow: var(--shadow); display: none;
   }
 
+  /* ═══ OFFLINE BAR ═══ */
+  .offline-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: var(--warning, #fdcb6e); color: #1a1a2e;
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 8px; justify-content: center;
+    animation: slideDown 0.3s ease;
+  }
+  @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+  /* ═══ LOADING SKELETON ═══ */
+  .skeleton {
+    background: linear-gradient(90deg, var(--bg-card) 25%, rgba(255,255,255,0.05) 50%, var(--bg-card) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* ═══ EMPTY STATE ═══ */
+  .empty-state {
+    text-align: center; padding: 48px 24px; color: var(--text-muted);
+  }
+  .empty-state svg { opacity: 0.3; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; max-width: 300px; margin: 0 auto; }
+
   /* ═══ SETTINGS PAGE ═══ */
   .settings-sections { display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
   .settings-card {
@@ -2590,6 +2616,12 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
+<!-- Offline Indicator -->
+<div class="offline-bar" id="offlineBar" style="display:none;" role="alert">
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+  You're offline — changes will sync when reconnected
+</div>
+
 <!-- Confetti Canvas -->
 <canvas id="confettiCanvas"></canvas>
 
@@ -2622,20 +2654,38 @@ let currentUser = JSON.parse(localStorage.getItem('orbit_user') || 'null');
 let selectedContact = null;
 
 // === API HELPERS ===
+const API_BASE = API || '';
+
 async function api(path, opts) {
   const headers = { 'Content-Type': 'application/json' };
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-  const res = await fetch(API + path, { headers, ...opts });
-  if (res.status === 401) {
-    logout();
-    throw new Error('Session expired. Please log in again.');
+  try {
+    const res = await fetch(API_BASE + path, { headers, ...opts });
+    if (res.status === 401) {
+      logout();
+      throw new Error('Session expired. Please log in again.');
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || 'API error: ' + res.status);
+    }
+    return res.json();
+  } catch (e) {
+    if (!navigator.onLine) {
+      showToast('You are offline. Changes will sync later.', 'info');
+    }
+    throw e;
   }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || 'API error: ' + res.status);
-  }
-  return res.json();
 }
+
+// Offline detection
+window.addEventListener('online', () => {
+  document.getElementById('offlineBar').style.display = 'none';
+  showToast('Back online!', 'success');
+});
+window.addEventListener('offline', () => {
+  document.getElementById('offlineBar').style.display = 'flex';
+});
 
 function setAuth(token, user) {
   authToken = token;
@@ -4439,7 +4489,11 @@ function showDashboard() {
     })
     .catch(e => {
       overlay.classList.add('hidden');
-      showToast('Could not connect: ' + e.message, 'info');
+      if (!navigator.onLine) {
+        showToast('You are offline. Showing cached data if available.', 'info');
+      } else {
+        showToast('Could not connect: ' + e.message + ' — tap to retry', 'info');
+      }
     });
 }
 
