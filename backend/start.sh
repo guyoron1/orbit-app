@@ -2,27 +2,39 @@
 
 echo "=== Orbit Startup ==="
 
-# Step 1: Stamp existing databases so Alembic knows they're current
+# Handle database schema and Alembic state in one step
 python -c "
-from app.database import engine
+from app.database import Base, engine
+from app import models  # register all models
 from sqlalchemy import inspect
+
 tables = inspect(engine).get_table_names()
-if 'alembic_version' not in tables and len(tables) > 0:
-    print('Existing DB without migration tracking — stamping head')
+has_alembic = 'alembic_version' in tables
+has_tables = len([t for t in tables if t != 'alembic_version']) > 0
+
+if has_tables and has_alembic:
+    # Normal case: run pending migrations
+    print('Running pending Alembic migrations...')
+    import subprocess, sys
+    subprocess.run([sys.executable, '-m', 'alembic', 'upgrade', 'head'], check=True)
+
+elif has_tables and not has_alembic:
+    # Tables from create_all but no Alembic tracking — stamp head
+    print('Existing tables without Alembic — stamping head')
     import subprocess, sys
     subprocess.run([sys.executable, '-m', 'alembic', 'stamp', 'head'], check=True)
-elif 'alembic_version' in tables:
-    print('Alembic version table found — will run upgrade')
+
 else:
-    print('Empty database — will create via migrations')
-" || echo "WARNING: stamp check failed, continuing anyway"
+    # Empty DB — create tables via create_all, then stamp
+    print('Empty database — creating tables...')
+    Base.metadata.create_all(bind=engine)
+    print('Stamping Alembic head...')
+    import subprocess, sys
+    subprocess.run([sys.executable, '-m', 'alembic', 'stamp', 'head'], check=True)
+" || echo "WARNING: migration step had an error, continuing"
 
-# Step 2: Run migrations (creates tables for empty DBs, applies new migrations for existing)
-python -m alembic upgrade head || echo "WARNING: alembic upgrade failed — tables may already exist, continuing"
-
-# Step 3: Seed (only if DB is empty)
+echo "Seeding database (skips if data exists)..."
 python -c "from seed import seed; seed()" || echo "WARNING: seed failed"
 
-# Step 4: Start server
 echo "Starting server..."
 exec python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
