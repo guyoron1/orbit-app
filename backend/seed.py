@@ -21,9 +21,18 @@ from app.decay import update_weights_after_interaction
 
 
 def seed():
-    Base.metadata.drop_all(bind=engine)
+    """Seed the database with demo data. Only runs if database is empty."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
+
+    # Safety check: never wipe existing data
+    existing_users = db.query(User).count()
+    if existing_users > 0:
+        print("Database already has data — skipping seed to preserve production data.")
+        db.close()
+        return
+
+    print("Empty database detected — seeding demo data...")
 
     now = datetime.utcnow()
 

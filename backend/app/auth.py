@@ -20,7 +20,13 @@ from .database import get_db
 from .models import User
 
 # ── Config ──
-SECRET_KEY = os.environ.get("JWT_SECRET", "orbit-dev-secret-change-in-prod-32chars!")
+SECRET_KEY = os.environ.get("JWT_SECRET", "")
+if not SECRET_KEY:
+    import warnings
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT"):
+        raise RuntimeError("JWT_SECRET must be set in production. Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\"")
+    SECRET_KEY = "orbit-local-dev-only-not-for-production"
+    warnings.warn("Using insecure default JWT_SECRET — set JWT_SECRET env var for production", stacklevel=1)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("TOKEN_EXPIRE_MINUTES", "1440"))  # 24h default
 

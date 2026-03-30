@@ -96,13 +96,18 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
+if _origins_env:
+    ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
+else:
+    # Dev mode: allow all. In production, set ALLOWED_ORIGINS env var.
+    ALLOWED_ORIGINS = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_credentials=True if ALLOWED_ORIGINS != ["*"] else False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -119,27 +124,40 @@ async def add_security_headers(request: Request, call_next):
 
 # ── In-memory rate limiter (60 req/min per IP) ──
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
+_rate_limit_last_cleanup = time.time()
 RATE_LIMIT_MAX_REQUESTS = 60
 RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_IPS = 10000  # Prevent unbounded memory growth
 
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
+    global _rate_limit_last_cleanup
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
     window_start = now - RATE_LIMIT_WINDOW_SECONDS
 
-    # Prune old timestamps
-    timestamps = _rate_limit_store[client_ip]
-    _rate_limit_store[client_ip] = [t for t in timestamps if t > window_start]
+    # Periodic cleanup: evict stale IPs every 5 minutes
+    if now - _rate_limit_last_cleanup > 300:
+        stale = [ip for ip, ts in _rate_limit_store.items() if not ts or ts[-1] < window_start]
+        for ip in stale:
+            del _rate_limit_store[ip]
+        _rate_limit_last_cleanup = now
 
-    if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
-        return JSONResponse(
-            status_code=429,
-            content={"detail": "Rate limit exceeded. Max 60 requests per minute."},
-        )
+    # Cap total tracked IPs to prevent memory exhaustion
+    if len(_rate_limit_store) > RATE_LIMIT_MAX_IPS and client_ip not in _rate_limit_store:
+        pass  # Don't track new IPs when at capacity (fail open)
+    else:
+        timestamps = _rate_limit_store[client_ip]
+        _rate_limit_store[client_ip] = [t for t in timestamps if t > window_start]
 
-    _rate_limit_store[client_ip].append(now)
+        if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded. Max 60 requests per minute."},
+            )
+        _rate_limit_store[client_ip].append(now)
+
     response = await call_next(request)
     return response
 
