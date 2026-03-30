@@ -10,7 +10,7 @@ COPY manifest.json .
 COPY sw.js .
 
 # Force cache bust for new party/challenge features
-RUN echo "deploy-v4-full-monarch"
+RUN echo "deploy-v5-fix-endpoints-httpx"
 
 WORKDIR /app/backend
 RUN python seed.py
