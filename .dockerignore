@@ -12,7 +12,9 @@ backend/app/__pycache__/
 *.mjs
 *.webm
 *.mp4
-*.png
+demo-screenshots/*.png
+screenshots/*.png
+fix-screenshots/*.png
 .env
 render.yaml
 package*.json
