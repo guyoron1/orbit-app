@@ -66,7 +66,7 @@ from .schemas import (
     GateOut, GateCreate, StatAllocation, ShadowExtractOut,
     BossRaidCreate, BossRaidOut,
 )
-from .decay import compute_health, update_weights_after_interaction
+from .decay import compute_health, compute_health_batch, update_weights_after_interaction
 from .auth import hash_password, verify_password, create_access_token, get_current_user
 from .ai import generate_conversation_starters, generate_relationship_summary
 from .gamification import (
@@ -280,10 +280,19 @@ def create_contact(
 
 @app.get("/contacts", response_model=list[ContactOut])
 def list_contacts(
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return db.query(Contact).filter(Contact.user_id == user.id).all()
+    return (
+        db.query(Contact)
+        .filter(Contact.user_id == user.id)
+        .order_by(Contact.name)
+        .offset(skip)
+        .limit(min(limit, 200))
+        .all()
+    )
 
 
 @app.delete("/contacts/{contact_id}")
@@ -1373,11 +1382,17 @@ def get_dashboard(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    contacts_list = db.query(Contact).filter(Contact.user_id == user.id).all()
+    from sqlalchemy.orm import joinedload
+    contacts_list = (
+        db.query(Contact)
+        .options(joinedload(Contact.weights))
+        .filter(Contact.user_id == user.id)
+        .all()
+    )
     now = datetime.utcnow()
     week_ago = now - timedelta(days=7)
 
-    reports = [compute_health(c, db, now) for c in contacts_list]
+    reports = compute_health_batch(contacts_list, db, now)
 
     inner_circle = [r for r in reports if r.health >= 75]
     avg_health = sum(r.health for r in reports) / len(reports) if reports else 0
