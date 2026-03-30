@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v5-full-endpoints
+ARG CACHE_BUST=v6-all-phases
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/
@@ -16,6 +16,5 @@ COPY icon-192.png .
 COPY icon-512.png .
 
 WORKDIR /app/backend
-COPY backend/start.sh ./start.sh
 RUN chmod +x start.sh
 CMD ["./start.sh"]
