@@ -1,0 +1,9 @@
+# iOS
+app_identifier("io.orbitapp.app")
+apple_id(ENV["APPLE_ID"] || "your@apple.id")
+team_id(ENV["APPLE_TEAM_ID"] || "YOUR_TEAM_ID")
+itc_team_id(ENV["ITC_TEAM_ID"] || "YOUR_ITC_TEAM_ID")
+
+# Android
+json_key_file(ENV["PLAY_STORE_JSON_KEY"] || "play-store-key.json")
+package_name("io.orbitapp.app")

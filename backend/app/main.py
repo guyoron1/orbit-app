@@ -22,8 +22,11 @@ Protected endpoints (require Bearer token):
 import os
 import csv
 import io
+import re
 import time
 import random
+import logging
+import traceback
 from collections import defaultdict
 from datetime import datetime, timedelta, date
 from contextlib import asynccontextmanager
@@ -40,10 +43,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+log = logging.getLogger("orbit.api")
+
 from .database import Base, engine, get_db
 from .models import (
     User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
-    Party, PartyMember, Challenge, StravaConnection, Gate, BossRaid,
+    Party, PartyMember, Challenge, StravaConnection, Gate, BossRaid, PushToken,
     NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus, Recurrence,
     HunterRank,
     INTERACTION_DEPTH, FREQUENCY_DAYS,
@@ -56,6 +61,7 @@ from .schemas import (
     LifeEventCreate, LifeEventOut,
     NudgeOut, DashboardOut,
     SignupRequest, LoginRequest, PasswordChangeRequest, TokenResponse,
+    ForgotPasswordRequest, ResetPasswordRequest, VerifyEmailRequest, PushTokenRegister,
     ConversationStartersOut, AISummaryOut,
     QuestOut, AchievementDef, XPAwardOut, LevelProgressOut,
     GamificationDashboardOut,
@@ -65,9 +71,13 @@ from .schemas import (
     NearbyContactOut, LocationUpdate, StravaStatusOut,
     GateOut, GateCreate, StatAllocation, ShadowExtractOut,
     BossRaidCreate, BossRaidOut,
+    AppleLoginRequest, GoogleLoginRequest,
 )
 from .decay import compute_health, compute_health_batch, update_weights_after_interaction
-from .auth import hash_password, verify_password, create_access_token, get_current_user
+from .auth import (
+    hash_password, verify_password, create_access_token, get_current_user,
+    decode_purpose_token, send_verification_email, send_reset_email,
+)
 from .ai import generate_conversation_starters, generate_relationship_summary
 from .gamification import (
     award_interaction_xp, generate_quests, complete_quest,
@@ -99,8 +109,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 _origins_env = os.environ.get("ALLOWED_ORIGINS", "")
 if _origins_env:
     ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
+elif os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT"):
+    # Production: only allow our own domain + Capacitor origins
+    ALLOWED_ORIGINS = [
+        "https://orbit-app-production-fd37.up.railway.app",
+        "capacitor://localhost",   # iOS Capacitor
+        "http://localhost",        # Android Capacitor
+    ]
 else:
-    # Dev mode: allow all. In production, set ALLOWED_ORIGINS env var.
     ALLOWED_ORIGINS = ["*"]
 app.add_middleware(
     CORSMiddleware,
@@ -111,6 +127,51 @@ app.add_middleware(
 )
 
 
+# ── Sentry error tracking (optional) ──
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if _SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=_SENTRY_DSN,
+            traces_sample_rate=0.1,
+            environment=os.environ.get("RAILWAY_ENVIRONMENT", "development"),
+        )
+        log.info("Sentry error tracking enabled")
+    except ImportError:
+        log.warning("SENTRY_DSN set but sentry-sdk not installed")
+
+
+# ── Global exception handler ──
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch unhandled exceptions — log the full traceback, return a safe response."""
+    log.error("Unhandled exception on %s %s: %s\n%s",
+              request.method, request.url.path, exc, traceback.format_exc())
+    if _SENTRY_DSN:
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            pass
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+
+# ── Request body size limit (1MB) ──
+MAX_BODY_SIZE = int(os.environ.get("MAX_BODY_SIZE", str(1024 * 1024)))
+
+
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+    return await call_next(request)
+
+
 # ── Security headers middleware ──
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -119,6 +180,18 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://appleid.cdn-apple.com https://accounts.google.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self' https://appleid.apple.com https://accounts.google.com; "
+        "frame-src https://appleid.apple.com https://accounts.google.com; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
     return response
 
 
@@ -162,13 +235,27 @@ async def rate_limit_middleware(request: Request, call_next):
     return response
 
 
+# ── Input sanitization ──
+_HTML_TAG_RE = re.compile(r'<[^>]+>')
+_SCRIPT_RE = re.compile(r'<script[^>]*>.*?</script>', re.IGNORECASE | re.DOTALL)
+
+
+def sanitize(text: str) -> str:
+    """Strip HTML tags and script content from user input."""
+    if not text:
+        return text
+    text = _SCRIPT_RE.sub('', text)
+    text = _HTML_TAG_RE.sub('', text)
+    return text.strip()
+
+
 # ══════════════════════════════════════════════
 # AUTH ENDPOINTS (public)
 # ══════════════════════════════════════════════
 
 @app.post("/auth/signup", response_model=TokenResponse)
 @limiter.limit("5/minute")
-def signup(request: Request, data: SignupRequest, db: Session = Depends(get_db)):
+async def signup(request: Request, data: SignupRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(400, "Email already registered")
@@ -176,12 +263,19 @@ def signup(request: Request, data: SignupRequest, db: Session = Depends(get_db))
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),
-        name=data.name,
+        name=sanitize(data.name),
         timezone=data.timezone,
+        email_verified=False,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Send verification email (non-blocking — don't fail signup if email fails)
+    try:
+        await send_verification_email(user.id, user.email, user.name)
+    except Exception:
+        pass  # Email failure shouldn't block signup
 
     token = create_access_token(user.id, user.email)
     return TokenResponse(
@@ -204,6 +298,89 @@ def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
     )
 
 
+@app.post("/auth/apple", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def login_apple(request: Request, data: AppleLoginRequest, db: Session = Depends(get_db)):
+    """Sign in with Apple. Creates account on first use."""
+    from .social_auth import verify_apple_token
+
+    try:
+        apple_user = await verify_apple_token(data.id_token)
+    except ValueError as e:
+        raise HTTPException(401, str(e))
+
+    provider_id = f"apple_{apple_user['sub']}"
+
+    # Check if user already exists with this Apple ID
+    user = db.query(User).filter(User.auth_provider_id == provider_id).first()
+    if not user:
+        # Check if email already exists (link accounts)
+        user = db.query(User).filter(User.email == apple_user["email"]).first()
+        if user:
+            # Link existing email account to Apple
+            user.auth_provider = "apple"
+            user.auth_provider_id = provider_id
+            user.email_verified = True
+            db.commit()
+        else:
+            # Create new account
+            name = data.name or apple_user["email"].split("@")[0]
+            user = User(
+                email=apple_user["email"],
+                name=name,
+                timezone=data.timezone,
+                auth_provider="apple",
+                auth_provider_id=provider_id,
+                email_verified=True,  # Apple verifies email
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+    token = create_access_token(user.id, user.email)
+    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
+
+
+@app.post("/auth/google", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def login_google(request: Request, data: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """Sign in with Google. Creates account on first use."""
+    from .social_auth import verify_google_token
+
+    try:
+        google_user = await verify_google_token(data.id_token)
+    except ValueError as e:
+        raise HTTPException(401, str(e))
+
+    provider_id = f"google_{google_user['sub']}"
+
+    # Check if user already exists with this Google ID
+    user = db.query(User).filter(User.auth_provider_id == provider_id).first()
+    if not user:
+        # Check if email already exists (link accounts)
+        user = db.query(User).filter(User.email == google_user["email"]).first()
+        if user:
+            user.auth_provider = "google"
+            user.auth_provider_id = provider_id
+            user.email_verified = True
+            db.commit()
+        else:
+            user = User(
+                email=google_user["email"],
+                name=google_user.get("name") or google_user["email"].split("@")[0],
+                timezone=data.timezone,
+                auth_provider="google",
+                auth_provider_id=provider_id,
+                email_verified=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+    token = create_access_token(user.id, user.email)
+    return TokenResponse(access_token=token, user=UserOut.model_validate(user))
+
+
 @app.get("/auth/me", response_model=UserOut)
 def get_me(user: User = Depends(get_current_user)):
     return user
@@ -215,6 +392,8 @@ def change_password(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    if user.auth_provider != "email":
+        raise HTTPException(400, f"Password changes not available for {user.auth_provider} accounts")
     if not verify_password(data.current_password, user.password_hash):
         raise HTTPException(400, "Current password is incorrect")
     user.password_hash = hash_password(data.new_password)
@@ -223,7 +402,9 @@ def change_password(
 
 
 @app.delete("/auth/account")
+@limiter.limit("3/hour")
 def delete_account(
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -237,9 +418,171 @@ def delete_account(
         db.query(LifeEvent).filter(LifeEvent.contact_id.in_(contact_ids)).delete(synchronize_session=False)
     db.query(Contact).filter(Contact.user_id == user.id).delete()
     db.query(Gate).filter(Gate.creator_id == user.id).delete()
+    db.query(PushToken).filter(PushToken.user_id == user.id).delete()
     db.delete(user)
     db.commit()
     return {"status": "account_deleted"}
+
+
+# ── Email Verification & Password Reset ──
+
+@app.post("/auth/verify-email")
+async def verify_email(data: VerifyEmailRequest, db: Session = Depends(get_db)):
+    """Verify a user's email using the token from the verification email."""
+    payload = decode_purpose_token(data.token, "verify")
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    if user.email_verified:
+        return {"status": "already_verified"}
+    user.email_verified = True
+    db.commit()
+    return {"status": "verified"}
+
+
+@app.post("/auth/resend-verification")
+@limiter.limit("3/minute")
+async def resend_verification(request: Request, user: User = Depends(get_current_user)):
+    """Resend the verification email for the current user."""
+    if user.email_verified:
+        return {"status": "already_verified"}
+    await send_verification_email(user.id, user.email, user.name)
+    return {"status": "sent"}
+
+
+@app.post("/auth/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Send a password reset email. Always returns success to prevent email enumeration."""
+    user = db.query(User).filter(User.email == data.email).first()
+    if user:
+        await send_reset_email(user.id, user.email, user.name)
+    # Always return success to prevent email enumeration
+    return {"status": "sent", "message": "If that email exists, a reset link has been sent."}
+
+
+@app.post("/auth/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using the token from the reset email."""
+    payload = decode_purpose_token(data.token, "reset")
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    user.password_hash = hash_password(data.new_password)
+    db.commit()
+    return {"status": "password_reset"}
+
+
+# ── Push Notification Token Management ──
+
+@app.post("/auth/push-token")
+@limiter.limit("10/minute")
+def register_push_token(
+    request: Request,
+    data: PushTokenRegister,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Register or update a device push notification token."""
+    existing = db.query(PushToken).filter(PushToken.token == data.token).first()
+    if existing:
+        existing.user_id = user.id
+        existing.platform = data.platform
+        existing.active = True
+        existing.updated_at = datetime.utcnow()
+    else:
+        db.add(PushToken(
+            user_id=user.id,
+            token=data.token,
+            platform=data.platform,
+        ))
+    db.commit()
+    return {"status": "registered"}
+
+
+@app.delete("/auth/push-token")
+def unregister_push_token(
+    data: PushTokenRegister,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Deactivate a push token (e.g., on logout)."""
+    token = db.query(PushToken).filter(
+        PushToken.token == data.token,
+        PushToken.user_id == user.id,
+    ).first()
+    if token:
+        token.active = False
+        db.commit()
+    return {"status": "unregistered"}
+
+
+@app.post("/notifications/send-nudges")
+async def send_nudge_notifications(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Send push notifications for all pending nudges.
+    Designed to be called by a cron job or scheduler.
+    Protected by an API key in the Authorization header.
+    """
+    import os
+    cron_key = os.environ.get("CRON_API_KEY", "")
+    auth_header = request.headers.get("Authorization", "")
+
+    # Allow either cron key or a valid user token (for manual testing)
+    if cron_key and auth_header == f"Bearer {cron_key}":
+        pass  # Authorized via cron key
+    else:
+        # Try user auth — only allow if user exists (for dev testing)
+        try:
+            get_current_user(auth_header.replace("Bearer ", ""), db)
+        except Exception:
+            raise HTTPException(401, "Unauthorized — set CRON_API_KEY env var")
+
+    from .push import send_push_to_user
+
+    # Find all pending nudges that haven't been pushed yet
+    pending_nudges = (
+        db.query(Nudge)
+        .filter(Nudge.status == NudgeStatus.pending)
+        .order_by(Nudge.priority.desc())
+        .limit(100)
+        .all()
+    )
+
+    sent_count = 0
+    user_cache: dict = {}
+
+    for nudge in pending_nudges:
+        # Get user's contact name for the nudge
+        contact = db.query(Contact).filter(Contact.id == nudge.contact_id).first()
+        contact_name = contact.name if contact else "someone"
+
+        title = "Orbit Nudge"
+        body = nudge.message or f"Time to reach out to {contact_name}!"
+
+        if nudge.suggestion:
+            body += f" — {nudge.suggestion}"
+
+        result = await send_push_to_user(
+            db=db,
+            user_id=nudge.user_id,
+            title=title,
+            body=body,
+            data={"page": "contacts", "nudge_id": str(nudge.id)},
+        )
+        sent_count += result
+
+    return {
+        "status": "done",
+        "nudges_processed": len(pending_nudges),
+        "notifications_sent": sent_count,
+    }
 
 
 # ══════════════════════════════════════════════
@@ -261,11 +604,11 @@ def create_contact(
 
     contact = Contact(
         user_id=user.id,
-        name=data.name,
+        name=sanitize(data.name),
         relationship_type=data.relationship_type,
         target_frequency=data.target_frequency,
-        notes=data.notes,
-        city=data.city,
+        notes=sanitize(data.notes),
+        city=sanitize(data.city),
     )
     db.add(contact)
     db.commit()
@@ -324,7 +667,10 @@ def update_contact(
     if not contact:
         raise HTTPException(404, "Contact not found")
 
+    _text_fields = {"name", "notes", "city"}
     for field, value in data.model_dump(exclude_unset=True).items():
+        if field in _text_fields and isinstance(value, str):
+            value = sanitize(value)
         setattr(contact, field, value)
     db.commit()
     db.refresh(contact)
@@ -359,7 +705,7 @@ def log_interaction(
         interaction_type=data.interaction_type,
         duration_minutes=data.duration_minutes,
         initiated_by_user=data.initiated_by_user,
-        notes=data.notes,
+        notes=sanitize(data.notes),
         quality_score=round(quality, 3),
         timestamp=datetime.utcnow(),
     )
@@ -488,7 +834,9 @@ def get_conversation_starters(
 # ══════════════════════════════════════════════
 
 @app.post("/life-events", response_model=LifeEventOut)
+@limiter.limit("30/minute")
 def create_life_event(
+    request: Request,
     data: LifeEventCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -502,7 +850,7 @@ def create_life_event(
     event = LifeEvent(
         contact_id=data.contact_id,
         event_type=data.event_type,
-        description=data.description,
+        description=sanitize(data.description),
         event_date=data.event_date,
         pause_decay=data.pause_decay,
     )
@@ -656,10 +1004,10 @@ def create_party(
 
     party = Party(
         creator_id=user.id,
-        title=data.title,
+        title=sanitize(data.title),
         activity_type=data.activity_type,
-        description=data.description,
-        location=data.location,
+        description=sanitize(data.description),
+        location=sanitize(data.location),
         scheduled_at=data.scheduled_at,
         xp_reward=base_xp,
         is_recurring=data.is_recurring,
@@ -872,8 +1220,8 @@ def create_challenge(
     challenge = Challenge(
         challenger_id=user.id,
         contact_id=data.contact_id,
-        title=data.title,
-        description=data.description,
+        title=sanitize(data.title),
+        description=sanitize(data.description),
         activity_type=data.activity_type,
         xp_reward=xp,
         expires_at=datetime.utcnow() + timedelta(days=7),
@@ -1711,8 +2059,8 @@ def create_gate(
 
     gate = Gate(
         creator_id=user.id,
-        title=gate_data.title,
-        description=gate_data.description,
+        title=sanitize(gate_data.title),
+        description=sanitize(gate_data.description),
         gate_rank=HunterRank(rank_str),
         xp_reward=xp_reward,
         time_limit_hours=gate_data.time_limit_hours,
@@ -2034,9 +2382,9 @@ def create_boss_raid(
     """Create a new boss raid."""
     raid = BossRaid(
         creator_id=user.id,
-        title=data.title,
-        description=data.description,
-        boss_name=data.boss_name,
+        title=sanitize(data.title),
+        description=sanitize(data.description),
+        boss_name=sanitize(data.boss_name),
         boss_hp=data.boss_hp,
         boss_max_hp=data.boss_hp,
         xp_reward=data.xp_reward,
@@ -2217,7 +2565,9 @@ def export_contacts_csv(
 
 
 @app.post("/contacts/import/csv")
+@limiter.limit("5/hour")
 def import_contacts_csv(
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -2383,6 +2733,19 @@ def serve_icon_512():
     return FileResponse(_STATIC_ROOT / "icon-512.png", media_type="image/png")
 
 
+@app.get("/icon-180.png")
+def serve_icon_180():
+    return FileResponse(_STATIC_ROOT / "icon-180.png", media_type="image/png")
+
+
+@app.get("/native-bridge.js")
+def serve_native_bridge():
+    path = _STATIC_ROOT / "native-bridge.js"
+    if path.exists():
+        return FileResponse(path, media_type="application/javascript")
+    return JSONResponse(content={}, status_code=404)
+
+
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     """Health check for monitoring and load balancers."""
@@ -2392,6 +2755,34 @@ def health_check(db: Session = Depends(get_db)):
     except Exception:
         return JSONResponse(status_code=503, content={"status": "unhealthy"})
 
+
+@app.get("/verify")
+def serve_verify():
+    """Email verification landing page."""
+    if FRONTEND_PATH.exists():
+        return FileResponse(FRONTEND_PATH, media_type="text/html")
+    return {"message": "Verify your email at the Orbit app"}
+
+@app.get("/reset-password")
+def serve_reset_password():
+    """Password reset landing page."""
+    if FRONTEND_PATH.exists():
+        return FileResponse(FRONTEND_PATH, media_type="text/html")
+    return {"message": "Reset your password at the Orbit app"}
+
+@app.get("/privacy")
+def serve_privacy():
+    """Standalone privacy policy page for app store listings."""
+    if FRONTEND_PATH.exists():
+        return FileResponse(FRONTEND_PATH, media_type="text/html")
+    return {"message": "Privacy Policy — contact privacy@orbitapp.io"}
+
+@app.get("/terms")
+def serve_terms():
+    """Standalone terms of service page for app store listings."""
+    if FRONTEND_PATH.exists():
+        return FileResponse(FRONTEND_PATH, media_type="text/html")
+    return {"message": "Terms of Service — contact legal@orbitapp.io"}
 
 @app.get("/")
 def serve_frontend():

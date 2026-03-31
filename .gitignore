@@ -15,3 +15,18 @@ package-lock.json
 demo.mjs
 demo-full.mjs
 review-screenshots.mjs
+
+# Build artifacts
+build/
+*.ipa
+*.aab
+*.apk
+
+# Signing keys (never commit these)
+*.jks
+*.keystore
+keystore.properties
+play-store-key.json
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/

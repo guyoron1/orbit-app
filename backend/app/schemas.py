@@ -29,6 +29,35 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=128)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., max_length=255)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class AppleLoginRequest(BaseModel):
+    id_token: str
+    name: Optional[str] = None  # Apple only sends name on first auth
+    timezone: str = "UTC"
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+    timezone: str = "UTC"
+
+
+class PushTokenRegister(BaseModel):
+    token: str = Field(..., max_length=500)
+    platform: str = Field(..., pattern="^(ios|android|web)$")
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -49,6 +78,8 @@ class UserOut(BaseModel):
     name: str
     timezone: str
     plan: str
+    email_verified: bool = False
+    auth_provider: str = "email"
     created_at: datetime
     xp: int = 0
     level: int = 1

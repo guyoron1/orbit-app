@@ -1,5 +1,5 @@
-const CACHE_NAME = 'orbit-v3';
-const SHELL_ASSETS = ['/', '/manifest.json'];
+const CACHE_NAME = 'orbit-v4';
+const SHELL_ASSETS = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-180.png'];
 
 // ── Install: cache the app shell ──
 self.addEventListener('install', event => {

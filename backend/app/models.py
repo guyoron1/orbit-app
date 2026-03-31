@@ -172,6 +172,9 @@ class User(Base):
     name = Column(String(255), nullable=False)
     timezone = Column(String(50), default="UTC")
     plan = Column(String(20), default="free")
+    email_verified = Column(Boolean, default=False)
+    auth_provider = Column(String(20), default="email")  # "email", "apple", "google"
+    auth_provider_id = Column(String(255), nullable=True, unique=True)  # provider's user ID
     created_at = Column(DateTime, default=datetime.utcnow)
 
     city = Column(String(100), default="")
@@ -409,6 +412,21 @@ class Challenge(Base):
 
     challenger = relationship("User", back_populates="challenges_sent", foreign_keys=[challenger_id])
     challenged_contact = relationship("Contact", foreign_keys=[contact_id])
+
+
+class PushToken(Base):
+    """Device push notification tokens (FCM) per user."""
+    __tablename__ = "push_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token = Column(String(500), nullable=False, unique=True)
+    platform = Column(String(20), nullable=False)  # "ios", "android", "web"
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
 
 
 class StravaConnection(Base):

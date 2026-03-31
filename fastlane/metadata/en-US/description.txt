@@ -1,0 +1,36 @@
+Orbit is your personal relationship intelligence companion. It helps you maintain and strengthen your connections with friends, family, colleagues, and everyone in between.
+
+Your relationships are your most valuable asset, but life gets busy. Orbit makes sure no one falls through the cracks.
+
+KEY FEATURES:
+
+Relationship Health Scores
+Each contact gets a dynamic health score based on interaction frequency, depth, and reciprocity. Watch your relationships flourish or catch them before they fade.
+
+Smart Nudges
+Get personalized reminders about who to reach out to, with AI-powered conversation starters tailored to each relationship.
+
+AI-Powered Insights
+Understand your social patterns with intelligent summaries and actionable suggestions powered by Claude AI.
+
+Gamified Motivation
+Level up your social skills with XP, quests, achievements, and a Solo Leveling-inspired ranking system. Complete daily quests, join parties, and climb the hunter ranks.
+
+Visual Orbit View
+See all your relationships mapped in an interactive orbital visualization. Inner circle, close friends, acquaintances - everyone has their place.
+
+Social Challenges
+Challenge yourself with gates, boss raids, and streak challenges to keep your connections active.
+
+Life Events Tracking
+Log birthdays, moves, job changes, and other milestones to always have context for your conversations.
+
+Interaction Logging
+Track calls, meetups, messages, and more. Orbit learns your patterns and adapts its recommendations.
+
+Privacy First
+Your relationship data stays private and secure. No social media scraping, no contact sharing.
+
+Whether you're maintaining a dozen close friendships or managing a network of hundreds, Orbit helps you be intentional about the connections that matter most.
+
+Download Orbit and start nurturing your relationships today.

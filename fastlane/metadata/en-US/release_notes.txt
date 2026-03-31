@@ -1,0 +1,9 @@
+Welcome to Orbit! This is our first release.
+
+- Relationship health tracking with smart decay algorithms
+- AI-powered conversation starters and insights
+- Gamification with XP, quests, achievements, and hunter ranks
+- Visual orbit map of your relationships
+- Push notifications for nudges
+- Sign in with Apple and Google
+- Dark mode throughout

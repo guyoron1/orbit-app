@@ -18,3 +18,7 @@ fix-screenshots/*.png
 .env
 render.yaml
 package*.json
+ios/
+android/
+www/
+capacitor.config.json

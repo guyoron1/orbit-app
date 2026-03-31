@@ -1,0 +1,104 @@
+# Orbit Fastfile
+# Usage:
+#   fastlane ios beta    — Build & upload to TestFlight
+#   fastlane android beta — Build & upload to Play Console internal track
+
+default_platform(:ios)
+
+# ── iOS ──
+
+platform :ios do
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    # Sync web assets to Capacitor
+    sh("cd #{Dir.pwd}/.. && npm run cap:sync")
+
+    # Install CocoaPods
+    cocoapods(
+      podfile: "./ios/App/Podfile",
+      clean_install: true
+    )
+
+    # Increment build number
+    increment_build_number(
+      xcodeproj: "./ios/App/App.xcodeproj",
+      build_number: Time.now.strftime("%Y%m%d%H%M")
+    )
+
+    # Build the app
+    build_app(
+      workspace: "./ios/App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store",
+      output_directory: "./build/ios",
+      output_name: "Orbit.ipa",
+      clean: true,
+      include_bitcode: false
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      apple_id: ENV["APPLE_APP_ID"] || "",
+      skip_submission: false
+    )
+  end
+
+  desc "Build only (no upload)"
+  lane :build do
+    sh("cd #{Dir.pwd}/.. && npm run cap:sync")
+
+    cocoapods(
+      podfile: "./ios/App/Podfile",
+      clean_install: true
+    )
+
+    build_app(
+      workspace: "./ios/App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store",
+      output_directory: "./build/ios",
+      output_name: "Orbit.ipa",
+      clean: true,
+      include_bitcode: false
+    )
+  end
+end
+
+# ── Android ──
+
+platform :android do
+  desc "Build and upload to Play Console internal track"
+  lane :beta do
+    # Sync web assets to Capacitor
+    sh("cd #{Dir.pwd}/.. && npm run cap:sync")
+
+    # Build AAB (Android App Bundle)
+    gradle(
+      project_dir: "./android",
+      task: "bundle",
+      build_type: "Release"
+    )
+
+    # Upload to Play Console internal testing track
+    upload_to_play_store(
+      track: "internal",
+      aab: "./android/app/build/outputs/bundle/release/app-release.aab",
+      json_key: ENV["PLAY_STORE_JSON_KEY"] || "play-store-key.json",
+      skip_upload_metadata: false,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Build only (no upload)"
+  lane :build do
+    sh("cd #{Dir.pwd}/.. && npm run cap:sync")
+
+    gradle(
+      project_dir: "./android",
+      task: "bundle",
+      build_type: "Release"
+    )
+  end
+end

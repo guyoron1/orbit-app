@@ -29,8 +29,9 @@
     *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
 </style>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='none' stroke='%236c5ce7' stroke-width='6' stroke-dasharray='15 10'/><circle cx='50' cy='50' r='15' fill='%236c5ce7'/></svg>">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0a0f'/><circle cx='50' cy='50' r='30' fill='none' stroke='%236c5ce7' stroke-width='5' stroke-dasharray='12 8'/><circle cx='50' cy='50' r='12' fill='%236c5ce7'/></svg>">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
 <link rel="manifest" href="/manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/animejs@4/dist/anime.min.js"></script>
@@ -64,8 +65,11 @@
     font-family: 'Inter', -apple-system, sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
-    min-height: 100vh;
+    min-height: 100vh; min-height: 100dvh;
     overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: contain;
   }
 
   /* Ambient Background */
@@ -92,7 +96,7 @@
   @keyframes float3 { 0%,100%{transform:translate(-50%,-50%)} 50%{transform:translate(-30%,-60%)} }
 
   /* Layout */
-  .app { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+  .app { display: flex; min-height: 100vh; min-height: 100dvh; position: relative; z-index: 1; }
 
   /* Sidebar */
   .sidebar {
@@ -589,6 +593,22 @@
     margin-bottom: 14px; display: none;
   }
   .auth-error.visible { display: block; animation: fadeIn 0.2s ease; }
+  .auth-divider {
+    display: flex; align-items: center; gap: 12px; margin: 18px 0;
+    color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .auth-divider::before, .auth-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+  .social-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card-bg); color: var(--text-primary); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .social-btn:hover { border-color: var(--accent); background: rgba(108,92,231,0.04); }
+  .social-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .social-btn + .social-btn { margin-top: 10px; }
 
   /* Contact Detail Panel */
   .detail-overlay {
@@ -783,20 +803,73 @@
   /* Mobile bottom nav */
   .mobile-nav {
     display: none; position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--bg-secondary); border-top: 1px solid var(--border);
-    z-index: 90; padding: 6px 0 env(safe-area-inset-bottom, 6px);
+    background: rgba(18, 18, 26, 0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    z-index: 90; padding: 4px 0 env(safe-area-inset-bottom, 4px);
   }
   .mobile-nav-inner {
     display: flex; justify-content: space-around; align-items: center;
   }
   .mobile-nav-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
     background: none; border: none; color: var(--text-muted); cursor: pointer;
-    padding: 6px 12px; font-family: inherit; transition: color 0.2s;
+    padding: 8px 16px; min-width: 56px; min-height: 44px;
+    font-family: inherit; transition: color 0.2s;
     font-size: 10px; font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
   }
   .mobile-nav-btn.active { color: var(--accent-light); }
-  .mobile-nav-btn svg { width: 20px; height: 20px; }
+  .mobile-nav-btn.active::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 24px; height: 2px; border-radius: 1px;
+    background: var(--accent-light);
+  }
+  .mobile-nav-btn svg { width: 22px; height: 22px; }
+  .mobile-nav-btn:active { transform: scale(0.9); transition: transform 0.1s; }
+
+  /* PWA Install Banner */
+  .pwa-install-banner {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: linear-gradient(135deg, rgba(108, 92, 231, 0.95), rgba(162, 155, 254, 0.95));
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    padding: 16px 20px env(safe-area-inset-bottom, 16px);
+    animation: slideUpBanner 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .pwa-install-banner.show { display: block; }
+  .pwa-install-inner {
+    display: flex; align-items: center; gap: 14px; max-width: 480px; margin: 0 auto;
+  }
+  .pwa-install-icon {
+    width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+    background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center;
+  }
+  .pwa-install-icon img { width: 32px; height: 32px; border-radius: 6px; }
+  .pwa-install-text { flex: 1; }
+  .pwa-install-title { font-size: 14px; font-weight: 700; color: white; }
+  .pwa-install-desc { font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 2px; }
+  .pwa-install-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .pwa-install-btn {
+    padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 700;
+    cursor: pointer; border: none; font-family: inherit;
+  }
+  .pwa-install-btn.primary { background: white; color: var(--accent); }
+  .pwa-install-btn.dismiss { background: rgba(255,255,255,0.2); color: white; }
+  @keyframes slideUpBanner { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  /* Pull to refresh */
+  .ptr-indicator {
+    position: fixed; top: -60px; left: 50%; transform: translateX(-50%);
+    z-index: 200; transition: top 0.2s ease;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 50%; width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .ptr-indicator.pulling { top: 16px; }
+  .ptr-indicator.refreshing { top: 16px; }
+  .ptr-indicator svg { width: 20px; height: 20px; color: var(--accent-light); }
+  .ptr-indicator.refreshing svg { animation: spin 0.8s linear infinite; }
 
   /* Parties */
   .parties-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 32px; }
@@ -958,7 +1031,11 @@
   @media (max-width: 768px) {
     .sidebar { display: none; }
     .mobile-nav { display: block; }
-    .main { padding: 16px 14px 80px; }
+    .main {
+      padding: 16px 14px calc(72px + env(safe-area-inset-bottom, 0px));
+      padding-left: max(14px, env(safe-area-inset-left, 14px));
+      padding-right: max(14px, env(safe-area-inset-right, 14px));
+    }
     .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .stat-card { padding: 14px; }
     .stat-value { font-size: 24px; }
@@ -1004,6 +1081,25 @@
   @media (max-width: 380px) {
     .stats { grid-template-columns: 1fr; }
     .landing h1 { font-size: 26px; }
+    .pwa-install-inner { flex-wrap: wrap; }
+    .pwa-install-actions { width: 100%; justify-content: stretch; }
+    .pwa-install-btn { flex: 1; text-align: center; }
+  }
+
+  /* PWA Standalone mode adjustments */
+  .pwa-standalone .mobile-nav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pwa-standalone .main { padding-top: max(16px, env(safe-area-inset-top, 16px)); }
+  .pwa-standalone .pwa-install-banner { display: none !important; }
+
+  /* Touch feedback for interactive elements */
+  @media (hover: none) and (pointer: coarse) {
+    .btn:active, .contact-card:active, .stat-card:active,
+    .quest-card:active, .party-card:active, .challenge-card:active,
+    .nudge-card:active, .feed-item:active {
+      transform: scale(0.97); transition: transform 0.1s;
+    }
+    .btn:hover, .contact-card:hover, .stat-card:hover,
+    .quest-card:hover, .party-card:hover, .challenge-card:hover { transform: none; }
   }
 
   /* Loading skeleton */
@@ -1484,7 +1580,7 @@
   /* ═══ NETWORK GRAPH PAGE ═══ */
   #page-network { position: relative; }
   .network-canvas {
-    width: 100%; height: calc(100vh - 80px);
+    width: 100%; height: calc(100dvh - 80px); height: calc(100vh - 80px);
     background: var(--bg-primary); border-radius: var(--radius);
     border: 1px solid var(--border);
   }
@@ -1528,6 +1624,53 @@
     padding: 20px; border: 1px solid var(--border);
   }
   .settings-card-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+
+  /* ═══ LEGAL PAGES ═══ */
+  .legal-page { max-width: 680px; padding-bottom: 60px; }
+  .legal-page h2 { font-size: 22px; font-weight: 700; margin: 28px 0 12px; color: var(--text-primary); }
+  .legal-page h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: var(--text-primary); }
+  .legal-page p, .legal-page li { font-size: 14px; line-height: 1.7; color: var(--text-secondary); margin-bottom: 10px; }
+  .legal-page ul { padding-left: 20px; margin-bottom: 14px; }
+  .legal-page .legal-updated { font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }
+  .legal-page .legal-back { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-light); font-size: 13px; cursor: pointer; margin-bottom: 20px; background: none; border: none; padding: 0; }
+  .legal-page .legal-back:hover { text-decoration: underline; }
+
+  /* ═══ VERIFICATION BANNER ═══ */
+  .verify-banner {
+    background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(0,206,201,0.1));
+    border: 1px solid rgba(108,92,231,0.3);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .verify-banner-icon { font-size: 20px; flex-shrink: 0; }
+  .verify-banner-text { flex: 1; }
+  .verify-banner-text strong { color: var(--text-primary); }
+  .verify-banner .btn { flex-shrink: 0; font-size: 12px; padding: 6px 14px; }
+  .verify-banner-dismiss {
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 16px; padding: 0 4px; flex-shrink: 0;
+  }
+
+  /* ═══ RESET PASSWORD OVERLAY ═══ */
+  .reset-overlay {
+    position: fixed; inset: 0; background: var(--bg-body);
+    z-index: 10000; display: flex; align-items: center; justify-content: center;
+  }
+  .reset-card {
+    background: var(--bg-card); border-radius: 16px; padding: 40px;
+    max-width: 420px; width: 90%; border: 1px solid var(--border);
+    text-align: center;
+  }
+  .reset-card h2 { font-size: 22px; margin-bottom: 8px; }
+  .reset-card p { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
+  .reset-card .form-group { text-align: left; }
+  .reset-card .reset-success { color: var(--success); font-weight: 600; }
 
   /* ═══ EDIT CONTACT MODAL ═══ */
   .edit-modal-overlay {
@@ -1777,7 +1920,7 @@
 
   <!-- Footer -->
   <div class="landing-footer">
-    <p>Built with care by the Orbit team. <a href="#">Privacy Policy</a> &middot; <a href="#">Terms</a> &middot; <a href="#">GitHub</a></p>
+    <p>Built with care by the Orbit team. <a href="#" onclick="showLegalPage('privacy');return false;">Privacy Policy</a> &middot; <a href="#" onclick="showLegalPage('terms');return false;">Terms of Service</a></p>
     <p style="margin-top:8px; opacity:0.6">&copy; 2026 Orbit. All rights reserved.</p>
   </div>
 </div>
@@ -1886,6 +2029,14 @@
             </button>
           </div>
         </div>
+      </div>
+      <div id="verifyBanner" class="verify-banner" style="display:none;">
+        <div class="verify-banner-icon">&#9993;</div>
+        <div class="verify-banner-text">
+          <strong>Verify your email</strong> to secure your account and unlock all features.
+        </div>
+        <button class="btn btn-primary" onclick="resendVerification()">Resend Email</button>
+        <button class="verify-banner-dismiss" onclick="dismissVerifyBanner()" title="Dismiss">&times;</button>
       </div>
       <div class="search-bar">
         <div class="search-icon">
@@ -2225,6 +2376,210 @@
           <p style="color:var(--text-muted);margin-bottom:12px;">Permanently delete your account and all associated data. This cannot be undone.</p>
           <button class="btn" style="background:var(--danger);color:#fff;" onclick="deleteAccount()">Delete My Account</button>
         </div>
+
+        <!-- Legal Links -->
+        <div class="settings-card">
+          <h3 class="settings-card-title">Legal</h3>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="navigateTo('privacy')">Privacy Policy</button>
+            <button class="btn btn-ghost" onclick="navigateTo('terms')">Terms of Service</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRIVACY POLICY PAGE -->
+    <div class="page" id="page-privacy">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>Privacy Policy</h1>
+            <p>How we handle your data.</p>
+          </div>
+        </div>
+      </div>
+      <div class="legal-page">
+        <button class="legal-back" onclick="legalGoBack()">&larr; Back</button>
+        <p class="legal-updated">Last updated: March 30, 2026</p>
+
+        <h2>1. Introduction</h2>
+        <p>Orbit ("we," "our," or "us") is a relationship intelligence application that helps you maintain meaningful connections with the people who matter most. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use the Orbit application and related services (the "Service").</p>
+        <p>By using Orbit, you agree to the collection and use of information as described in this policy. If you do not agree, please do not use the Service.</p>
+
+        <h2>2. Information We Collect</h2>
+        <h3>2.1 Information You Provide</h3>
+        <ul>
+          <li><strong>Account Information:</strong> Name, email address, and password when you create an account.</li>
+          <li><strong>Contact Data:</strong> Names, relationship types, contact frequency preferences, and personal notes about people you add to your orbit.</li>
+          <li><strong>Interaction Logs:</strong> Records of interactions you log, including type (call, text, in-person, etc.), duration, notes, and timestamps.</li>
+          <li><strong>Life Events:</strong> Milestones and events you record for your contacts (birthdays, job changes, etc.).</li>
+        </ul>
+        <h3>2.2 Information Collected Automatically</h3>
+        <ul>
+          <li><strong>Usage Data:</strong> Pages visited, features used, and interaction patterns within the app to improve the Service.</li>
+          <li><strong>Device Information:</strong> Browser type, operating system, and screen resolution for responsive design optimization.</li>
+          <li><strong>Gamification Data:</strong> XP earned, level progress, quest completions, and achievement unlocks.</li>
+        </ul>
+        <h3>2.3 Third-Party Integrations</h3>
+        <ul>
+          <li><strong>Strava (optional):</strong> If you connect Strava, we access your activity data (runs, rides, etc.) solely to create social "party" events. We do not store your Strava credentials.</li>
+        </ul>
+
+        <h2>3. How We Use Your Information</h2>
+        <ul>
+          <li><strong>Core Service:</strong> To track relationship health, generate smart nudges and conversation starters, and provide the orbit visualization.</li>
+          <li><strong>AI Features:</strong> Contact notes and interaction history are processed by AI to generate personalized conversation starters and relationship insights. This processing happens on-demand and we do not use your data to train AI models.</li>
+          <li><strong>Gamification:</strong> To calculate XP, levels, ranks, and quest progress that motivate you to maintain your relationships.</li>
+          <li><strong>Service Improvement:</strong> Aggregated, anonymized usage patterns help us improve features and user experience.</li>
+        </ul>
+
+        <h2>4. Data Storage and Security</h2>
+        <ul>
+          <li>Your data is stored on secure servers hosted by Railway (cloud infrastructure provider).</li>
+          <li>Passwords are hashed using industry-standard algorithms and are never stored in plaintext.</li>
+          <li>All data transmission is encrypted via HTTPS/TLS.</li>
+          <li>We implement access controls to limit who can access production data.</li>
+        </ul>
+
+        <h2>5. Data Sharing</h2>
+        <p>We do not sell, rent, or trade your personal information. We may share data only in the following circumstances:</p>
+        <ul>
+          <li><strong>Service Providers:</strong> With infrastructure providers (Railway, database hosting) who process data on our behalf under strict confidentiality agreements.</li>
+          <li><strong>AI Processing:</strong> Contact notes may be sent to AI providers (Anthropic/OpenAI) to generate conversation starters. These providers do not retain your data for training purposes.</li>
+          <li><strong>Legal Requirements:</strong> If required by law, court order, or governmental authority.</li>
+          <li><strong>Safety:</strong> To protect the rights, safety, or property of Orbit, our users, or the public.</li>
+        </ul>
+
+        <h2>6. Your Rights and Controls</h2>
+        <ul>
+          <li><strong>Access:</strong> View all your data in the app at any time.</li>
+          <li><strong>Export:</strong> Download all your data in JSON or CSV format from Settings.</li>
+          <li><strong>Correction:</strong> Edit your contacts, notes, and profile information at any time.</li>
+          <li><strong>Deletion:</strong> Permanently delete your account and all associated data from Settings &gt; Danger Zone. This action is immediate and irreversible.</li>
+          <li><strong>Portability:</strong> Export your data in standard formats for use with other services.</li>
+        </ul>
+
+        <h2>7. Data Retention</h2>
+        <p>We retain your data for as long as your account is active. When you delete your account, all personal data — including contacts, interactions, notes, life events, gamification progress, and account information — is permanently deleted from our servers within 30 days. Anonymized, aggregated analytics data may be retained indefinitely.</p>
+
+        <h2>8. Children's Privacy</h2>
+        <p>Orbit is not intended for users under the age of 13 (or 16 in the European Economic Area). We do not knowingly collect personal information from children. If we become aware that a child has provided us with personal data, we will take steps to delete it promptly.</p>
+
+        <h2>9. International Data Transfers</h2>
+        <p>Your data may be processed in countries outside your country of residence, including the United States. We ensure appropriate safeguards are in place for any international data transfers in compliance with applicable data protection laws.</p>
+
+        <h2>10. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by posting a notice in the app or sending an email. Continued use of the Service after changes constitutes acceptance of the updated policy.</p>
+
+        <h2>11. Contact Us</h2>
+        <p>If you have questions about this Privacy Policy or your data, contact us at:</p>
+        <p><strong>Email:</strong> privacy@orbitapp.io</p>
+      </div>
+    </div>
+
+    <!-- TERMS OF SERVICE PAGE -->
+    <div class="page" id="page-terms">
+      <div class="header">
+        <div class="header-top">
+          <div>
+            <h1>Terms of Service</h1>
+            <p>Rules and guidelines for using Orbit.</p>
+          </div>
+        </div>
+      </div>
+      <div class="legal-page">
+        <button class="legal-back" onclick="legalGoBack()">&larr; Back</button>
+        <p class="legal-updated">Last updated: March 30, 2026</p>
+
+        <h2>1. Acceptance of Terms</h2>
+        <p>By accessing or using Orbit ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service. These Terms constitute a legally binding agreement between you and Orbit.</p>
+
+        <h2>2. Description of Service</h2>
+        <p>Orbit is a relationship intelligence platform that helps users maintain and nurture personal and professional relationships. The Service includes:</p>
+        <ul>
+          <li>Contact management with relationship health tracking</li>
+          <li>Interaction logging and activity history</li>
+          <li>AI-powered conversation starters and relationship insights</li>
+          <li>Gamification features including XP, levels, quests, and achievements</li>
+          <li>Data visualization (orbit view, network graph)</li>
+          <li>Optional third-party integrations (e.g., Strava)</li>
+        </ul>
+
+        <h2>3. Account Registration</h2>
+        <ul>
+          <li>You must be at least 13 years old (or 16 in the EEA) to create an account.</li>
+          <li>You must provide accurate and complete registration information.</li>
+          <li>You are responsible for maintaining the confidentiality of your password.</li>
+          <li>You are responsible for all activities that occur under your account.</li>
+          <li>You must notify us immediately of any unauthorized use of your account.</li>
+        </ul>
+
+        <h2>4. Acceptable Use</h2>
+        <p>You agree not to:</p>
+        <ul>
+          <li>Use the Service for any illegal purpose or in violation of any applicable laws.</li>
+          <li>Store information about individuals without a legitimate personal or professional reason.</li>
+          <li>Attempt to gain unauthorized access to the Service, other accounts, or our systems.</li>
+          <li>Use automated scripts, bots, or scrapers to access the Service without permission.</li>
+          <li>Interfere with or disrupt the Service or servers connected to the Service.</li>
+          <li>Reverse engineer, decompile, or disassemble any portion of the Service.</li>
+          <li>Use the Service to harass, stalk, or harm another person.</li>
+        </ul>
+
+        <h2>5. Your Content and Data</h2>
+        <ul>
+          <li>You retain ownership of all data you input into Orbit (contacts, notes, interaction logs, etc.).</li>
+          <li>You grant us a limited license to process your data solely to provide and improve the Service.</li>
+          <li>You are responsible for the accuracy and legality of the data you provide.</li>
+          <li>You may export or delete your data at any time through the Settings page.</li>
+        </ul>
+
+        <h2>6. AI-Generated Content</h2>
+        <p>Orbit uses artificial intelligence to generate conversation starters, relationship insights, and other suggestions. You acknowledge that:</p>
+        <ul>
+          <li>AI-generated content is provided as suggestions only and may not always be accurate or appropriate.</li>
+          <li>You are responsible for reviewing and deciding whether to use AI-generated suggestions.</li>
+          <li>We do not guarantee the accuracy, completeness, or suitability of AI-generated content.</li>
+        </ul>
+
+        <h2>7. Intellectual Property</h2>
+        <p>The Service, including its design, code, graphics, logos, and features, is owned by Orbit and protected by intellectual property laws. You may not copy, modify, distribute, or create derivative works based on the Service without our express written permission.</p>
+
+        <h2>8. Service Availability</h2>
+        <ul>
+          <li>We strive to maintain high availability but do not guarantee uninterrupted access to the Service.</li>
+          <li>We may modify, suspend, or discontinue the Service (or any part of it) at any time with reasonable notice.</li>
+          <li>We are not liable for any downtime, data loss, or service interruptions.</li>
+        </ul>
+
+        <h2>9. Limitation of Liability</h2>
+        <p>To the maximum extent permitted by law:</p>
+        <ul>
+          <li>The Service is provided "as is" and "as available" without warranties of any kind.</li>
+          <li>We disclaim all warranties, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.</li>
+          <li>We shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service.</li>
+          <li>Our total liability shall not exceed the amount you paid for the Service in the 12 months preceding the claim.</li>
+        </ul>
+
+        <h2>10. Indemnification</h2>
+        <p>You agree to indemnify and hold harmless Orbit, its officers, directors, employees, and agents from any claims, damages, losses, or expenses (including legal fees) arising from your use of the Service or violation of these Terms.</p>
+
+        <h2>11. Account Termination</h2>
+        <ul>
+          <li>You may delete your account at any time from Settings &gt; Danger Zone.</li>
+          <li>We may suspend or terminate your account if you violate these Terms.</li>
+          <li>Upon termination, your data will be deleted in accordance with our Privacy Policy.</li>
+        </ul>
+
+        <h2>12. Governing Law</h2>
+        <p>These Terms are governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to conflict of law principles. Any disputes shall be resolved in the courts of Delaware.</p>
+
+        <h2>13. Changes to Terms</h2>
+        <p>We may update these Terms from time to time. We will notify you of material changes by posting a notice in the app or sending an email. Continued use of the Service after changes constitutes acceptance of the updated Terms.</p>
+
+        <h2>14. Contact Us</h2>
+        <p>If you have questions about these Terms, contact us at:</p>
+        <p><strong>Email:</strong> legal@orbitapp.io</p>
       </div>
     </div>
   </main>
@@ -2587,6 +2942,26 @@
   </div>
 </div>
 
+<!-- Pull to Refresh Indicator -->
+<div class="ptr-indicator" id="ptrIndicator">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+</div>
+
+<!-- PWA Install Banner -->
+<div class="pwa-install-banner" id="pwaInstallBanner">
+  <div class="pwa-install-inner">
+    <div class="pwa-install-icon"><img src="/icon-192.png" alt="Orbit"></div>
+    <div class="pwa-install-text">
+      <div class="pwa-install-title">Install Orbit</div>
+      <div class="pwa-install-desc">Add to your home screen for the best experience</div>
+    </div>
+    <div class="pwa-install-actions">
+      <button class="pwa-install-btn dismiss" onclick="dismissInstallBanner()">Later</button>
+      <button class="pwa-install-btn primary" onclick="installPWA()">Install</button>
+    </div>
+  </div>
+</div>
+
 <!-- Mobile Bottom Nav -->
 <nav class="mobile-nav" id="mobileNav" role="navigation" aria-label="Mobile navigation">
   <div class="mobile-nav-inner">
@@ -2627,7 +3002,8 @@
 
 <script>
 // === CONFIG ===
-const API = '';  // same origin
+// Detect native (Capacitor) vs web context for API routing
+const API = (window.Capacitor?.isNativePlatform?.()) ? 'https://orbit-app-production-fd37.up.railway.app' : '';
 
 const COLORS = [
   'linear-gradient(135deg, #6c5ce7, #a29bfe)',
@@ -4103,6 +4479,42 @@ function navigateTo(page) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
+// Show legal pages (works from both landing page and in-app)
+function showLegalPage(page) {
+  const landing = document.getElementById('landingPage');
+  const mainApp = document.getElementById('mainApp');
+  const isLoggedIn = mainApp && mainApp.style.display !== 'none' && authToken;
+
+  if (isLoggedIn) {
+    navigateTo(page);
+  } else {
+    // From landing page: hide landing, show main app briefly for the legal page
+    landing.classList.remove('active');
+    mainApp.style.display = 'block';
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    // Hide the sidebar and mobile nav when showing legal from landing
+    document.querySelector('.sidebar').style.display = 'none';
+    document.getElementById('mobileNav').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Store that we came from landing
+    window._legalFromLanding = true;
+  }
+}
+
+function legalGoBack() {
+  if (window._legalFromLanding) {
+    window._legalFromLanding = false;
+    document.getElementById('mainApp').style.display = 'none';
+    document.querySelector('.sidebar').style.display = '';
+    document.getElementById('mobileNav').style.display = '';
+    document.getElementById('landingPage').classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  } else {
+    navigateTo('settings');
+  }
+}
+
 document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => navigateTo(btn.dataset.page));
 });
@@ -4486,6 +4898,7 @@ function showDashboard() {
       animateStats();
       overlay.classList.add('hidden');
       showOnboarding();
+      updateVerifyBanner();
     })
     .catch(e => {
       overlay.classList.add('hidden');
@@ -4556,8 +4969,31 @@ function renderAuthForm(mode) {
   body.appendChild(switchEl);
 
   if (mode === 'login') {
+    const forgotEl = createElement('div', { style: 'text-align:center;margin-top:8px;' });
+    const forgotLink = createElement('a', {
+      style: 'color:var(--accent-light);font-size:13px;cursor:pointer;',
+      onClick: () => { document.getElementById('authModal').classList.remove('active'); showForgotPassword(); },
+    }, 'Forgot your password?');
+    forgotEl.appendChild(forgotLink);
+    body.appendChild(forgotEl);
     body.appendChild(createElement('div', { className: 'auth-demo-hint' }, 'Demo: jordan@example.com / orbit2024demo'));
   }
+
+  // Social login buttons
+  const divider = createElement('div', { className: 'auth-divider' }, 'or');
+  body.appendChild(divider);
+
+  const appleBtn = document.createElement('button');
+  appleBtn.className = 'social-btn';
+  appleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>Continue with Apple';
+  appleBtn.onclick = () => handleSocialLogin('apple');
+  body.appendChild(appleBtn);
+
+  const googleBtn = document.createElement('button');
+  googleBtn.className = 'social-btn';
+  googleBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>Continue with Google';
+  googleBtn.onclick = () => handleSocialLogin('google');
+  body.appendChild(googleBtn);
 
   // Focus first input
   setTimeout(() => {
@@ -4619,11 +5055,302 @@ async function handleAuth(mode) {
   }
 }
 
+async function handleSocialLogin(provider) {
+  const errorEl = document.getElementById('authError');
+  if (errorEl) errorEl.classList.remove('visible');
+
+  // Check if running in Capacitor native context
+  const isNative = window.Capacitor?.isNativePlatform?.();
+
+  try {
+    let idToken, userName;
+
+    if (provider === 'apple') {
+      if (isNative && window.Capacitor?.Plugins?.SignInWithApple) {
+        // Native Apple Sign In via Capacitor plugin
+        const result = await window.Capacitor.Plugins.SignInWithApple.authorize({
+          clientId: 'io.orbitapp.app',
+          scopes: 'email name',
+        });
+        idToken = result.response?.identityToken;
+        userName = [result.response?.givenName, result.response?.familyName].filter(Boolean).join(' ');
+      } else {
+        // Web fallback — Apple JS SDK
+        if (!window.AppleID) {
+          showToast('Apple Sign In is available in the native app', 'error');
+          return;
+        }
+        const result = await window.AppleID.auth.signIn();
+        idToken = result.authorization?.id_token;
+        userName = [result.user?.name?.firstName, result.user?.name?.lastName].filter(Boolean).join(' ');
+      }
+    } else if (provider === 'google') {
+      if (isNative && window.Capacitor?.Plugins?.GoogleAuth) {
+        // Native Google Sign In via Capacitor plugin
+        const result = await window.Capacitor.Plugins.GoogleAuth.signIn();
+        idToken = result.authentication?.idToken;
+      } else {
+        // Web fallback — Google Identity Services
+        if (!window.google?.accounts?.id) {
+          showToast('Google Sign In is available in the native app', 'error');
+          return;
+        }
+        idToken = await new Promise((resolve, reject) => {
+          window.google.accounts.id.initialize({
+            client_id: window.GOOGLE_CLIENT_ID || '',
+            callback: (response) => resolve(response.credential),
+          });
+          window.google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              reject(new Error('Google Sign In was cancelled'));
+            }
+          });
+        });
+      }
+    }
+
+    if (!idToken) {
+      showToast('Sign in was cancelled', 'error');
+      return;
+    }
+
+    const payload = { id_token: idToken, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    if (provider === 'apple' && userName) payload.name = userName;
+
+    const data = await api('/auth/' + provider, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    setAuth(data.access_token, data.user);
+    showToast('Welcome, ' + data.user.name + '!', 'success');
+    showDashboard();
+  } catch (e) {
+    const msg = e.message || 'Social sign in failed';
+    if (errorEl) { errorEl.textContent = msg; errorEl.classList.add('visible'); }
+    else showToast(msg, 'error');
+  }
+}
+
 // Auto-login on page load
 if (authToken && currentUser) {
   document.addEventListener('DOMContentLoaded', () => {
     showDashboard();
   });
+}
+
+// Handle direct URL routing for legal pages, verification, and password reset
+document.addEventListener('DOMContentLoaded', () => {
+  const path = window.location.pathname;
+  const params = new URLSearchParams(window.location.search);
+
+  if (path === '/privacy' || path === '/terms') {
+    showLegalPage(path.slice(1));
+  } else if (path === '/verify' && params.get('token')) {
+    handleEmailVerification(params.get('token'));
+  } else if (path === '/reset-password' && params.get('token')) {
+    showResetPasswordForm(params.get('token'));
+  }
+});
+
+// === EMAIL VERIFICATION ===
+
+function updateVerifyBanner() {
+  const banner = document.getElementById('verifyBanner');
+  if (!banner) return;
+  if (currentUser && !currentUser.email_verified && !sessionStorage.getItem('verify_dismissed')) {
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function dismissVerifyBanner() {
+  sessionStorage.setItem('verify_dismissed', '1');
+  const banner = document.getElementById('verifyBanner');
+  if (banner) banner.style.display = 'none';
+}
+
+async function resendVerification() {
+  try {
+    await api('/auth/resend-verification', { method: 'POST' });
+    showToast('Verification email sent! Check your inbox.', 'success');
+  } catch (e) {
+    showToast(e.message || 'Could not send email', 'error');
+  }
+}
+
+async function handleEmailVerification(token) {
+  // Show a simple verification status
+  const overlay = document.createElement('div');
+  overlay.className = 'reset-overlay';
+  overlay.innerHTML = '<div class="reset-card"><h2>Verifying Email...</h2><p>Please wait.</p></div>';
+  document.body.appendChild(overlay);
+
+  try {
+    const resp = await fetch(API_BASE + '/auth/verify-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'Verification failed');
+
+    overlay.querySelector('.reset-card').innerHTML =
+      '<h2>Email Verified!</h2>' +
+      '<p class="reset-success">Your email has been verified successfully.</p>' +
+      '<button class="btn btn-primary" style="margin-top:20px;width:100%;justify-content:center;" ' +
+      'onclick="this.closest(\'.reset-overlay\').remove();window.history.replaceState({},\'\',\'/\');">Continue to Orbit</button>';
+
+    // Update local user state
+    if (currentUser) {
+      currentUser.email_verified = true;
+      localStorage.setItem('orbit_user', JSON.stringify(currentUser));
+      updateVerifyBanner();
+    }
+  } catch (e) {
+    overlay.querySelector('.reset-card').innerHTML =
+      '<h2>Verification Failed</h2>' +
+      '<p style="color:var(--danger);">' + (e.message || 'Invalid or expired link') + '</p>' +
+      '<p>Please request a new verification email from Settings.</p>' +
+      '<button class="btn btn-primary" style="margin-top:20px;width:100%;justify-content:center;" ' +
+      'onclick="this.closest(\'.reset-overlay\').remove();window.history.replaceState({},\'\',\'/\');">Go to Orbit</button>';
+  }
+}
+
+// === FORGOT / RESET PASSWORD ===
+
+function showForgotPassword() {
+  const overlay = document.createElement('div');
+  overlay.className = 'reset-overlay';
+  overlay.id = 'forgotOverlay';
+  overlay.innerHTML =
+    '<div class="reset-card">' +
+      '<h2>Reset Password</h2>' +
+      '<p>Enter your email and we\'ll send you a reset link.</p>' +
+      '<div class="form-group">' +
+        '<label class="form-label" style="text-align:left;">Email</label>' +
+        '<input class="form-input" id="forgotEmail" type="email" placeholder="you@example.com">' +
+      '</div>' +
+      '<div id="forgotError" class="auth-error"></div>' +
+      '<div id="forgotSuccess" style="display:none;color:var(--success);font-size:14px;margin:12px 0;"></div>' +
+      '<button class="btn btn-primary" id="forgotSubmitBtn" onclick="submitForgotPassword()" style="width:100%;justify-content:center;margin-top:12px;">Send Reset Link</button>' +
+      '<button class="btn btn-ghost" onclick="closeForgotPassword()" style="width:100%;justify-content:center;margin-top:8px;">Back to Login</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('forgotEmail')?.focus(), 100);
+}
+
+function closeForgotPassword() {
+  const overlay = document.getElementById('forgotOverlay');
+  if (overlay) overlay.remove();
+  showAuthModal('login');
+}
+
+async function submitForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const errorEl = document.getElementById('forgotError');
+  const successEl = document.getElementById('forgotSuccess');
+  const btn = document.getElementById('forgotSubmitBtn');
+
+  errorEl.classList.remove('visible');
+  successEl.style.display = 'none';
+
+  if (!email) {
+    errorEl.textContent = 'Please enter your email.';
+    errorEl.classList.add('visible');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    const resp = await fetch(API_BASE + '/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'Request failed');
+
+    successEl.textContent = 'If that email exists, a reset link has been sent. Check your inbox.';
+    successEl.style.display = 'block';
+    btn.textContent = 'Email Sent';
+  } catch (e) {
+    errorEl.textContent = e.message;
+    errorEl.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Send Reset Link';
+  }
+}
+
+function showResetPasswordForm(token) {
+  const overlay = document.createElement('div');
+  overlay.className = 'reset-overlay';
+  overlay.id = 'resetOverlay';
+  overlay.innerHTML =
+    '<div class="reset-card">' +
+      '<h2>Set New Password</h2>' +
+      '<p>Choose a strong password for your account.</p>' +
+      '<div class="form-group">' +
+        '<label class="form-label" style="text-align:left;">New Password</label>' +
+        '<input class="form-input" id="resetNewPw" type="password" placeholder="Min 8 characters">' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label class="form-label" style="text-align:left;">Confirm Password</label>' +
+        '<input class="form-input" id="resetConfirmPw" type="password" placeholder="Repeat password">' +
+      '</div>' +
+      '<div id="resetError" class="auth-error"></div>' +
+      '<button class="btn btn-primary" id="resetSubmitBtn" style="width:100%;justify-content:center;margin-top:12px;">Reset Password</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  document.getElementById('resetSubmitBtn').addEventListener('click', async () => {
+    const newPw = document.getElementById('resetNewPw').value;
+    const confirmPw = document.getElementById('resetConfirmPw').value;
+    const errorEl = document.getElementById('resetError');
+    const btn = document.getElementById('resetSubmitBtn');
+
+    errorEl.classList.remove('visible');
+
+    if (!newPw || newPw.length < 8) {
+      errorEl.textContent = 'Password must be at least 8 characters.';
+      errorEl.classList.add('visible');
+      return;
+    }
+    if (newPw !== confirmPw) {
+      errorEl.textContent = 'Passwords do not match.';
+      errorEl.classList.add('visible');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Resetting...';
+
+    try {
+      const resp = await fetch(API_BASE + '/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, new_password: newPw }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || 'Reset failed');
+
+      overlay.querySelector('.reset-card').innerHTML =
+        '<h2>Password Reset!</h2>' +
+        '<p class="reset-success">Your password has been updated successfully.</p>' +
+        '<button class="btn btn-primary" style="margin-top:20px;width:100%;justify-content:center;" ' +
+        'onclick="document.getElementById(\'resetOverlay\').remove();window.history.replaceState({},\'\',\'/\');showAuthModal(\'login\');">Log In</button>';
+    } catch (e) {
+      errorEl.textContent = e.message || 'Invalid or expired reset link.';
+      errorEl.classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Reset Password';
+    }
+  });
+
+  setTimeout(() => document.getElementById('resetNewPw')?.focus(), 100);
 }
 
 function animateStats() {
@@ -5631,10 +6358,144 @@ buildContactCard = function(c) {
   return originalBuildContactCard(c);
 };
 
+// ═══ PWA MOBILE ENHANCEMENTS ═══
+
+// --- PWA Install Prompt ---
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // Show banner after 30s if not dismissed before
+  if (!localStorage.getItem('pwa-install-dismissed')) {
+    setTimeout(() => {
+      const banner = document.getElementById('pwaInstallBanner');
+      if (banner && deferredInstallPrompt) banner.classList.add('show');
+    }, 30000);
+  }
+});
+
+function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then((result) => {
+    deferredInstallPrompt = null;
+    document.getElementById('pwaInstallBanner')?.classList.remove('show');
+  });
+}
+
+function dismissInstallBanner() {
+  document.getElementById('pwaInstallBanner')?.classList.remove('show');
+  localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+  deferredInstallPrompt = null;
+}
+
+// --- Pull to Refresh ---
+(function() {
+  let startY = 0, pulling = false, triggered = false;
+  const threshold = 80;
+  const indicator = document.getElementById('ptrIndicator');
+
+  document.addEventListener('touchstart', (e) => {
+    if (window.scrollY === 0 && e.touches.length === 1) {
+      startY = e.touches[0].clientY;
+      pulling = true;
+      triggered = false;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling || triggered) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 10 && window.scrollY === 0) {
+      const progress = Math.min(dy / threshold, 1);
+      indicator.style.top = `${-60 + (progress * 76)}px`;
+      indicator.style.opacity = progress;
+      if (dy > threshold) indicator.classList.add('pulling');
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    if (indicator.classList.contains('pulling')) {
+      triggered = true;
+      indicator.classList.remove('pulling');
+      indicator.classList.add('refreshing');
+      // Refresh current page data
+      const currentPage = document.querySelector('.mobile-nav-btn.active')?.dataset?.page || 'dashboard';
+      const refreshFn = {
+        dashboard: typeof showDashboard === 'function' ? showDashboard : null,
+        contacts: typeof showContacts === 'function' ? showContacts : null,
+        orbit: typeof showOrbitPage === 'function' ? showOrbitPage : null,
+        insights: typeof showInsights === 'function' ? showInsights : null,
+        activity: typeof showActivity === 'function' ? showActivity : null,
+      }[currentPage];
+      if (refreshFn) refreshFn();
+      setTimeout(() => {
+        indicator.classList.remove('refreshing');
+        indicator.style.top = '-60px';
+        indicator.style.opacity = '0';
+      }, 800);
+    } else {
+      indicator.style.top = '-60px';
+      indicator.style.opacity = '0';
+    }
+  }, { passive: true });
+})();
+
+// --- Swipe Navigation Between Tabs ---
+(function() {
+  if (window.innerWidth > 768) return; // Desktop: skip
+  const pages = ['dashboard', 'contacts', 'orbit', 'insights', 'activity'];
+  let touchStartX = 0, touchStartY = 0, swiping = false;
+
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    swiping = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!swiping) return;
+    swiping = false;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    // Must be a horizontal swipe (dx > dy) with enough distance
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+    // Don't swipe if inside a scrollable container or modal
+    if (e.target.closest('.modal, .detail-panel, .network-canvas, input, textarea')) return;
+
+    const activeBtn = document.querySelector('.mobile-nav-btn.active');
+    const currentPage = activeBtn?.dataset?.page || 'dashboard';
+    const idx = pages.indexOf(currentPage);
+    if (idx === -1) return;
+
+    const nextIdx = dx < 0 ? idx + 1 : idx - 1; // left swipe = next, right = prev
+    if (nextIdx < 0 || nextIdx >= pages.length) return;
+
+    const targetBtn = document.querySelector(`.mobile-nav-btn[data-page="${pages[nextIdx]}"]`);
+    if (targetBtn) targetBtn.click();
+  }, { passive: true });
+})();
+
+// --- Standalone Mode Detection ---
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+  document.documentElement.classList.add('pwa-standalone');
+}
+
+// --- Viewport Height Fix for Mobile Browsers ---
+function setVH() {
+  document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+}
+setVH();
+window.addEventListener('resize', setVH);
+
 // PWA Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 </script>
+<script src="native-bridge.js"></script>
 </body>
 </html>

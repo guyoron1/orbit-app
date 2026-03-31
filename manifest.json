@@ -3,6 +3,7 @@
   "short_name": "Orbit",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
   "description": "AI-powered relationship intelligence. Smart nudges, health tracking, and gamified social engagement to help you nurture the connections that matter most.",
@@ -19,6 +20,21 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Add Interaction",
+      "short_name": "Log",
+      "url": "/?action=add-interaction",
+      "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "View Contacts",
+      "short_name": "People",
+      "url": "/?page=contacts",
+      "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
     }
   ]
 }
