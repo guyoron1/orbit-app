@@ -86,7 +86,14 @@ from .gamification import (
 
 
 # ── Rate limiter ──
-limiter = Limiter(key_func=get_remote_address)
+def _get_real_ip(request: Request) -> str:
+    """Extract real client IP from X-Forwarded-For (behind reverse proxy)."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+limiter = Limiter(key_func=_get_real_ip)
 
 
 @asynccontextmanager
@@ -160,6 +167,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+# ── Request logging ──
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = round((time.time() - start) * 1000)
+    if request.url.path not in ("/health", "/favicon.ico"):
+        log.info("%s %s → %s (%dms)", request.method, request.url.path, response.status_code, duration_ms)
+    return response
+
+
 # ── Request body size limit (1MB) ──
 MAX_BODY_SIZE = int(os.environ.get("MAX_BODY_SIZE", str(1024 * 1024)))
 
@@ -183,11 +201,11 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://appleid.cdn-apple.com https://accounts.google.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://appleid.cdn-apple.com https://accounts.google.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: blob:; "
-        "connect-src 'self' https://appleid.apple.com https://accounts.google.com; "
+        "connect-src 'self' https://appleid.apple.com https://accounts.google.com https://oauth2.googleapis.com; "
         "frame-src https://appleid.apple.com https://accounts.google.com; "
         "base-uri 'self'; "
         "form-action 'self';"
@@ -206,7 +224,9 @@ RATE_LIMIT_MAX_IPS = 10000  # Prevent unbounded memory growth
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     global _rate_limit_last_cleanup
-    client_ip = request.client.host if request.client else "unknown"
+    # Use X-Forwarded-For behind reverse proxy (Railway, etc.)
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
     now = time.time()
     window_start = now - RATE_LIMIT_WINDOW_SECONDS
 
@@ -256,6 +276,7 @@ def sanitize(text: str) -> str:
 @app.post("/auth/signup", response_model=TokenResponse)
 @limiter.limit("5/minute")
 async def signup(request: Request, data: SignupRequest, db: Session = Depends(get_db)):
+    data.email = data.email.strip().lower()
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(400, "Email already registered")
@@ -277,7 +298,7 @@ async def signup(request: Request, data: SignupRequest, db: Session = Depends(ge
     except Exception:
         pass  # Email failure shouldn't block signup
 
-    token = create_access_token(user.id, user.email)
+    token = create_access_token(user.id)
     return TokenResponse(
         access_token=token,
         user=UserOut.model_validate(user),
@@ -287,11 +308,12 @@ async def signup(request: Request, data: SignupRequest, db: Session = Depends(ge
 @app.post("/auth/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
+    data.email = data.email.strip().lower()
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password")
 
-    token = create_access_token(user.id, user.email)
+    token = create_access_token(user.id)
     return TokenResponse(
         access_token=token,
         user=UserOut.model_validate(user),
@@ -310,12 +332,13 @@ async def login_apple(request: Request, data: AppleLoginRequest, db: Session = D
         raise HTTPException(401, str(e))
 
     provider_id = f"apple_{apple_user['sub']}"
+    apple_email = apple_user["email"].strip().lower()
 
     # Check if user already exists with this Apple ID
     user = db.query(User).filter(User.auth_provider_id == provider_id).first()
     if not user:
         # Check if email already exists (link accounts)
-        user = db.query(User).filter(User.email == apple_user["email"]).first()
+        user = db.query(User).filter(User.email == apple_email).first()
         if user:
             # Link existing email account to Apple
             user.auth_provider = "apple"
@@ -323,21 +346,31 @@ async def login_apple(request: Request, data: AppleLoginRequest, db: Session = D
             user.email_verified = True
             db.commit()
         else:
-            # Create new account
-            name = data.name or apple_user["email"].split("@")[0]
+            # Create new account — wrap in try/except for race condition
+            name = data.name or apple_email.split("@")[0]
             user = User(
-                email=apple_user["email"],
+                email=apple_email,
                 name=name,
                 timezone=data.timezone,
                 auth_provider="apple",
                 auth_provider_id=provider_id,
-                email_verified=True,  # Apple verifies email
+                email_verified=True,
             )
             db.add(user)
-            db.commit()
-            db.refresh(user)
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                # Race condition: another request created the user — fetch it
+                user = db.query(User).filter(User.auth_provider_id == provider_id).first()
+                if not user:
+                    user = db.query(User).filter(User.email == apple_email).first()
+                if not user:
+                    raise HTTPException(500, "Account creation failed — please try again")
+            else:
+                db.refresh(user)
 
-    token = create_access_token(user.id, user.email)
+    token = create_access_token(user.id)
     return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -353,12 +386,13 @@ async def login_google(request: Request, data: GoogleLoginRequest, db: Session =
         raise HTTPException(401, str(e))
 
     provider_id = f"google_{google_user['sub']}"
+    google_email = google_user["email"].strip().lower()
 
     # Check if user already exists with this Google ID
     user = db.query(User).filter(User.auth_provider_id == provider_id).first()
     if not user:
         # Check if email already exists (link accounts)
-        user = db.query(User).filter(User.email == google_user["email"]).first()
+        user = db.query(User).filter(User.email == google_email).first()
         if user:
             user.auth_provider = "google"
             user.auth_provider_id = provider_id
@@ -366,18 +400,27 @@ async def login_google(request: Request, data: GoogleLoginRequest, db: Session =
             db.commit()
         else:
             user = User(
-                email=google_user["email"],
-                name=google_user.get("name") or google_user["email"].split("@")[0],
+                email=google_email,
+                name=google_user.get("name") or google_email.split("@")[0],
                 timezone=data.timezone,
                 auth_provider="google",
                 auth_provider_id=provider_id,
                 email_verified=True,
             )
             db.add(user)
-            db.commit()
-            db.refresh(user)
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                user = db.query(User).filter(User.auth_provider_id == provider_id).first()
+                if not user:
+                    user = db.query(User).filter(User.email == google_email).first()
+                if not user:
+                    raise HTTPException(500, "Account creation failed — please try again")
+            else:
+                db.refresh(user)
 
-    token = create_access_token(user.id, user.email)
+    token = create_access_token(user.id)
     return TokenResponse(access_token=token, user=UserOut.model_validate(user))
 
 
@@ -409,16 +452,36 @@ def delete_account(
     user: User = Depends(get_current_user),
 ):
     # Delete all user data in dependency order
-    db.query(Interaction).filter(Interaction.user_id == user.id).delete()
+    from .models import (
+        Weights, LifeEvent, Nudge, Quest, UserAchievement,
+        Party, PartyMember, Challenge, BossRaid, StravaConnection,
+    )
+
     contacts = db.query(Contact).filter(Contact.user_id == user.id).all()
     contact_ids = [c.id for c in contacts]
+
     if contact_ids:
-        from .models import Weights, LifeEvent
+        # Delete data referencing contacts first
+        db.query(PartyMember).filter(PartyMember.contact_id.in_(contact_ids)).delete(synchronize_session=False)
+        db.query(Challenge).filter(Challenge.contact_id.in_(contact_ids)).delete(synchronize_session=False)
         db.query(Weights).filter(Weights.contact_id.in_(contact_ids)).delete(synchronize_session=False)
         db.query(LifeEvent).filter(LifeEvent.contact_id.in_(contact_ids)).delete(synchronize_session=False)
+        db.query(Nudge).filter(Nudge.contact_id.in_(contact_ids)).delete(synchronize_session=False)
+        db.query(Quest).filter(Quest.contact_id.in_(contact_ids)).delete(synchronize_session=False)
+
+    # Delete user-level data
+    db.query(Interaction).filter(Interaction.user_id == user.id).delete()
     db.query(Contact).filter(Contact.user_id == user.id).delete()
+    db.query(Quest).filter(Quest.user_id == user.id).delete()
+    db.query(Nudge).filter(Nudge.user_id == user.id).delete()
+    db.query(UserAchievement).filter(UserAchievement.user_id == user.id).delete()
+    db.query(Party).filter(Party.creator_id == user.id).delete()
+    db.query(Challenge).filter(Challenge.challenger_id == user.id).delete()
     db.query(Gate).filter(Gate.creator_id == user.id).delete()
+    db.query(BossRaid).filter(BossRaid.creator_id == user.id).delete()
+    db.query(StravaConnection).filter(StravaConnection.user_id == user.id).delete()
     db.query(PushToken).filter(PushToken.user_id == user.id).delete()
+
     db.delete(user)
     db.commit()
     return {"status": "account_deleted"}
@@ -455,6 +518,7 @@ async def resend_verification(request: Request, user: User = Depends(get_current
 @limiter.limit("3/minute")
 async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Send a password reset email. Always returns success to prevent email enumeration."""
+    data.email = data.email.strip().lower()
     user = db.query(User).filter(User.email == data.email).first()
     if user:
         await send_reset_email(user.id, user.email, user.name)

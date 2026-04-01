@@ -1,0 +1,37 @@
+{
+  "app_name": "Orbit - Relationship Keeper",
+  "subtitle": "Nurture your relationships",
+  "bundle_id": "io.orbitapp.app",
+
+  "description": {
+    "short": "Stay connected with the people who matter most. Orbit helps you nurture relationships with smart reminders, health scores, and gamified motivation.",
+    "full": "Orbit is your personal relationship intelligence companion. It helps you maintain and strengthen your connections with friends, family, colleagues, and everyone in between.\n\nYour relationships are your most valuable asset, but life gets busy. Orbit makes sure no one falls through the cracks.\n\nKEY FEATURES:\n\n- Relationship Health Scores: Each contact gets a dynamic health score based on interaction frequency, depth, and reciprocity. Watch your relationships flourish or catch them before they fade.\n\n- Smart Nudges: Get personalized reminders about who to reach out to, with AI-powered conversation starters tailored to each relationship.\n\n- AI-Powered Insights: Understand your social patterns with intelligent summaries and actionable suggestions powered by Claude AI.\n\n- Gamified Motivation: Level up your social skills with XP, quests, achievements, and a Solo Leveling-inspired ranking system. Complete daily quests, join parties, and climb the hunter ranks.\n\n- Visual Orbit View: See all your relationships mapped in an interactive orbital visualization. Inner circle, close friends, acquaintances - everyone has their place.\n\n- Social Challenges: Challenge yourself with gates, boss raids, and streak challenges to keep your connections active.\n\n- Life Events Tracking: Log birthdays, moves, job changes, and other milestones to always have context for your conversations.\n\n- Interaction Logging: Track calls, meetups, messages, and more. Orbit learns your patterns and adapts its recommendations.\n\n- Privacy First: Your relationship data stays private and secure. No social media scraping, no contact sharing.\n\nWhether you're maintaining a dozen close friendships or managing a network of hundreds, Orbit helps you be intentional about the connections that matter most.\n\nDownload Orbit and start nurturing your relationships today."
+  },
+
+  "keywords": "relationships,contacts,friends,family,CRM,social,networking,reminders,habits,productivity,gamification,health,tracker,connections,personal",
+
+  "categories": {
+    "primary": "Lifestyle",
+    "secondary": "Productivity"
+  },
+
+  "age_rating": "4+",
+  "content_rating": "Everyone",
+
+  "privacy_url": "https://orbit-app-production-fd37.up.railway.app/privacy",
+  "terms_url": "https://orbit-app-production-fd37.up.railway.app/terms",
+  "support_url": "https://orbit-app-production-fd37.up.railway.app",
+
+  "whats_new": "Welcome to Orbit! This is our first release.\n\n- Relationship health tracking with smart decay algorithms\n- AI-powered conversation starters and insights\n- Gamification with XP, quests, achievements, and hunter ranks\n- Visual orbit map of your relationships\n- Push notifications for nudges\n- Sign in with Apple & Google\n- Dark mode throughout",
+
+  "promotional_text": "Nurture your relationships with smart reminders, health scores, and gamified motivation. Your personal relationship intelligence companion.",
+
+  "screenshots_needed": [
+    "Dashboard with health scores",
+    "Orbit visualization view",
+    "Contact detail with interaction history",
+    "Gamification dashboard with quests",
+    "Add contact flow",
+    "AI conversation starters"
+  ]
+}

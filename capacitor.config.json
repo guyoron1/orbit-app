@@ -1,0 +1,31 @@
+{
+  "appId": "io.orbitapp.app",
+  "appName": "Orbit",
+  "webDir": "www",
+  "server": {
+    "cleartext": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#0a0a1a",
+      "showSpinner": false,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0a0a1a"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  },
+  "ios": {
+    "scheme": "Orbit",
+    "contentInset": "automatic"
+  },
+  "android": {
+    "backgroundColor": "#0a0a1a"
+  }
+}

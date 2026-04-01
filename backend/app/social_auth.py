@@ -17,6 +17,8 @@ log = logging.getLogger("orbit.social_auth")
 
 APPLE_CLIENT_ID = os.environ.get("APPLE_CLIENT_ID", "io.orbitapp.app")
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+if not GOOGLE_CLIENT_ID:
+    log.warning("GOOGLE_CLIENT_ID not set — Google token audience will NOT be verified. Set this in production.")
 
 APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"

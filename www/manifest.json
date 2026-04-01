@@ -1,0 +1,24 @@
+{
+  "name": "Orbit - Relationship Intelligence",
+  "short_name": "Orbit",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "description": "AI-powered relationship intelligence. Smart nudges, health tracking, and gamified social engagement to help you nurture the connections that matter most.",
+  "categories": ["social", "lifestyle", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
