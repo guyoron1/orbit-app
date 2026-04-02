@@ -1523,6 +1523,158 @@
     display: inline-flex; align-items: center; gap: 6px;
   }
   .boss-attack-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,107,107,0.3); }
+  .boss-phase-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700;
+    background: rgba(255,107,107,0.15); color: #ff6b6b; margin-left: 8px; text-transform: uppercase;
+  }
+  .boss-type-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600;
+    background: rgba(108,92,231,0.15); color: var(--accent-light); margin-bottom: 6px;
+  }
+
+  /* ═══ QUEST CHAINS ═══ */
+  .chain-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; position: relative; overflow: hidden;
+  }
+  .chain-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #fdcb6e, #e17055, #6c5ce7);
+  }
+  .chain-card.completed::before { background: linear-gradient(90deg, #55efc4, #00cec9); }
+  .chain-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .chain-name { font-size: 15px; font-weight: 700; }
+  .chain-status {
+    padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  }
+  .chain-status.available { background: rgba(108,92,231,0.15); color: var(--accent-light); }
+  .chain-status.active { background: rgba(253,203,110,0.15); color: #fdcb6e; }
+  .chain-status.completed { background: rgba(85,239,196,0.15); color: #55efc4; }
+  .chain-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+  .chain-progress { display: flex; gap: 4px; align-items: center; margin-bottom: 8px; }
+  .chain-step-dot {
+    width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: var(--text-muted);
+    transition: all 0.3s;
+  }
+  .chain-step-dot.done { background: var(--accent); border-color: var(--accent); color: white; }
+  .chain-step-dot.current { border-color: #fdcb6e; color: #fdcb6e; animation: chainPulse 1.5s ease-in-out infinite; }
+  .chain-step-connector { flex: 1; height: 2px; background: var(--border); }
+  .chain-step-connector.done { background: var(--accent); }
+  .chain-bonus { font-size: 11px; color: #fdcb6e; font-weight: 600; margin-top: 6px; }
+  .chain-action-btn {
+    margin-top: 8px; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--accent); background: transparent; color: var(--accent-light);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .chain-action-btn:hover { background: var(--accent); color: white; }
+  @keyframes chainPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(253,203,110,0.3); } 50% { box-shadow: 0 0 0 6px rgba(253,203,110,0); } }
+
+  /* ═══ SKILL TREE ═══ */
+  .skill-tree-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .class-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; position: relative; overflow: hidden; transition: all 0.2s;
+  }
+  .class-card.selected { border-color: var(--accent); box-shadow: 0 0 20px rgba(108,92,231,0.15); }
+  .class-card.locked { opacity: 0.5; }
+  .class-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .class-name { font-size: 15px; font-weight: 700; }
+  .class-level-req { font-size: 10px; color: var(--text-muted); }
+  .class-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+  .skill-list { display: flex; flex-direction: column; gap: 6px; }
+  .skill-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    background: var(--glass); border-radius: 6px; font-size: 12px;
+  }
+  .skill-row.unlocked { background: rgba(108,92,231,0.08); }
+  .skill-name { flex: 1; font-weight: 600; }
+  .skill-level { font-size: 11px; color: var(--text-muted); }
+  .skill-unlock-btn {
+    padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 600;
+    border: 1px solid var(--accent); background: transparent; color: var(--accent-light);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .skill-unlock-btn:hover { background: var(--accent); color: white; }
+  .skill-unlock-btn:disabled { opacity: 0.3; cursor: default; }
+  .class-select-btn {
+    margin-top: 10px; width: 100%; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; transition: all 0.2s;
+    background: linear-gradient(135deg, var(--accent), #a29bfe); color: white;
+  }
+  .class-select-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px var(--accent-glow); }
+  .class-select-btn:disabled { opacity: 0.3; cursor: default; transform: none; box-shadow: none; }
+  .sp-badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 700; background: rgba(108,92,231,0.15); color: var(--accent-light);
+  }
+  @media (max-width: 600px) { .skill-tree-container { grid-template-columns: 1fr; } }
+
+  /* ═══ CIRCLES / GUILDS ═══ */
+  .circles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .circle-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; position: relative; overflow: hidden; cursor: pointer; transition: all 0.2s;
+  }
+  .circle-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .circle-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .circle-name { font-size: 15px; font-weight: 700; }
+  .circle-level-badge {
+    padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700;
+    background: rgba(0,206,201,0.15); color: #00cec9;
+  }
+  .circle-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+  .circle-members-row { display: flex; gap: -4px; margin-bottom: 6px; }
+  .circle-member-avatar {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--bg-card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: white; margin-left: -4px;
+  }
+  .circle-member-avatar:first-child { margin-left: 0; }
+  .circle-xp-bar { height: 4px; background: var(--bg-card-hover); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .circle-xp-fill { height: 100%; background: linear-gradient(90deg, #00cec9, #55efc4); border-radius: 2px; transition: width 0.5s; }
+  .circle-xp-label { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+  .circle-quests { margin-top: 8px; }
+  .circle-quest-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 8px; background: var(--glass); border-radius: 6px;
+    font-size: 12px; margin-top: 4px;
+  }
+  .create-circle-card {
+    background: var(--glass); border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; min-height: 120px;
+    color: var(--text-muted); font-size: 14px; gap: 8px;
+  }
+  .create-circle-card:hover { border-color: var(--accent); color: var(--accent-light); }
+
+  /* ═══ HP POTION ═══ */
+  .hp-potion-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    background: rgba(85,239,196,0.1); border: 1px solid rgba(85,239,196,0.2);
+    color: #55efc4; cursor: pointer; transition: all 0.2s;
+  }
+  .hp-potion-btn:hover { background: rgba(85,239,196,0.2); transform: scale(1.05); }
+  .exhausted-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700;
+    background: rgba(255,107,107,0.15); color: #ff6b6b; margin-left: 8px;
+    animation: exhaustPulse 2s ease-in-out infinite;
+  }
+  @keyframes exhaustPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* ═══ STAT BONUSES TOOLTIP ═══ */
+  .stat-bonuses-panel {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px; margin-top: 8px;
+  }
+  .stat-bonus-row {
+    display: flex; justify-content: space-between; padding: 4px 0;
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .stat-bonus-row span:last-child { color: #55efc4; font-weight: 600; }
 
   /* ═══ WEEKLY REPORT MODAL ═══ */
   .report-overlay {
@@ -2169,10 +2321,38 @@
         <div class="section-header">
           <div class="section-title">Achievements</div>
           <a class="section-link" id="achievementsLink">
-            <span id="achievementCount">0</span> / <span id="achievementTotal">16</span> earned
+            <span id="achievementCount">0</span> / <span id="achievementTotal">36</span> earned
           </a>
         </div>
         <div class="achievements-row" id="achievementsRow"></div>
+      </div>
+
+      <!-- Quest Chains -->
+      <div id="questChainsSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Quest Chains</div>
+          <span class="section-link" id="chainProgress" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
+        <div class="quests-grid" id="questChainsGrid"></div>
+      </div>
+
+      <!-- Skill Tree -->
+      <div id="skillTreeSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Skill Tree</div>
+          <span id="skillPointsBadge" class="sp-badge" style="display:none"></span>
+        </div>
+        <div id="socialClassLabel" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;"></div>
+        <div class="skill-tree-container" id="skillTreeGrid"></div>
+      </div>
+
+      <!-- Circles / Guilds -->
+      <div id="circlesSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title">Circles</div>
+          <a class="section-link" onclick="openCreateCircle()">+ Create Circle</a>
+        </div>
+        <div class="circles-grid" id="circlesGrid"></div>
       </div>
 
       <!-- Leaderboard -->
@@ -3449,6 +3629,15 @@ const ACHIEVEMENT_ICONS = {
   quest_1: '\u{1F9ED}', quest_5: '\u{1F5FA}\uFE0F', quest_10: '\u{1F451}',
   level_5: '\u{2B50}', level_10: '\u{1FA90}',
   in_person_5: '\u{1F91D}', inner_circle: '\u{2764}\uFE0F',
+  party_1: '\u{1F389}', party_5: '\u{1F38A}', party_master: '\u{1F3AA}',
+  challenge_1: '\u{1F94A}', challenge_5: '\u{1F3AF}',
+  gate_1: '\u{1FA78}', gate_5: '\u{26E9}\uFE0F', gate_10: '\u{1F3F0}',
+  boss_1: '\u{1F479}', boss_5: '\u{1F432}',
+  shadow_1: '\u{1F47B}', shadow_5: '\u{1F300}', shadow_army: '\u{2694}\uFE0F',
+  chain_1: '\u{1F517}', chain_master: '\u{1F4DC}',
+  diverse_3: '\u{1F308}', diverse_5: '\u{1F30D}',
+  circle_1: '\u{1F465}', circle_3: '\u{1F3D8}\uFE0F',
+  class_chosen: '\u{1F393}', skill_5: '\u{1F52E}',
 };
 const DIFFICULTY_ICONS = { easy: '\u{2615}', medium: '\u{26A1}', hard: '\u{1F525}' };
 
@@ -5963,9 +6152,21 @@ function renderBossRaids(raids) {
     return;
   }
 
+  const BOSS_TYPE_NAMES = {
+    shadow_beast: 'Shadow Beast', the_drifter: 'The Drifter',
+    social_hydra: 'Social Hydra', the_monarch: 'The Monarch'
+  };
   raids.forEach(r => {
     const card = createElement('div', { className: 'boss-raid-card' });
-    card.appendChild(createElement('div', { className: 'boss-name' }, '👹 ' + (r.boss_name || 'Shadow Beast')));
+    const nameRow = createElement('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:4px;' });
+    nameRow.appendChild(createElement('div', { className: 'boss-name', style: 'margin-bottom:0' }, '\u{1F479} ' + (r.boss_name || 'Shadow Beast')));
+    if (r.total_phases > 1) {
+      nameRow.appendChild(createElement('span', { className: 'boss-phase-badge' }, 'Phase ' + r.phase + '/' + r.total_phases));
+    }
+    card.appendChild(nameRow);
+    if (r.boss_type && r.boss_type !== 'shadow_beast') {
+      card.appendChild(createElement('div', { className: 'boss-type-badge' }, BOSS_TYPE_NAMES[r.boss_type] || r.boss_type));
+    }
     card.appendChild(createElement('div', { style: 'font-size:13px;color:var(--text-secondary);margin-bottom:4px;' }, r.title));
 
     const hpPct = Math.max(0, ((r.boss_hp || 0) / (r.boss_max_hp || 100)) * 100);
@@ -5973,11 +6174,14 @@ function renderBossRaids(raids) {
     hpBar.appendChild(createElement('div', { className: 'boss-hp-fill', style: 'width:' + hpPct + '%' }));
     card.appendChild(hpBar);
     card.appendChild(createElement('div', { className: 'boss-hp-text' }, 'HP: ' + (r.boss_hp || 0) + '/' + (r.boss_max_hp || 100)));
+    if (r.stat_points_reward > 0) {
+      card.appendChild(createElement('div', { style: 'font-size:11px;color:#fdcb6e;margin-top:2px;' }, '+' + r.stat_points_reward + ' stat points on clear'));
+    }
 
     const atkBtn = createElement('button', {
       className: 'boss-attack-btn',
       onClick: () => attackBoss(r.id)
-    }, '⚔️ Attack');
+    }, '\u2694\uFE0F Attack');
     card.appendChild(atkBtn);
     container.appendChild(card);
   });
@@ -6249,12 +6453,369 @@ showDashboard = function() {
   }
 };
 
-// After dashboard loads, do daily check-in
+// ═══════════════════════════════════════════
+// QUEST CHAINS SYSTEM
+// ═══════════════════════════════════════════
+let questChainsData = [];
+
+async function loadQuestChains() {
+  try {
+    questChainsData = await api('/quest-chains');
+  } catch (e) { questChainsData = []; }
+}
+
+function renderQuestChains() {
+  const sec = document.getElementById('questChainsSection');
+  const grid = document.getElementById('questChainsGrid');
+  if (!sec || !grid) return;
+  if (questChainsData.length === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  grid.textContent = '';
+  const completedCount = questChainsData.filter(c => c.status === 'completed').length;
+  document.getElementById('chainProgress').textContent = completedCount + '/' + questChainsData.length + ' completed';
+  questChainsData.forEach(chain => grid.appendChild(buildChainCard(chain)));
+}
+
+function buildChainCard(chain) {
+  const card = createElement('div', { className: 'chain-card' + (chain.status === 'completed' ? ' completed' : '') });
+  const header = createElement('div', { className: 'chain-header' });
+  header.appendChild(createElement('div', { className: 'chain-name' }, chain.name));
+  header.appendChild(createElement('span', { className: 'chain-status ' + chain.status }, chain.status));
+  card.appendChild(header);
+  card.appendChild(createElement('div', { className: 'chain-desc' }, chain.description));
+
+  // Step progress dots
+  const progress = createElement('div', { className: 'chain-progress' });
+  for (let i = 0; i < chain.total_steps; i++) {
+    if (i > 0) {
+      const conn = createElement('div', { className: 'chain-step-connector' + (i < chain.current_step ? ' done' : '') });
+      progress.appendChild(conn);
+    }
+    const cls = i < chain.current_step ? 'done' : i === chain.current_step && chain.status === 'active' ? 'current' : '';
+    const dot = createElement('div', { className: 'chain-step-dot ' + cls }, String(i + 1));
+    progress.appendChild(dot);
+  }
+  card.appendChild(progress);
+
+  // Current step info
+  if (chain.steps && chain.steps.length > 0) {
+    const currentStep = chain.steps.find(s => s.current);
+    if (currentStep) {
+      card.appendChild(createElement('div', { style: 'font-size:12px;color:var(--text-primary);font-weight:600;' }, 'Step ' + currentStep.step + ': ' + currentStep.title));
+      card.appendChild(createElement('div', { style: 'font-size:11px;color:var(--text-muted);margin-top:2px;' }, currentStep.description));
+    }
+  }
+
+  if (chain.chain_bonus_xp > 0) {
+    card.appendChild(createElement('div', { className: 'chain-bonus' }, 'Chain Bonus: +' + chain.chain_bonus_xp + ' XP' + (chain.chain_bonus_title ? ' + "' + chain.chain_bonus_title + '" title' : '')));
+  }
+
+  if (chain.status === 'available') {
+    const btn = createElement('button', { className: 'chain-action-btn', onClick: () => startChain(chain.chain_key) }, 'Start Chain');
+    card.appendChild(btn);
+  } else if (chain.status === 'active') {
+    const btn = createElement('button', { className: 'chain-action-btn', onClick: () => checkChainStep(chain.chain_key) }, 'Check Progress');
+    card.appendChild(btn);
+  }
+  return card;
+}
+
+async function startChain(chainKey) {
+  try {
+    await api('/quest-chains/' + chainKey + '/start', { method: 'POST' });
+    showToast('Quest chain started!', 'success');
+    playSound('reward');
+    await loadQuestChains();
+    renderQuestChains();
+  } catch (e) { showToast(e.message || 'Cannot start chain', 'error'); }
+}
+
+async function checkChainStep(chainKey) {
+  try {
+    const data = await api('/quest-chains/' + chainKey + '/check', { method: 'POST' });
+    if (data.advanced) {
+      showToast('Step completed! Moving to step ' + data.current_step, 'success');
+      playSound('reward');
+      if (data.chain_completed) {
+        showToast('Quest chain completed! ' + (data.chain_bonus_xp ? '+' + data.chain_bonus_xp + ' bonus XP!' : ''), 'success');
+        launchMegaConfetti();
+      }
+    } else {
+      showToast(data.message || 'Keep going - step not yet complete', 'info');
+    }
+    await loadQuestChains();
+    renderQuestChains();
+  } catch (e) { showToast(e.message || 'Check failed', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+// SKILL TREE & SOCIAL CLASSES
+// ═══════════════════════════════════════════
+let skillTreeData = null;
+
+async function loadSkillTree() {
+  try {
+    skillTreeData = await api('/skills/tree');
+  } catch (e) { skillTreeData = null; }
+}
+
+function renderSkillTree() {
+  const sec = document.getElementById('skillTreeSection');
+  const grid = document.getElementById('skillTreeGrid');
+  if (!sec || !grid || !skillTreeData) { if (sec) sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  grid.textContent = '';
+
+  const sp = skillTreeData.skill_points || 0;
+  const spBadge = document.getElementById('skillPointsBadge');
+  if (sp > 0) {
+    spBadge.style.display = '';
+    spBadge.textContent = sp + ' SP';
+  } else {
+    spBadge.style.display = 'none';
+  }
+
+  const classLabel = document.getElementById('socialClassLabel');
+  if (skillTreeData.social_class) {
+    classLabel.textContent = 'Current Class: ' + skillTreeData.social_class.charAt(0).toUpperCase() + skillTreeData.social_class.slice(1);
+  } else {
+    classLabel.textContent = 'Choose a class to unlock skills';
+  }
+
+  Object.entries(skillTreeData.classes).forEach(([key, cls]) => {
+    const card = createElement('div', { className: 'class-card' + (cls.selected ? ' selected' : '') + (!cls.available ? ' locked' : '') });
+    const header = createElement('div', { className: 'class-card-header' });
+    header.appendChild(createElement('div', { className: 'class-name' }, cls.name + (cls.selected ? ' \u2713' : '')));
+    header.appendChild(createElement('div', { className: 'class-level-req' }, 'Lv.' + cls.unlock_level + '+'));
+    card.appendChild(header);
+    card.appendChild(createElement('div', { className: 'class-desc' }, cls.description));
+
+    const skillList = createElement('div', { className: 'skill-list' });
+    Object.entries(cls.skills).forEach(([skey, skill]) => {
+      const row = createElement('div', { className: 'skill-row' + (skill.current_level > 0 ? ' unlocked' : '') });
+      row.appendChild(createElement('span', { className: 'skill-name' }, skill.name));
+      row.appendChild(createElement('span', { className: 'skill-level' }, skill.current_level + '/' + skill.max_level));
+      if (cls.selected && skill.current_level < skill.max_level && sp >= skill.sp_cost) {
+        const btn = createElement('button', { className: 'skill-unlock-btn', onClick: () => unlockSkillAction(skey) },
+          skill.current_level === 0 ? 'Unlock (' + skill.sp_cost + ' SP)' : 'Upgrade (' + skill.sp_cost + ' SP)');
+        row.appendChild(btn);
+      }
+      skillList.appendChild(row);
+    });
+    card.appendChild(skillList);
+
+    if (!skillTreeData.social_class && cls.available) {
+      const selectBtn = createElement('button', { className: 'class-select-btn', onClick: () => chooseClassAction(key) }, 'Choose ' + cls.name);
+      card.appendChild(selectBtn);
+    }
+    grid.appendChild(card);
+  });
+}
+
+async function chooseClassAction(classKey) {
+  try {
+    await api('/skills/choose-class', { method: 'POST', body: JSON.stringify({ class_key: classKey }) });
+    showToast('Class chosen! Welcome, ' + classKey + '!', 'success');
+    launchConfetti();
+    playSound('levelup');
+    await loadSkillTree();
+    renderSkillTree();
+    await loadDashboard();
+    renderGamification();
+  } catch (e) { showToast(e.message || 'Cannot choose class', 'error'); }
+}
+
+async function unlockSkillAction(skillKey) {
+  try {
+    const data = await api('/skills/unlock', { method: 'POST', body: JSON.stringify({ skill_key: skillKey }) });
+    showToast(data.message || 'Skill unlocked!', 'success');
+    playSound('reward');
+    await loadSkillTree();
+    renderSkillTree();
+  } catch (e) { showToast(e.message || 'Cannot unlock skill', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+// CIRCLES / GUILDS SYSTEM
+// ═══════════════════════════════════════════
+let circlesData = [];
+
+async function loadCircles() {
+  try {
+    circlesData = await api('/circles');
+  } catch (e) { circlesData = []; }
+}
+
+function renderCircles() {
+  const sec = document.getElementById('circlesSection');
+  const grid = document.getElementById('circlesGrid');
+  if (!sec || !grid) return;
+  sec.style.display = '';
+  grid.textContent = '';
+
+  circlesData.forEach(circle => grid.appendChild(buildCircleCard(circle)));
+
+  const createCard = createElement('div', { className: 'create-circle-card', onClick: () => openCreateCircle() });
+  createCard.appendChild(createElement('div', { style: 'font-size:24px;' }, '+'));
+  createCard.appendChild(createElement('div', {}, 'Create Circle'));
+  grid.appendChild(createCard);
+}
+
+const CIRCLE_COLORS = ['#6c5ce7', '#00cec9', '#fd79a8', '#fdcb6e', '#55efc4', '#ff6b6b', '#a29bfe', '#e17055'];
+
+function buildCircleCard(circle) {
+  const card = createElement('div', { className: 'circle-card' });
+  const header = createElement('div', { className: 'circle-card-header' });
+  header.appendChild(createElement('div', { className: 'circle-name' }, circle.name));
+  header.appendChild(createElement('div', { className: 'circle-level-badge' }, 'Lv.' + circle.level));
+  card.appendChild(header);
+  if (circle.description) card.appendChild(createElement('div', { className: 'circle-desc' }, circle.description));
+
+  // Member avatars
+  if (circle.members && circle.members.length > 0) {
+    const membersRow = createElement('div', { className: 'circle-members-row' });
+    circle.members.slice(0, 6).forEach((m, i) => {
+      const av = createElement('div', { className: 'circle-member-avatar',
+        style: 'background:' + CIRCLE_COLORS[i % CIRCLE_COLORS.length],
+        title: m.contact_name || 'Member'
+      }, (m.contact_name || '?')[0].toUpperCase());
+      membersRow.appendChild(av);
+    });
+    if (circle.members.length > 6) {
+      const more = createElement('div', { className: 'circle-member-avatar',
+        style: 'background:var(--bg-card-hover);color:var(--text-muted);font-size:9px;'
+      }, '+' + (circle.members.length - 6));
+      membersRow.appendChild(more);
+    }
+    card.appendChild(membersRow);
+  }
+
+  // XP bar
+  const xpForNext = circle.level * circle.level * 200;
+  const pct = Math.min(100, (circle.xp_pool / xpForNext) * 100);
+  const xpBar = createElement('div', { className: 'circle-xp-bar' });
+  xpBar.appendChild(createElement('div', { className: 'circle-xp-fill', style: 'width:' + pct + '%' }));
+  card.appendChild(xpBar);
+  card.appendChild(createElement('div', { className: 'circle-xp-label' }, circle.xp_pool + ' / ' + xpForNext + ' XP'));
+
+  // Active quests
+  if (circle.active_quests && circle.active_quests.length > 0) {
+    const questsDiv = createElement('div', { className: 'circle-quests' });
+    circle.active_quests.forEach(q => {
+      const item = createElement('div', { className: 'circle-quest-item' });
+      item.appendChild(createElement('span', {}, q.title));
+      item.appendChild(createElement('span', { style: 'color:#fdcb6e;' }, '+' + q.xp_reward + ' XP'));
+      questsDiv.appendChild(item);
+    });
+    card.appendChild(questsDiv);
+  }
+
+  // Delete button
+  const deleteBtn = createElement('button', {
+    style: 'position:absolute;top:8px;right:8px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;',
+    onClick: (e) => { e.stopPropagation(); deleteCircle(circle.id); }
+  }, '\u00D7');
+  card.appendChild(deleteBtn);
+
+  return card;
+}
+
+function openCreateCircle() {
+  const name = prompt('Circle name:');
+  if (!name) return;
+  const desc = prompt('Description (optional):') || '';
+  createCircle(name, desc);
+}
+
+async function createCircle(name, description) {
+  try {
+    const contactIds = [];
+    // Let user pick contacts
+    if (contacts.length > 0) {
+      const picks = prompt('Add contacts by number (comma-separated):\\n' + contacts.map((c, i) => (i + 1) + '. ' + c.name).join('\\n'));
+      if (picks) {
+        picks.split(',').forEach(p => {
+          const idx = parseInt(p.trim()) - 1;
+          if (idx >= 0 && idx < contacts.length) contactIds.push(contacts[idx].id);
+        });
+      }
+    }
+    await api('/circles', { method: 'POST', body: JSON.stringify({ name, description, contact_ids: contactIds }) });
+    showToast('Circle created!', 'success');
+    playSound('reward');
+    await loadCircles();
+    renderCircles();
+  } catch (e) { showToast(e.message || 'Failed to create circle', 'error'); }
+}
+
+async function deleteCircle(circleId) {
+  if (!confirm('Delete this circle?')) return;
+  try {
+    await api('/circles/' + circleId, { method: 'DELETE' });
+    showToast('Circle deleted', 'success');
+    await loadCircles();
+    renderCircles();
+  } catch (e) { showToast(e.message || 'Failed to delete', 'error'); }
+}
+
+// ═══════════════════════════════════════════
+// HP POTION SYSTEM
+// ═══════════════════════════════════════════
+async function useHPPotion() {
+  try {
+    const data = await api('/hp/potion', { method: 'POST' });
+    showToast('HP restored! ' + data.new_hp + '/100 HP (-50 XP)', 'success');
+    playSound('reward');
+    await loadDashboard();
+    renderGamification();
+  } catch (e) { showToast(e.message || 'Cannot use potion (need 50+ XP)', 'info'); }
+}
+
+// ═══════════════════════════════════════════
+// STAT BONUSES DISPLAY
+// ═══════════════════════════════════════════
+let statBonusesData = null;
+
+async function loadStatBonuses() {
+  try {
+    statBonusesData = await api('/stats/bonuses');
+  } catch (e) { statBonusesData = null; }
+}
+
+function renderStatBonuses() {
+  const existing = document.getElementById('statBonusesPanel');
+  if (existing) existing.remove();
+  if (!statBonusesData) return;
+  const section = document.getElementById('hunterStatsSection');
+  if (!section || section.style.display === 'none') return;
+
+  const panel = createElement('div', { className: 'stat-bonuses-panel', id: 'statBonusesPanel' });
+  const bonuses = [
+    ['Party XP', 'x' + statBonusesData.party_xp_mult.toFixed(2)],
+    ['Relationship XP', 'x' + statBonusesData.relationship_xp_mult.toFixed(2)],
+    ['Quest XP', 'x' + statBonusesData.quest_xp_mult.toFixed(2)],
+    ['Global XP', 'x' + statBonusesData.global_xp_mult.toFixed(2)],
+    ['Max Quests', String(statBonusesData.max_active_quests)],
+    ['HP/Interaction', '+' + statBonusesData.hp_per_interaction],
+    ['Streak Freezes', String(statBonusesData.free_streak_freezes)],
+  ];
+  bonuses.forEach(([label, val]) => {
+    if (val === 'x1.00' || val === '0' || val === '+0') return;
+    const row = createElement('div', { className: 'stat-bonus-row' });
+    row.appendChild(createElement('span', {}, label));
+    row.appendChild(createElement('span', {}, val));
+    panel.appendChild(row);
+  });
+  if (panel.children.length > 0) section.appendChild(panel);
+}
+
+// After dashboard loads, do daily check-in and load new phase data
 const originalLoadDashboard = loadDashboard;
 loadDashboard = async function() {
   const result = await originalLoadDashboard();
-  // Check title on every load
   checkTitle();
+  // Load all new phase data in parallel
+  await Promise.all([loadQuestChains(), loadSkillTree(), loadCircles(), loadStatBonuses()]);
   return result;
 };
 
@@ -6288,6 +6849,26 @@ renderGamification = function() {
                   document.querySelector('#page-dashboard .section:last-child');
     if (gamEl) gamEl.appendChild(freezeDiv);
   }
+
+  // HP potion button next to HP bar
+  if (!document.getElementById('hpPotionBtn')) {
+    const hpContainer = document.querySelector('.hp-bar-container');
+    if (hpContainer) {
+      const potionBtn = createElement('button', { className: 'hp-potion-btn', id: 'hpPotionBtn', onClick: useHPPotion }, '\u{1F9EA} Potion (50 XP)');
+      const hp = dashboardData?.gamification?.hp;
+      if (hp !== undefined && hp === 0) {
+        const exhaustBadge = createElement('span', { className: 'exhausted-badge' }, 'EXHAUSTED -50% XP');
+        hpContainer.querySelector('.hp-bar-label').appendChild(exhaustBadge);
+      }
+      hpContainer.appendChild(potionBtn);
+    }
+  }
+
+  // Render new phase sections
+  renderQuestChains();
+  renderSkillTree();
+  renderCircles();
+  renderStatBonuses();
 
   // Add weekly report button
   if (!document.getElementById('weeklyReportBtn')) {

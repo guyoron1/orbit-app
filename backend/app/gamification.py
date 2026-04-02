@@ -1,13 +1,16 @@
 """
-Orbit Gamification Engine — Quests, XP, Achievements, Streaks
+Orbit Gamification Engine — Quests, XP, Achievements, Streaks, Skills, Chains, Circles
 
 Design principles:
   - Reward organic behavior, don't force it
   - Encourage real-world meetups over digital interactions
   - Make progression visible but not pushy
   - Quests are suggestions, not mandatory checklists
+  - Stats have real mechanical effects
+  - Every system feeds into every other system
 """
 
+import json
 import random
 from datetime import datetime, timedelta, date
 from typing import Optional, List
@@ -16,12 +19,78 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from .models import (
-    User, Contact, Interaction, Quest, UserAchievement,
+    User, Contact, Interaction, Quest, UserAchievement, UserSkill,
+    QuestChain, QuestChainStatus, Circle, CircleMember, CircleQuest,
+    Party, PartyMember, Challenge, Gate, BossRaid,
     InteractionType, QuestStatus, QuestType, DifficultyTier,
+    PartyStatus, ChallengeStatus,
 )
 
 
-# ── XP Rewards ──
+# ══════════════════════════════════════════════
+# PHASE 1: STAT EFFECTS
+# ══════════════════════════════════════════════
+
+def get_stat_bonuses(user: User, db: Session) -> dict:
+    """Calculate all mechanical bonuses from stats and skills."""
+    charisma = user.stat_charisma or 1
+    empathy = user.stat_empathy or 1
+    consistency = user.stat_consistency or 1
+    initiative = user.stat_initiative or 1
+    wisdom = user.stat_wisdom or 1
+
+    bonuses = {
+        "party_xp_mult": 1.0 + (charisma - 1) * 0.02,      # +2% per point above 1
+        "relationship_xp_mult": 1.0 + (empathy - 1) * 0.02, # +2% per point above 1
+        "free_streak_freezes": (consistency - 1) // 10,       # +1 free freeze per 10 pts
+        "quest_xp_mult": 1.0 + (initiative - 1) * 0.05,     # +5% per point above 1
+        "global_xp_mult": 1.0 + (wisdom - 1) * 0.01,        # +1% per point above 1
+    }
+
+    # Apply skill bonuses
+    skills = {s.skill_key: s.level for s in
+              db.query(UserSkill).filter(UserSkill.user_id == user.id).all()}
+
+    # Connector skills
+    if "wide_net" in skills:
+        bonuses["max_active_quests"] = 3 + skills["wide_net"]  # +1 per level
+    else:
+        bonuses["max_active_quests"] = 3
+
+    if "social_butterfly" in skills:
+        bonuses["new_contact_xp_mult"] = 1.0 + skills["social_butterfly"] * 0.5  # +50% per level
+
+    # Nurturer skills
+    if "deep_roots" in skills:
+        bonuses["relationship_xp_mult"] += skills["deep_roots"] * 0.15  # +15% per level
+    if "healing_touch" in skills:
+        bonuses["hp_per_interaction"] = skills["healing_touch"] * 5  # +5 HP per level
+    else:
+        bonuses["hp_per_interaction"] = 0
+
+    # Catalyst skills
+    if "party_leader" in skills:
+        bonuses["party_size_bonus"] = skills["party_leader"] * 2  # +2 max per level
+    else:
+        bonuses["party_size_bonus"] = 0
+    if "rally_cry" in skills:
+        bonuses["party_xp_mult"] += skills["rally_cry"] * 0.25  # +25% per level
+
+    # Sage skills
+    if "iron_will" in skills:
+        bonuses["free_streak_freezes"] += skills["iron_will"] * 2  # +2 per level
+    if "meditation" in skills:
+        bonuses["daily_checkin_xp_mult"] = 1.0 + skills["meditation"] * 0.25
+    else:
+        bonuses["daily_checkin_xp_mult"] = 1.0
+
+    return bonuses
+
+
+# ══════════════════════════════════════════════
+# XP & LEVELING
+# ══════════════════════════════════════════════
+
 XP_INTERACTION = {
     InteractionType.in_person: 40,
     InteractionType.video_call: 25,
@@ -32,10 +101,9 @@ XP_INTERACTION = {
 }
 
 XP_DURATION_BONUS = 0.5  # per minute, capped at 30 bonus
-XP_QUEST_MULTIPLIER = 1.5  # quest completion bonus on top of base XP
+XP_QUEST_MULTIPLIER = 1.5
 
-# ── Level Thresholds ──
-# Level N requires sum(100 * 1.4^(i-1)) for i in 1..N
+
 def xp_for_level(level: int) -> int:
     if level <= 1:
         return 0
@@ -53,7 +121,6 @@ def level_from_xp(xp: int) -> int:
 
 
 def level_progress(xp: int) -> dict:
-    """Returns current level, XP within level, XP needed for next level."""
     lvl = level_from_xp(xp)
     current_threshold = xp_for_level(lvl)
     next_threshold = xp_for_level(lvl + 1)
@@ -66,7 +133,10 @@ def level_progress(xp: int) -> dict:
     }
 
 
-# ── Relationship Levels ──
+# ══════════════════════════════════════════════
+# RELATIONSHIP LEVELS
+# ══════════════════════════════════════════════
+
 RELATIONSHIP_LEVELS = [
     (0, "new"),
     (50, "acquaintance"),
@@ -84,26 +154,87 @@ def relationship_level_from_xp(xp: int) -> str:
     return level
 
 
-# ── XP Award ──
+# ══════════════════════════════════════════════
+# PHASE 2: HP RECOVERY
+# ══════════════════════════════════════════════
+
+HP_RECOVERY = {
+    "interaction_in_person": 10,
+    "interaction_video_call": 5,
+    "interaction_call": 3,
+    "interaction_other": 2,
+    "quest_complete": 5,
+    "party_complete": 15,
+    "boss_clear": 20,
+    "daily_checkin_streak": 3,  # only if streak >= 3
+}
+HP_MAX = 100
+HP_EXHAUSTED_THRESHOLD = 0  # at 0 HP = exhausted debuff
+HP_POTION_COST = 50  # XP cost for HP potion
+HP_POTION_HEAL = 25
+
+
+def recover_hp(user: User, source: str, skill_bonus: int = 0):
+    """Add HP from an action. Caps at HP_MAX."""
+    amount = HP_RECOVERY.get(source, 0) + skill_bonus
+    if amount > 0:
+        user.hp = min(HP_MAX, (user.hp or 0) + amount)
+
+
+def is_exhausted(user: User) -> bool:
+    """Check if user is in exhausted state (0 HP)."""
+    return (user.hp or 0) <= HP_EXHAUSTED_THRESHOLD
+
+
+def get_xp_penalty(user: User) -> float:
+    """Returns XP multiplier penalty. 0.5x if exhausted, 1.0x otherwise."""
+    return 0.5 if is_exhausted(user) else 1.0
+
+
+# ══════════════════════════════════════════════
+# XP AWARD (with stat effects + HP recovery)
+# ══════════════════════════════════════════════
+
 def award_interaction_xp(user: User, contact: Contact, interaction: Interaction, db: Session) -> dict:
     """Award XP for logging an interaction. Returns XP breakdown."""
+    bonuses = get_stat_bonuses(user, db)
+
     base = XP_INTERACTION.get(interaction.interaction_type, 10)
     duration_bonus = min(30, int(interaction.duration_minutes * XP_DURATION_BONUS))
-    total = base + duration_bonus
+    raw_total = base + duration_bonus
+
+    # Apply stat multipliers
+    xp_mult = bonuses["global_xp_mult"] * get_xp_penalty(user)
+    relationship_mult = bonuses["relationship_xp_mult"]
+
+    total = int(raw_total * xp_mult)
 
     # Update user XP
     old_level = user.level or 1
     user.xp = (user.xp or 0) + total
     user.level = level_from_xp(user.xp)
 
-    # Grant stat points on level-up (Solo Leveling mechanic)
+    # Grant stat points + skill points on level-up
     if user.level > old_level:
         levels_gained = user.level - old_level
         user.stat_points = (user.stat_points or 0) + (3 * levels_gained)
+        user.skill_points = (user.skill_points or 0) + (1 * levels_gained)
 
-    # Update contact relationship XP
-    contact.relationship_xp = (contact.relationship_xp or 0) + total
+    # Update contact relationship XP (with empathy bonus)
+    rel_xp = int(raw_total * relationship_mult)
+    contact.relationship_xp = (contact.relationship_xp or 0) + rel_xp
     contact.relationship_level = relationship_level_from_xp(contact.relationship_xp)
+
+    # HP recovery from interaction
+    if interaction.interaction_type == InteractionType.in_person:
+        hp_source = "interaction_in_person"
+    elif interaction.interaction_type == InteractionType.video_call:
+        hp_source = "interaction_video_call"
+    elif interaction.interaction_type == InteractionType.call:
+        hp_source = "interaction_call"
+    else:
+        hp_source = "interaction_other"
+    recover_hp(user, hp_source, bonuses.get("hp_per_interaction", 0))
 
     # Update streak
     today = date.today()
@@ -114,6 +245,15 @@ def award_interaction_xp(user: User, contact: Contact, interaction: Interaction,
             user.streak_days = 1
         user.last_active_date = today
 
+    # Progress quest chains
+    progress_quest_chains(user, interaction, db)
+
+    # Progress circle XP
+    progress_circle_xp(user, contact, raw_total, db)
+
+    # Progress boss raids (interaction = damage)
+    progress_boss_raids(user, interaction, bonuses, db)
+
     db.commit()
 
     # Check achievements
@@ -123,14 +263,18 @@ def award_interaction_xp(user: User, contact: Contact, interaction: Interaction,
         "xp_earned": total,
         "base_xp": base,
         "duration_bonus": duration_bonus,
+        "stat_bonus": total - (base + duration_bonus),
+        "hp_recovered": HP_RECOVERY.get(hp_source, 0) + bonuses.get("hp_per_interaction", 0),
         "new_level": user.level,
         "new_achievements": new_achievements,
     }
 
 
-# ── Quest Generation ──
+# ══════════════════════════════════════════════
+# QUEST GENERATION
+# ══════════════════════════════════════════════
+
 QUEST_TEMPLATES = [
-    # (type, difficulty, xp, title_template, description_template, requires_contact)
     (QuestType.coffee, DifficultyTier.easy, 30,
      "Coffee catch-up with {name}",
      "Meet {name} for coffee or a drink. In-person connections are the strongest.",
@@ -176,19 +320,20 @@ def generate_quests(user: User, db: Session) -> List[Quest]:
     if not contacts:
         return []
 
-    # Don't generate if user already has 3+ active quests
+    bonuses = get_stat_bonuses(user, db)
+    max_quests = bonuses.get("max_active_quests", 3)
+
     active_count = db.query(func.count(Quest.id)).filter(
         Quest.user_id == user.id,
         Quest.status == QuestStatus.active,
     ).scalar() or 0
-    if active_count >= 3:
+    if active_count >= max_quests:
         return []
 
     now = datetime.utcnow()
     new_quests = []
-    slots = 3 - active_count
+    slots = max_quests - active_count
 
-    # Prioritize contacts who need attention
     contact_scores = []
     for c in contacts:
         last = (
@@ -202,7 +347,6 @@ def generate_quests(user: User, db: Session) -> List[Quest]:
 
     contact_scores.sort(key=lambda x: x[1], reverse=True)
 
-    # Pick templates
     available_templates = list(QUEST_TEMPLATES)
     random.shuffle(available_templates)
 
@@ -215,7 +359,6 @@ def generate_quests(user: User, db: Session) -> List[Quest]:
         if needs_contact and not contact_scores:
             continue
 
-        # Check for duplicate active quests of same type
         existing = db.query(Quest).filter(
             Quest.user_id == user.id,
             Quest.quest_type == qtype,
@@ -226,20 +369,21 @@ def generate_quests(user: User, db: Session) -> List[Quest]:
 
         if needs_contact:
             contact, days_silent = contact_scores[0]
-            # For reconnect quests, pick contacts with most silence
             if qtype == QuestType.reconnect and days_silent < 7:
                 continue
             title = title_tmpl.format(name=contact.name)
             desc = desc_tmpl.format(name=contact.name)
             contact_id = contact.id
-            # Rotate to next contact for variety
             contact_scores.append(contact_scores.pop(0))
         else:
             title = title_tmpl
             desc = desc_tmpl
             contact_id = None
 
-        # Set expiry based on difficulty
+        # Apply initiative stat bonus to quest XP
+        bonuses = get_stat_bonuses(user, db)
+        quest_xp = int(xp * bonuses.get("quest_xp_mult", 1.0))
+
         expire_days = {DifficultyTier.easy: 3, DifficultyTier.medium: 7, DifficultyTier.hard: 14}
         expires_at = now + timedelta(days=expire_days.get(diff, 7))
 
@@ -250,7 +394,7 @@ def generate_quests(user: User, db: Session) -> List[Quest]:
             description=desc,
             quest_type=qtype,
             difficulty=diff,
-            xp_reward=xp,
+            xp_reward=quest_xp,
             expires_at=expires_at,
         )
         db.add(quest)
@@ -270,15 +414,19 @@ def complete_quest(quest: Quest, user: User, db: Session) -> dict:
     quest.status = QuestStatus.completed
     quest.completed_at = datetime.utcnow()
 
-    xp = quest.xp_reward
+    bonuses = get_stat_bonuses(user, db)
+    xp = int(quest.xp_reward * bonuses["global_xp_mult"] * get_xp_penalty(user))
     old_level = user.level or 1
     user.xp = (user.xp or 0) + xp
     user.level = level_from_xp(user.xp)
 
-    # Grant stat points on level-up
     if user.level > old_level:
         levels_gained = user.level - old_level
         user.stat_points = (user.stat_points or 0) + (3 * levels_gained)
+        user.skill_points = (user.skill_points or 0) + (1 * levels_gained)
+
+    # HP recovery from quest
+    recover_hp(user, "quest_complete")
 
     db.commit()
 
@@ -291,8 +439,343 @@ def complete_quest(quest: Quest, user: User, db: Session) -> dict:
     }
 
 
-# ── Achievements ──
+# ══════════════════════════════════════════════
+# PHASE 3: QUEST CHAINS
+# ══════════════════════════════════════════════
+
+QUEST_CHAIN_DEFS = {
+    "reconnection_saga": {
+        "name": "The Reconnection Saga",
+        "description": "Rebuild a fading connection from scratch",
+        "total_steps": 5,
+        "steps": [
+            {"title": "The First Call", "desc": "Call someone you haven't spoken to in 30+ days", "xp": 30,
+             "condition": "call_silent_30"},
+            {"title": "The Follow-Up", "desc": "Meet them in person within 7 days of the call", "xp": 50,
+             "condition": "in_person_within_7"},
+            {"title": "Building Momentum", "desc": "Log 3 more interactions with them in 14 days", "xp": 40,
+             "condition": "3_interactions_14_days"},
+            {"title": "Going Deep", "desc": "Have a 30+ minute interaction with them", "xp": 45,
+             "condition": "long_interaction_30min"},
+            {"title": "Inner Circle", "desc": "Get them to 'close' relationship level", "xp": 60,
+             "condition": "relationship_close"},
+        ],
+        "chain_bonus_xp": 200,
+        "chain_bonus_title": "The Reviver",
+    },
+    "party_animal": {
+        "name": "Party Animal",
+        "description": "Become the ultimate social event organizer",
+        "total_steps": 4,
+        "steps": [
+            {"title": "First Party", "desc": "Create and complete your first party", "xp": 20,
+             "condition": "complete_1_party"},
+            {"title": "Party Regular", "desc": "Complete 3 parties with 2+ members each", "xp": 50,
+             "condition": "3_parties_with_members"},
+            {"title": "Social Mixer", "desc": "Complete parties in 3 different activity types", "xp": 80,
+             "condition": "3_different_party_types"},
+            {"title": "Legendary Host", "desc": "Complete 10 total parties", "xp": 60,
+             "condition": "10_total_parties"},
+        ],
+        "chain_bonus_xp": 150,
+        "chain_bonus_title": "Legendary Host",
+    },
+    "the_marathon": {
+        "name": "The Marathon",
+        "description": "Push your consistency to the limit",
+        "total_steps": 3,
+        "steps": [
+            {"title": "Week Warrior", "desc": "Maintain a 7-day streak", "xp": 35,
+             "condition": "streak_7"},
+            {"title": "Fortnight Force", "desc": "Maintain a 14-day streak", "xp": 70,
+             "condition": "streak_14"},
+            {"title": "Monthly Master", "desc": "Maintain a 30-day streak", "xp": 150,
+             "condition": "streak_30"},
+        ],
+        "chain_bonus_xp": 100,
+        "chain_bonus_title": "Unstoppable Force",
+    },
+    "shadow_hunter": {
+        "name": "Shadow Hunter",
+        "description": "Build your shadow army from the strongest bonds",
+        "total_steps": 4,
+        "steps": [
+            {"title": "First Extraction", "desc": "Extract your first shadow", "xp": 25,
+             "condition": "1_shadow"},
+            {"title": "Shadow Squad", "desc": "Have 5 shadows in your army", "xp": 50,
+             "condition": "5_shadows"},
+            {"title": "Elite Shadows", "desc": "Have 3 shadows at elite grade or higher", "xp": 75,
+             "condition": "3_elite_shadows"},
+            {"title": "Shadow Legion", "desc": "Have 15 shadows in your army", "xp": 100,
+             "condition": "15_shadows"},
+        ],
+        "chain_bonus_xp": 200,
+        "chain_bonus_title": "Shadow Commander",
+    },
+    "gate_crawler": {
+        "name": "Gate Crawler",
+        "description": "Conquer gates of increasing difficulty",
+        "total_steps": 4,
+        "steps": [
+            {"title": "Gate Opener", "desc": "Clear your first gate", "xp": 30,
+             "condition": "1_gate_cleared"},
+            {"title": "D-Rank Gates", "desc": "Clear a D-Rank or higher gate", "xp": 50,
+             "condition": "d_rank_gate"},
+            {"title": "B-Rank Breaker", "desc": "Clear a B-Rank or higher gate", "xp": 100,
+             "condition": "b_rank_gate"},
+            {"title": "S-Rank Conqueror", "desc": "Clear an S-Rank or higher gate", "xp": 200,
+             "condition": "s_rank_gate"},
+        ],
+        "chain_bonus_xp": 300,
+        "chain_bonus_title": "Gate Master",
+    },
+}
+
+
+def get_user_chains(user: User, db: Session) -> list:
+    """Get all chain progress for a user, including available ones."""
+    active_chains = db.query(QuestChain).filter(
+        QuestChain.user_id == user.id
+    ).all()
+
+    chain_map = {c.chain_key: c for c in active_chains}
+    result = []
+
+    for key, defn in QUEST_CHAIN_DEFS.items():
+        chain = chain_map.get(key)
+        steps_info = []
+        for i, step in enumerate(defn["steps"], 1):
+            steps_info.append({
+                "step": i,
+                "title": step["title"],
+                "description": step["desc"],
+                "xp_reward": step["xp"],
+                "completed": chain is not None and i < (chain.current_step or 1),
+                "current": chain is not None and i == (chain.current_step or 1) and chain.status == QuestChainStatus.active,
+            })
+
+        result.append({
+            "chain_key": key,
+            "name": defn["name"],
+            "description": defn["description"],
+            "total_steps": defn["total_steps"],
+            "current_step": chain.current_step if chain else 0,
+            "status": chain.status.value if chain else "available",
+            "chain_bonus_xp": defn["chain_bonus_xp"],
+            "chain_bonus_title": defn.get("chain_bonus_title", ""),
+            "steps": steps_info,
+        })
+
+    return result
+
+
+def start_quest_chain(user: User, chain_key: str, db: Session) -> dict:
+    """Start a quest chain for a user."""
+    if chain_key not in QUEST_CHAIN_DEFS:
+        return {"error": "Unknown quest chain"}
+
+    existing = db.query(QuestChain).filter(
+        QuestChain.user_id == user.id,
+        QuestChain.chain_key == chain_key,
+    ).first()
+    if existing:
+        return {"error": "Chain already started"}
+
+    defn = QUEST_CHAIN_DEFS[chain_key]
+    chain = QuestChain(
+        user_id=user.id,
+        chain_key=chain_key,
+        current_step=1,
+        total_steps=defn["total_steps"],
+    )
+    db.add(chain)
+    db.commit()
+    db.refresh(chain)
+
+    return {
+        "chain_key": chain_key,
+        "name": defn["name"],
+        "current_step": 1,
+        "total_steps": defn["total_steps"],
+        "status": "active",
+    }
+
+
+def check_chain_step(user: User, chain: QuestChain, db: Session) -> bool:
+    """Check if the current step of a chain is completed. Returns True if advanced."""
+    defn = QUEST_CHAIN_DEFS.get(chain.chain_key)
+    if not defn:
+        return False
+
+    step_idx = (chain.current_step or 1) - 1
+    if step_idx >= len(defn["steps"]):
+        return False
+
+    step = defn["steps"][step_idx]
+    condition = step["condition"]
+    chain_data = json.loads(chain.chain_data or "{}")
+
+    met = _evaluate_chain_condition(user, condition, chain_data, db)
+    if not met:
+        return False
+
+    # Award step XP
+    xp = step["xp"]
+    user.xp = (user.xp or 0) + xp
+    user.level = level_from_xp(user.xp)
+
+    chain.current_step = (chain.current_step or 1) + 1
+
+    # Check if chain is completed
+    if chain.current_step > chain.total_steps:
+        chain.status = QuestChainStatus.completed
+        chain.completed_at = datetime.utcnow()
+        # Award chain bonus
+        bonus_xp = defn.get("chain_bonus_xp", 0)
+        user.xp = (user.xp or 0) + bonus_xp
+        user.level = level_from_xp(user.xp)
+        # Award title
+        bonus_title = defn.get("chain_bonus_title")
+        if bonus_title:
+            user.title = bonus_title
+
+    db.commit()
+    return True
+
+
+def _evaluate_chain_condition(user: User, condition: str, chain_data: dict, db: Session) -> bool:
+    """Evaluate a quest chain step condition."""
+    if condition == "call_silent_30":
+        # Has the user called someone who was silent for 30+ days?
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        return db.query(Interaction).filter(
+            Interaction.user_id == user.id,
+            Interaction.interaction_type.in_([InteractionType.call, InteractionType.video_call]),
+            Interaction.timestamp >= datetime.utcnow() - timedelta(days=7),
+        ).first() is not None
+
+    elif condition == "in_person_within_7":
+        seven_days = datetime.utcnow() - timedelta(days=7)
+        return db.query(Interaction).filter(
+            Interaction.user_id == user.id,
+            Interaction.interaction_type == InteractionType.in_person,
+            Interaction.timestamp >= seven_days,
+        ).first() is not None
+
+    elif condition == "3_interactions_14_days":
+        two_weeks = datetime.utcnow() - timedelta(days=14)
+        count = db.query(func.count(Interaction.id)).filter(
+            Interaction.user_id == user.id,
+            Interaction.timestamp >= two_weeks,
+        ).scalar() or 0
+        return count >= 3
+
+    elif condition == "long_interaction_30min":
+        return db.query(Interaction).filter(
+            Interaction.user_id == user.id,
+            Interaction.duration_minutes >= 30,
+        ).first() is not None
+
+    elif condition == "relationship_close":
+        return db.query(Contact).filter(
+            Contact.user_id == user.id,
+            Contact.relationship_xp >= 500,
+        ).first() is not None
+
+    elif condition == "complete_1_party":
+        return db.query(Party).filter(
+            Party.creator_id == user.id,
+            Party.status == PartyStatus.completed,
+        ).first() is not None
+
+    elif condition == "3_parties_with_members":
+        parties = db.query(Party).filter(
+            Party.creator_id == user.id,
+            Party.status == PartyStatus.completed,
+        ).all()
+        count = 0
+        for p in parties:
+            joined = db.query(func.count(PartyMember.id)).filter(
+                PartyMember.party_id == p.id,
+                PartyMember.status == "joined",
+            ).scalar() or 0
+            if joined >= 2:
+                count += 1
+        return count >= 3
+
+    elif condition == "3_different_party_types":
+        types = db.query(Party.activity_type).filter(
+            Party.creator_id == user.id,
+            Party.status == PartyStatus.completed,
+        ).distinct().all()
+        return len(types) >= 3
+
+    elif condition == "10_total_parties":
+        count = db.query(func.count(Party.id)).filter(
+            Party.creator_id == user.id,
+            Party.status == PartyStatus.completed,
+        ).scalar() or 0
+        return count >= 10
+
+    elif condition == "streak_7":
+        return (user.streak_days or 0) >= 7
+    elif condition == "streak_14":
+        return (user.streak_days or 0) >= 14
+    elif condition == "streak_30":
+        return (user.streak_days or 0) >= 30
+
+    elif condition == "1_shadow":
+        return (user.shadow_army_count or 0) >= 1
+    elif condition == "5_shadows":
+        return (user.shadow_army_count or 0) >= 5
+    elif condition == "3_elite_shadows":
+        elite_count = db.query(func.count(Contact.id)).filter(
+            Contact.user_id == user.id,
+            Contact.shadow_grade.in_(["elite", "knight", "general", "marshal"]),
+        ).scalar() or 0
+        return elite_count >= 3
+    elif condition == "15_shadows":
+        return (user.shadow_army_count or 0) >= 15
+
+    elif condition == "1_gate_cleared":
+        return db.query(Gate).filter(
+            Gate.creator_id == user.id, Gate.status == "cleared"
+        ).first() is not None
+    elif condition == "d_rank_gate":
+        return db.query(Gate).filter(
+            Gate.creator_id == user.id, Gate.status == "cleared",
+            Gate.gate_rank.in_(["D-Rank", "C-Rank", "B-Rank", "A-Rank", "S-Rank", "SS-Rank", "Monarch"]),
+        ).first() is not None
+    elif condition == "b_rank_gate":
+        return db.query(Gate).filter(
+            Gate.creator_id == user.id, Gate.status == "cleared",
+            Gate.gate_rank.in_(["B-Rank", "A-Rank", "S-Rank", "SS-Rank", "Monarch"]),
+        ).first() is not None
+    elif condition == "s_rank_gate":
+        return db.query(Gate).filter(
+            Gate.creator_id == user.id, Gate.status == "cleared",
+            Gate.gate_rank.in_(["S-Rank", "SS-Rank", "Monarch"]),
+        ).first() is not None
+
+    return False
+
+
+def progress_quest_chains(user: User, interaction: Interaction, db: Session):
+    """Check all active quest chains for progress after an interaction."""
+    active_chains = db.query(QuestChain).filter(
+        QuestChain.user_id == user.id,
+        QuestChain.status == QuestChainStatus.active,
+    ).all()
+    for chain in active_chains:
+        check_chain_step(user, chain, db)
+
+
+# ══════════════════════════════════════════════
+# PHASE 4: ACHIEVEMENTS (expanded from 16 to 36)
+# ══════════════════════════════════════════════
+
 ACHIEVEMENT_DEFS = [
+    # Original 16
     ("first_contact", "First Contact", "Add your first person to Orbit", "rocket", 20),
     ("social_5", "Social Butterfly", "Have 5 people in your orbit", "butterfly", 30),
     ("social_10", "Connector", "Have 10 people in your orbit", "link", 50),
@@ -309,6 +792,27 @@ ACHIEVEMENT_DEFS = [
     ("level_10", "Orbit Master", "Reach level 10", "orbit", 75),
     ("in_person_5", "Real World", "Have 5 in-person meetups", "handshake", 60),
     ("inner_circle", "Inner Circle", "Get a relationship to Inner Circle level", "heart", 80),
+    # Phase 4: New achievements (20 more)
+    ("party_3", "Party Starter", "Complete 3 parties", "confetti", 40),
+    ("party_10", "Event Planner", "Complete 10 parties", "calendar", 100),
+    ("challenge_5", "Challenger", "Complete 5 challenges", "swords", 50),
+    ("challenge_10", "Champion", "Complete 10 challenges", "medal", 120),
+    ("gate_3", "Gate Keeper", "Clear 3 gates", "door", 60),
+    ("gate_10", "Dungeon Master", "Clear 10 gates", "castle", 150),
+    ("boss_1", "Boss Slayer", "Clear your first boss raid", "skull", 50),
+    ("boss_5", "Raid Leader", "Clear 5 boss raids", "dragon", 120),
+    ("shadow_5", "Shadow Squad", "Extract 5 shadows", "ghost", 40),
+    ("shadow_20", "Shadow Legion", "Extract 20 shadows", "army", 200),
+    ("chain_1", "Chain Starter", "Complete your first quest chain", "chain", 75),
+    ("chain_3", "Storyline Hero", "Complete 3 quest chains", "book", 200),
+    ("diverse_5", "Renaissance Soul", "Use all 6 interaction types in one week", "rainbow", 60),
+    ("level_20", "Veteran", "Reach level 20", "shield", 100),
+    ("level_30", "Elite", "Reach level 30", "diamond", 150),
+    ("monarch", "The Monarch", "Reach Monarch rank", "crown_royal", 500),
+    ("hp_survive", "Survivor", "Recover from below 20 HP to full", "phoenix", 30),
+    ("perfect_week", "Perfect Week", "Interact every day for 7 days straight", "calendar_check", 75),
+    ("circle_1", "Circle Founder", "Create your first circle", "circle", 25),
+    ("skill_1", "Skilled", "Unlock your first skill", "sparkle", 30),
 ]
 
 
@@ -319,37 +823,35 @@ def check_achievements(user: User, contact: Optional[Contact], db: Session) -> l
 
     new_achievements = []
 
-    # Helper to check and award
     def try_award(key: str, condition: bool):
         if key not in earned and condition:
             ua = UserAchievement(user_id=user.id, achievement_key=key)
             db.add(ua)
-            # Find XP bonus
             for akey, name, desc, icon, xp in ACHIEVEMENT_DEFS:
                 if akey == key:
                     user.xp = (user.xp or 0) + xp
                     new_achievements.append({"key": key, "name": name, "xp_bonus": xp})
                     break
 
-    # Contact count achievements
+    # Contact count
     contact_count = db.query(func.count(Contact.id)).filter(Contact.user_id == user.id).scalar() or 0
     try_award("first_contact", contact_count >= 1)
     try_award("social_5", contact_count >= 5)
     try_award("social_10", contact_count >= 10)
 
-    # Interaction count achievements
+    # Interaction count
     interaction_count = db.query(func.count(Interaction.id)).filter(Interaction.user_id == user.id).scalar() or 0
     try_award("first_interaction", interaction_count >= 1)
     try_award("interactions_10", interaction_count >= 10)
     try_award("interactions_50", interaction_count >= 50)
 
-    # Streak achievements
+    # Streak
     streak = user.streak_days or 0
     try_award("streak_3", streak >= 3)
     try_award("streak_7", streak >= 7)
     try_award("streak_30", streak >= 30)
 
-    # Quest achievements
+    # Quest count
     quest_count = db.query(func.count(Quest.id)).filter(
         Quest.user_id == user.id, Quest.status == QuestStatus.completed
     ).scalar() or 0
@@ -357,9 +859,11 @@ def check_achievements(user: User, contact: Optional[Contact], db: Session) -> l
     try_award("quest_5", quest_count >= 5)
     try_award("quest_10", quest_count >= 10)
 
-    # Level achievements
+    # Level
     try_award("level_5", (user.level or 1) >= 5)
     try_award("level_10", (user.level or 1) >= 10)
+    try_award("level_20", (user.level or 1) >= 20)
+    try_award("level_30", (user.level or 1) >= 30)
 
     # In-person meetups
     in_person_count = db.query(func.count(Interaction.id)).filter(
@@ -368,12 +872,499 @@ def check_achievements(user: User, contact: Optional[Contact], db: Session) -> l
     ).scalar() or 0
     try_award("in_person_5", in_person_count >= 5)
 
-    # Inner circle relationship
+    # Inner circle
     if contact and (contact.relationship_xp or 0) >= 1000:
         try_award("inner_circle", True)
+
+    # Party achievements
+    party_count = db.query(func.count(Party.id)).filter(
+        Party.creator_id == user.id, Party.status == PartyStatus.completed
+    ).scalar() or 0
+    try_award("party_3", party_count >= 3)
+    try_award("party_10", party_count >= 10)
+
+    # Challenge achievements
+    challenge_count = db.query(func.count(Challenge.id)).filter(
+        Challenge.challenger_id == user.id, Challenge.status == ChallengeStatus.completed
+    ).scalar() or 0
+    try_award("challenge_5", challenge_count >= 5)
+    try_award("challenge_10", challenge_count >= 10)
+
+    # Gate achievements
+    gate_count = db.query(func.count(Gate.id)).filter(
+        Gate.creator_id == user.id, Gate.status == "cleared"
+    ).scalar() or 0
+    try_award("gate_3", gate_count >= 3)
+    try_award("gate_10", gate_count >= 10)
+
+    # Boss achievements
+    boss_count = db.query(func.count(BossRaid.id)).filter(
+        BossRaid.creator_id == user.id, BossRaid.status == "cleared"
+    ).scalar() or 0
+    try_award("boss_1", boss_count >= 1)
+    try_award("boss_5", boss_count >= 5)
+
+    # Shadow achievements
+    shadow_count = user.shadow_army_count or 0
+    try_award("shadow_5", shadow_count >= 5)
+    try_award("shadow_20", shadow_count >= 20)
+
+    # Chain achievements
+    chain_count = db.query(func.count(QuestChain.id)).filter(
+        QuestChain.user_id == user.id, QuestChain.status == QuestChainStatus.completed
+    ).scalar() or 0
+    try_award("chain_1", chain_count >= 1)
+    try_award("chain_3", chain_count >= 3)
+
+    # Diverse interactions (all 6 types in last 7 days)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    distinct_types = db.query(Interaction.interaction_type).filter(
+        Interaction.user_id == user.id,
+        Interaction.timestamp >= week_ago,
+    ).distinct().all()
+    try_award("diverse_5", len(distinct_types) >= 6)
+
+    # Monarch rank
+    from .models import HunterRank
+    try_award("monarch", user.hunter_rank == HunterRank.monarch)
+
+    # HP survive (recovered from <20 to 100)
+    try_award("hp_survive", (user.hp or 0) >= 100 and "was_low_hp" in (user.title or ""))
+    # Note: hp_survive tracked via flag — set when HP drops below 20
+
+    # Perfect week = 7+ streak
+    try_award("perfect_week", streak >= 7)
+
+    # Circle founder
+    circle_count = db.query(func.count(Circle.id)).filter(Circle.user_id == user.id).scalar() or 0
+    try_award("circle_1", circle_count >= 1)
+
+    # Skill unlock
+    skill_count = db.query(func.count(UserSkill.id)).filter(UserSkill.user_id == user.id).scalar() or 0
+    try_award("skill_1", skill_count >= 1)
 
     if new_achievements:
         user.level = level_from_xp(user.xp)
         db.commit()
 
     return new_achievements
+
+
+# ══════════════════════════════════════════════
+# PHASE 5: BOSS RAID MECHANICS
+# ══════════════════════════════════════════════
+
+BOSS_TEMPLATES = {
+    "shadow_beast": {
+        "name": "Shadow Beast",
+        "description": "A basic shadow creature. Deal damage by logging any interaction.",
+        "hp": 100,
+        "xp_reward": 200,
+        "stat_points": 3,
+        "phases": 1,
+        "mechanic": "basic",  # any interaction deals damage
+    },
+    "the_drifter": {
+        "name": "The Drifter",
+        "description": "A restless spirit that can only be harmed by diverse social efforts. Use 3+ different interaction types to deal damage.",
+        "hp": 300,
+        "xp_reward": 500,
+        "stat_points": 5,
+        "phases": 1,
+        "mechanic": "diverse",  # requires 3+ different interaction types
+    },
+    "social_hydra": {
+        "name": "Social Hydra",
+        "description": "A three-headed beast. Each head requires a different attack: Call, Text, and In-Person. All three within 24h to deal massive damage.",
+        "hp": 500,
+        "xp_reward": 800,
+        "stat_points": 8,
+        "phases": 3,
+        "mechanic": "hydra",  # 3 heads: call, text, in_person — all 3 in 24h for damage
+    },
+    "the_monarch": {
+        "name": "The Monarch",
+        "description": "The ultimate boss. Requires sustained effort: each interaction chips away, but damage increases with your streak. 1000 HP, 14-day time limit.",
+        "hp": 1000,
+        "xp_reward": 1500,
+        "stat_points": 15,
+        "phases": 3,
+        "mechanic": "monarch",  # damage scales with streak + stats
+    },
+}
+
+
+def calculate_boss_damage(user: User, interaction: Interaction, boss: BossRaid, bonuses: dict, db: Session) -> int:
+    """Calculate damage dealt to a boss based on interaction and boss type."""
+    boss_type = boss.boss_type or "shadow_beast"
+    template = BOSS_TEMPLATES.get(boss_type, BOSS_TEMPLATES["shadow_beast"])
+    mechanic = template["mechanic"]
+    mechanic_data = json.loads(boss.mechanic_data or "{}")
+
+    damage = 0
+
+    if mechanic == "basic":
+        # Any interaction deals 10-25 damage + stat bonus
+        base_dmg = random.randint(10, 25)
+        charisma_bonus = (user.stat_charisma or 1) - 1  # +1 per charisma point
+        damage = base_dmg + charisma_bonus
+
+    elif mechanic == "diverse":
+        # Track unique interaction types used against this boss
+        types_used = set(mechanic_data.get("types_used", []))
+        types_used.add(interaction.interaction_type.value)
+        mechanic_data["types_used"] = list(types_used)
+        boss.mechanic_data = json.dumps(mechanic_data)
+
+        if len(types_used) >= 3:
+            damage = random.randint(20, 40) + (user.stat_empathy or 1)
+        else:
+            damage = random.randint(5, 10)  # weak hit until diverse
+
+    elif mechanic == "hydra":
+        # Track which heads are hit within 24h windows
+        now = datetime.utcnow()
+        heads = mechanic_data.get("heads", {"call": None, "text": None, "in_person": None})
+
+        itype = interaction.interaction_type.value
+        if itype in ("call", "video_call"):
+            heads["call"] = now.isoformat()
+        elif itype in ("text", "social_media", "email"):
+            heads["text"] = now.isoformat()
+        elif itype == "in_person":
+            heads["in_person"] = now.isoformat()
+
+        # Check if all 3 heads hit within 24h
+        all_hit = True
+        for head_time in heads.values():
+            if head_time is None:
+                all_hit = False
+                break
+            ht = datetime.fromisoformat(head_time)
+            if (now - ht).total_seconds() > 86400:
+                all_hit = False
+                break
+
+        mechanic_data["heads"] = heads
+        boss.mechanic_data = json.dumps(mechanic_data)
+
+        if all_hit:
+            damage = random.randint(50, 80) + (user.stat_initiative or 1) * 2
+            # Reset heads after big hit
+            mechanic_data["heads"] = {"call": None, "text": None, "in_person": None}
+            boss.mechanic_data = json.dumps(mechanic_data)
+        else:
+            damage = random.randint(5, 15)  # chip damage
+
+    elif mechanic == "monarch":
+        # Damage scales with streak and all stats
+        streak = user.streak_days or 0
+        total_stats = sum([
+            user.stat_charisma or 1,
+            user.stat_empathy or 1,
+            user.stat_consistency or 1,
+            user.stat_initiative or 1,
+            user.stat_wisdom or 1,
+        ])
+        base_dmg = random.randint(8, 20)
+        streak_mult = 1 + min(streak, 30) * 0.05  # up to 2.5x at 30-day streak
+        stat_bonus = total_stats // 5
+        damage = int((base_dmg + stat_bonus) * streak_mult)
+
+    # Apply wisdom global bonus
+    damage = int(damage * bonuses.get("global_xp_mult", 1.0))
+
+    return max(1, damage)
+
+
+def progress_boss_raids(user: User, interaction: Interaction, bonuses: dict, db: Session):
+    """Deal damage to all active boss raids when an interaction is logged."""
+    active_raids = db.query(BossRaid).filter(
+        BossRaid.creator_id == user.id,
+        BossRaid.status == "active",
+    ).all()
+
+    for boss in active_raids:
+        # Check expiry
+        if boss.expires_at and datetime.utcnow() > boss.expires_at:
+            boss.status = "failed"
+            continue
+
+        damage = calculate_boss_damage(user, interaction, boss, bonuses, db)
+        boss.boss_hp = max(0, (boss.boss_hp or 0) - damage)
+
+        # Check if boss is defeated
+        if boss.boss_hp <= 0:
+            boss.status = "cleared"
+            boss.cleared_at = datetime.utcnow()
+            boss.boss_hp = 0
+
+            # Award rewards
+            user.xp = (user.xp or 0) + (boss.xp_reward or 200)
+            user.level = level_from_xp(user.xp)
+            user.stat_points = (user.stat_points or 0) + (boss.stat_points_reward or 3)
+
+            # HP recovery
+            recover_hp(user, "boss_clear")
+
+
+# ══════════════════════════════════════════════
+# PHASE 6: SKILL TREE & SOCIAL CLASSES
+# ══════════════════════════════════════════════
+
+SOCIAL_CLASSES = {
+    "connector": {
+        "name": "Connector",
+        "description": "Master of breadth — more quests, more contacts, wider reach",
+        "unlock_level": 5,
+        "skills": {
+            "wide_net": {"name": "Wide Net", "desc": "+1 max active quest per level", "max_level": 3, "sp_cost": 1},
+            "social_butterfly": {"name": "Social Butterfly", "desc": "+50% XP for new contacts per level", "max_level": 3, "sp_cost": 1},
+            "speed_dial": {"name": "Speed Dial", "desc": "+15% XP from text/social media per level", "max_level": 2, "sp_cost": 2},
+            "first_impression": {"name": "First Impression", "desc": "+30 XP when adding a new contact", "max_level": 1, "sp_cost": 2},
+            "network_effect": {"name": "Network Effect", "desc": "+3% global XP per 10 contacts", "max_level": 2, "sp_cost": 3},
+            "hub_master": {"name": "Hub Master", "desc": "Circles give +25% XP per level", "max_level": 2, "sp_cost": 3},
+        },
+    },
+    "nurturer": {
+        "name": "Nurturer",
+        "description": "Master of depth — stronger bonds, faster relationship growth",
+        "unlock_level": 5,
+        "skills": {
+            "deep_roots": {"name": "Deep Roots", "desc": "+15% relationship XP per level", "max_level": 3, "sp_cost": 1},
+            "healing_touch": {"name": "Healing Touch", "desc": "+5 HP per interaction per level", "max_level": 3, "sp_cost": 1},
+            "emotional_intel": {"name": "Emotional Intelligence", "desc": "+20% XP from calls/video per level", "max_level": 2, "sp_cost": 2},
+            "inner_strength": {"name": "Inner Strength", "desc": "+10 max HP per level", "max_level": 2, "sp_cost": 2},
+            "bond_master": {"name": "Bond Master", "desc": "Relationship levels unlock 20% faster", "max_level": 2, "sp_cost": 3},
+            "soulmate": {"name": "Soulmate", "desc": "Inner Circle contacts give 2x XP", "max_level": 1, "sp_cost": 3},
+        },
+    },
+    "catalyst": {
+        "name": "Catalyst",
+        "description": "Master of groups — bigger parties, better events, more fun",
+        "unlock_level": 10,
+        "skills": {
+            "party_leader": {"name": "Party Leader", "desc": "+2 max party members per level", "max_level": 3, "sp_cost": 1},
+            "rally_cry": {"name": "Rally Cry", "desc": "+25% party XP per level", "max_level": 3, "sp_cost": 1},
+            "challenge_master": {"name": "Challenge Master", "desc": "+30% challenge XP per level", "max_level": 2, "sp_cost": 2},
+            "event_horizon": {"name": "Event Horizon", "desc": "Recurring parties give +50% XP", "max_level": 1, "sp_cost": 2},
+            "mob_mentality": {"name": "Mob Mentality", "desc": "+5% XP per party member joined", "max_level": 2, "sp_cost": 3},
+            "legendary_host": {"name": "Legendary Host", "desc": "Parties auto-complete gate progress", "max_level": 1, "sp_cost": 3},
+        },
+    },
+    "sage": {
+        "name": "Sage",
+        "description": "Master of consistency — longer streaks, stronger discipline",
+        "unlock_level": 10,
+        "skills": {
+            "iron_will": {"name": "Iron Will", "desc": "+2 free streak freezes per level", "max_level": 3, "sp_cost": 1},
+            "meditation": {"name": "Meditation", "desc": "+25% daily check-in XP per level", "max_level": 3, "sp_cost": 1},
+            "discipline": {"name": "Discipline", "desc": "+10% XP when streak >= 7", "max_level": 2, "sp_cost": 2},
+            "time_mastery": {"name": "Time Mastery", "desc": "Quest deadlines extended by 2 days", "max_level": 2, "sp_cost": 2},
+            "zen_master": {"name": "Zen Master", "desc": "HP loss from missed days reduced by 50%", "max_level": 2, "sp_cost": 3},
+            "enlightened": {"name": "Enlightened", "desc": "All stat gains doubled", "max_level": 1, "sp_cost": 3},
+        },
+    },
+}
+
+
+def choose_social_class(user: User, class_key: str, db: Session) -> dict:
+    """Choose a social class. Can only be done once (or at cost to respec)."""
+    if class_key not in SOCIAL_CLASSES:
+        return {"error": "Unknown class"}
+
+    cls = SOCIAL_CLASSES[class_key]
+    if (user.level or 1) < cls["unlock_level"]:
+        return {"error": f"Requires level {cls['unlock_level']}"}
+
+    if user.social_class and user.social_class == class_key:
+        return {"error": "Already this class"}
+
+    # If switching classes, reset skills (cost: lose all invested SP)
+    if user.social_class:
+        db.query(UserSkill).filter(UserSkill.user_id == user.id).delete()
+        user.social_class = ""
+        db.commit()
+
+    user.social_class = class_key
+    db.commit()
+
+    return {
+        "class": class_key,
+        "name": cls["name"],
+        "description": cls["description"],
+        "skills": cls["skills"],
+    }
+
+
+def unlock_skill(user: User, skill_key: str, db: Session) -> dict:
+    """Unlock or level up a skill using SP."""
+    if not user.social_class:
+        return {"error": "Choose a social class first"}
+
+    cls = SOCIAL_CLASSES.get(user.social_class)
+    if not cls:
+        return {"error": "Invalid class"}
+
+    skill_def = cls["skills"].get(skill_key)
+    if not skill_def:
+        return {"error": "Skill not available for your class"}
+
+    existing = db.query(UserSkill).filter(
+        UserSkill.user_id == user.id,
+        UserSkill.skill_key == skill_key,
+    ).first()
+
+    current_level = existing.level if existing else 0
+    if current_level >= skill_def["max_level"]:
+        return {"error": "Skill already at max level"}
+
+    sp_cost = skill_def["sp_cost"]
+    if (user.skill_points or 0) < sp_cost:
+        return {"error": f"Need {sp_cost} SP, have {user.skill_points or 0}"}
+
+    user.skill_points = (user.skill_points or 0) - sp_cost
+
+    if existing:
+        existing.level += 1
+    else:
+        skill = UserSkill(user_id=user.id, skill_key=skill_key, level=1)
+        db.add(skill)
+
+    db.commit()
+
+    # Check skill achievement
+    check_achievements(user, None, db)
+
+    return {
+        "skill_key": skill_key,
+        "name": skill_def["name"],
+        "new_level": (current_level + 1),
+        "max_level": skill_def["max_level"],
+        "sp_remaining": user.skill_points,
+    }
+
+
+def get_skill_tree(user: User, db: Session) -> dict:
+    """Get full skill tree state for a user."""
+    user_skills = {s.skill_key: s.level for s in
+                   db.query(UserSkill).filter(UserSkill.user_id == user.id).all()}
+
+    result = {
+        "social_class": user.social_class or "",
+        "skill_points": user.skill_points or 0,
+        "classes": {},
+    }
+
+    for key, cls in SOCIAL_CLASSES.items():
+        class_info = {
+            "name": cls["name"],
+            "description": cls["description"],
+            "unlock_level": cls["unlock_level"],
+            "available": (user.level or 1) >= cls["unlock_level"],
+            "selected": user.social_class == key,
+            "skills": {},
+        }
+        for sk, sd in cls["skills"].items():
+            class_info["skills"][sk] = {
+                "name": sd["name"],
+                "description": sd["desc"],
+                "max_level": sd["max_level"],
+                "current_level": user_skills.get(sk, 0),
+                "sp_cost": sd["sp_cost"],
+                "unlocked": sk in user_skills,
+            }
+        result["classes"][key] = class_info
+
+    return result
+
+
+# ══════════════════════════════════════════════
+# PHASE 7: CIRCLES
+# ══════════════════════════════════════════════
+
+CIRCLE_LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 2000, 4000, 8000]
+CIRCLE_XP_BONUS = 0.1  # +10% XP for interactions within a circle
+
+
+def circle_level_from_xp(xp: int) -> int:
+    level = 1
+    for i, threshold in enumerate(CIRCLE_LEVEL_THRESHOLDS):
+        if xp >= threshold:
+            level = i + 1
+    return level
+
+
+def progress_circle_xp(user: User, contact: Contact, base_xp: int, db: Session):
+    """Award circle XP when interacting with a contact who is in a circle."""
+    memberships = db.query(CircleMember).filter(
+        CircleMember.contact_id == contact.id
+    ).all()
+
+    for mem in memberships:
+        circle = db.query(Circle).filter(Circle.id == mem.circle_id, Circle.user_id == user.id).first()
+        if circle:
+            circle.xp_pool = (circle.xp_pool or 0) + base_xp
+            circle.level = circle_level_from_xp(circle.xp_pool)
+
+            # Check circle quest progress
+            active_cq = db.query(CircleQuest).filter(
+                CircleQuest.circle_id == circle.id,
+                CircleQuest.user_id == user.id,
+                CircleQuest.status == "active",
+            ).all()
+            for cq in active_cq:
+                _progress_circle_quest(cq, contact, db)
+
+
+def _progress_circle_quest(cq: CircleQuest, contact: Contact, db: Session):
+    """Track progress on a circle quest."""
+    progress = json.loads(cq.progress_data or "{}")
+    contact_key = str(contact.id)
+
+    if cq.quest_type == "interact_all":
+        # Track which members have been interacted with
+        interacted = progress.get("interacted", {})
+        interacted[contact_key] = True
+        progress["interacted"] = interacted
+        cq.progress_data = json.dumps(progress)
+
+        # Check if all members interacted with
+        circle = db.query(Circle).filter(Circle.id == cq.circle_id).first()
+        if circle:
+            member_ids = {str(m.contact_id) for m in circle.members}
+            if member_ids and member_ids.issubset(set(interacted.keys())):
+                cq.status = "completed"
+                cq.completed_at = datetime.utcnow()
+                # Award XP
+                user = db.query(User).filter(User.id == cq.user_id).first()
+                if user:
+                    user.xp = (user.xp or 0) + cq.xp_reward
+                    user.level = level_from_xp(user.xp)
+
+
+def create_circle_quest(circle: Circle, user: User, db: Session) -> CircleQuest:
+    """Auto-generate a circle quest: interact with all members."""
+    member_count = db.query(func.count(CircleMember.id)).filter(
+        CircleMember.circle_id == circle.id
+    ).scalar() or 0
+
+    if member_count == 0:
+        return None
+
+    xp_reward = 50 + member_count * 20  # scales with circle size
+
+    cq = CircleQuest(
+        circle_id=circle.id,
+        user_id=user.id,
+        title=f"Connect with your {circle.name} circle",
+        description=f"Interact with all {member_count} members of {circle.name} within 7 days",
+        quest_type="interact_all",
+        target=member_count,
+        xp_reward=xp_reward,
+        expires_at=datetime.utcnow() + timedelta(days=7),
+    )
+    db.add(cq)
+    db.commit()
+    db.refresh(cq)
+    return cq

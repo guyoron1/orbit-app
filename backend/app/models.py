@@ -201,6 +201,10 @@ class User(Base):
     title = Column(String(100), default="Rookie Hunter")
     streak_freezes = Column(Integer, default=0)
 
+    # Skill tree
+    social_class = Column(String(20), default="")  # "", "connector", "nurturer", "catalyst", "sage"
+    skill_points = Column(Integer, default=0)  # SP earned per level, spent on skills
+
     contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")
     nudges = relationship("Nudge", back_populates="user", cascade="all, delete-orphan")
     quests = relationship("Quest", back_populates="user", cascade="all, delete-orphan")
@@ -471,8 +475,8 @@ class Gate(Base):
 
 class BossRaid(Base):
     """
-    Boss Raid — cooperative boss fight with HP-based damage system.
-    Users attack the boss to reduce its HP and earn rewards on clear.
+    Boss Raid — boss fight with HP-based damage system.
+    Damage dealt via real interactions, scaled by stats.
     """
     __tablename__ = "boss_raids"
 
@@ -489,5 +493,117 @@ class BossRaid(Base):
     expires_at = Column(DateTime, nullable=True)
     cleared_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Phase 5: deeper boss mechanics
+    boss_type = Column(String(30), default="shadow_beast")  # shadow_beast, drifter, hydra, monarch
+    phase = Column(Integer, default=1)
+    total_phases = Column(Integer, default=1)
+    mechanic_data = Column(Text, default="{}")  # JSON for tracking boss-specific state (e.g. hydra heads)
+    stat_points_reward = Column(Integer, default=3)
 
     creator = relationship("User")
+
+
+# ── Quest Chains (Phase 3) ──
+
+class QuestChainStatus(str, enum.Enum):
+    active = "active"
+    completed = "completed"
+    failed = "failed"
+
+
+class QuestChain(Base):
+    """
+    Multi-step quest storylines with prerequisites and chain bonuses.
+    Each chain has a key (e.g. 'reconnection_saga') and tracks progress.
+    """
+    __tablename__ = "quest_chains"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    chain_key = Column(String(50), nullable=False)  # e.g. 'reconnection_saga'
+    current_step = Column(Integer, default=1)
+    total_steps = Column(Integer, nullable=False)
+    status = Column(Enum(QuestChainStatus), default=QuestChainStatus.active)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    # Store chain-specific state (e.g. target contact_id for reconnection)
+    chain_data = Column(Text, default="{}")
+
+    user = relationship("User")
+
+
+# ── Skill Tree (Phase 6) ──
+
+class UserSkill(Base):
+    """
+    Skills unlocked by spending SP within a social class.
+    Each skill has a key and a level (1-3).
+    """
+    __tablename__ = "user_skills"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    skill_key = Column(String(50), nullable=False)
+    level = Column(Integer, default=1)
+    unlocked_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+# ── Circles / Guilds (Phase 7) ──
+
+class Circle(Base):
+    """
+    Persistent contact groups. Group contacts into circles
+    for circle-specific quests, XP tracking, and perks.
+    """
+    __tablename__ = "circles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, default="")
+    icon = Column(String(20), default="users")  # icon key
+    xp_pool = Column(Integer, default=0)  # cumulative XP from circle interactions
+    level = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    members = relationship("CircleMember", back_populates="circle", cascade="all, delete-orphan")
+
+
+class CircleMember(Base):
+    """Contacts assigned to a circle."""
+    __tablename__ = "circle_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    circle_id = Column(Integer, ForeignKey("circles.id"), nullable=False, index=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=False)
+    joined_at = Column(DateTime, default=datetime.utcnow)
+
+    circle = relationship("Circle", back_populates="members")
+    contact = relationship("Contact")
+
+
+class CircleQuest(Base):
+    """
+    Circle-wide quest: interact with all members within a timeframe.
+    """
+    __tablename__ = "circle_quests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    circle_id = Column(Integer, ForeignKey("circles.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    quest_type = Column(String(30), default="interact_all")  # interact_all, group_activity, streak_all
+    target = Column(Integer, default=1)  # e.g. interact with each member 1 time
+    progress_data = Column(Text, default="{}")  # JSON tracking per-member progress
+    xp_reward = Column(Integer, default=100)
+    status = Column(String(20), default="active")  # active, completed, failed
+    expires_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    circle = relationship("Circle")
+    user = relationship("User")

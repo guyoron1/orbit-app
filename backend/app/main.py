@@ -49,7 +49,8 @@ from .database import Base, engine, get_db
 from .models import (
     User, Contact, Interaction, Weights, Nudge, LifeEvent, Quest,
     Party, PartyMember, Challenge, StravaConnection, Gate, BossRaid, PushToken,
-    NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus, Recurrence,
+    QuestChain, QuestChainStatus, UserSkill, Circle, CircleMember, CircleQuest,
+    InteractionType, NudgeStatus, QuestStatus, PartyStatus, ChallengeStatus, Recurrence,
     HunterRank,
     INTERACTION_DEPTH, FREQUENCY_DAYS,
 )
@@ -72,6 +73,10 @@ from .schemas import (
     GateOut, GateCreate, StatAllocation, ShadowExtractOut,
     BossRaidCreate, BossRaidOut,
     AppleLoginRequest, GoogleLoginRequest,
+    QuestChainOut, QuestChainStepOut,
+    SkillTreeOut, ChooseClassRequest, UnlockSkillRequest,
+    CircleCreate, CircleOut, CircleMemberOut, CircleQuestOut,
+    StatBonusesOut,
 )
 from .decay import compute_health, compute_health_batch, update_weights_after_interaction
 from .auth import (
@@ -82,6 +87,12 @@ from .ai import generate_conversation_starters, generate_relationship_summary
 from .gamification import (
     award_interaction_xp, generate_quests, complete_quest,
     level_progress, ACHIEVEMENT_DEFS,
+    get_stat_bonuses, recover_hp, HP_POTION_COST, HP_POTION_HEAL, HP_MAX,
+    get_user_chains, start_quest_chain, check_chain_step,
+    BOSS_TEMPLATES, calculate_boss_damage,
+    choose_social_class, unlock_skill, get_skill_tree, SOCIAL_CLASSES,
+    create_circle_quest, circle_level_from_xp, CIRCLE_XP_BONUS,
+    QUEST_CHAIN_DEFS, check_achievements,
 )
 
 
@@ -462,6 +473,7 @@ def delete_account(
 
     if contact_ids:
         # Delete data referencing contacts first
+        db.query(CircleMember).filter(CircleMember.contact_id.in_(contact_ids)).delete(synchronize_session=False)
         db.query(PartyMember).filter(PartyMember.contact_id.in_(contact_ids)).delete(synchronize_session=False)
         db.query(Challenge).filter(Challenge.contact_id.in_(contact_ids)).delete(synchronize_session=False)
         db.query(Weights).filter(Weights.contact_id.in_(contact_ids)).delete(synchronize_session=False)
@@ -470,6 +482,10 @@ def delete_account(
         db.query(Quest).filter(Quest.contact_id.in_(contact_ids)).delete(synchronize_session=False)
 
     # Delete user-level data
+    db.query(CircleQuest).filter(CircleQuest.user_id == user.id).delete()
+    db.query(Circle).filter(Circle.user_id == user.id).delete()
+    db.query(QuestChain).filter(QuestChain.user_id == user.id).delete()
+    db.query(UserSkill).filter(UserSkill.user_id == user.id).delete()
     db.query(Interaction).filter(Interaction.user_id == user.id).delete()
     db.query(Contact).filter(Contact.user_id == user.id).delete()
     db.query(Quest).filter(Quest.user_id == user.id).delete()
@@ -2443,17 +2459,28 @@ def create_boss_raid(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Create a new boss raid."""
+    """Create a new boss raid. Optionally use a boss_type template."""
+    # If boss_type is provided, use template values
+    boss_type = getattr(data, 'boss_type', None) or "shadow_beast"
+    template = BOSS_TEMPLATES.get(boss_type, BOSS_TEMPLATES["shadow_beast"])
+
+    hp = template["hp"] if boss_type != "shadow_beast" else data.boss_hp
+    xp_reward = template["xp_reward"] if boss_type != "shadow_beast" else data.xp_reward
+    sp_reward = template.get("stat_points", 3)
+
     raid = BossRaid(
         creator_id=user.id,
-        title=sanitize(data.title),
-        description=sanitize(data.description),
-        boss_name=sanitize(data.boss_name),
-        boss_hp=data.boss_hp,
-        boss_max_hp=data.boss_hp,
-        xp_reward=data.xp_reward,
+        title=sanitize(data.title) or template["name"],
+        description=sanitize(data.description) or template["description"],
+        boss_name=sanitize(data.boss_name) or template["name"],
+        boss_hp=hp,
+        boss_max_hp=hp,
+        xp_reward=xp_reward,
         time_limit_days=data.time_limit_days,
         expires_at=datetime.utcnow() + timedelta(days=data.time_limit_days),
+        boss_type=boss_type,
+        total_phases=template.get("phases", 1),
+        stat_points_reward=sp_reward,
     )
     db.add(raid)
     db.commit()
@@ -2481,7 +2508,7 @@ def attack_boss_raid(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Deal damage to a boss raid. Random 10-25 damage per attack."""
+    """Deal damage to a boss raid. Damage based on stats and boss type mechanics."""
     raid = db.query(BossRaid).filter(
         BossRaid.id == raid_id, BossRaid.creator_id == user.id
     ).first()
@@ -2496,35 +2523,378 @@ def attack_boss_raid(
         db.commit()
         return {"status": "failed", "message": "Boss raid expired! The beast escaped."}
 
-    damage = random.randint(10, 25)
+    bonuses = get_stat_bonuses(user, db)
+
+    # Create a mock interaction for damage calculation (basic attack)
+    mock_interaction = type('obj', (object,), {
+        'interaction_type': InteractionType.text,
+        'duration_minutes': 0,
+    })()
+    damage = calculate_boss_damage(user, mock_interaction, raid, bonuses, db)
     raid.boss_hp = max(0, raid.boss_hp - damage)
 
     result = {
         "damage_dealt": damage,
         "boss_hp": raid.boss_hp,
         "boss_max_hp": raid.boss_max_hp,
+        "boss_type": raid.boss_type or "shadow_beast",
     }
 
     if raid.boss_hp <= 0:
         raid.status = "cleared"
         raid.cleared_at = datetime.utcnow()
 
-        # Award XP + 3 stat points
+        sp_reward = raid.stat_points_reward or 3
         user.xp = (user.xp or 0) + raid.xp_reward
-        user.stat_points = (user.stat_points or 0) + 3
+        user.stat_points = (user.stat_points or 0) + sp_reward
         from .gamification import level_from_xp
         user.level = level_from_xp(user.xp)
 
+        recover_hp(user, "boss_clear")
+
         result["status"] = "cleared"
-        result["message"] = f"Boss defeated! +{raid.xp_reward} XP, +3 stat points!"
+        result["message"] = f"Boss defeated! +{raid.xp_reward} XP, +{sp_reward} stat points!"
         result["xp_earned"] = raid.xp_reward
-        result["stat_points_earned"] = 3
+        result["stat_points_earned"] = sp_reward
     else:
         result["status"] = "active"
         result["message"] = f"Hit for {damage} damage! Boss HP: {raid.boss_hp}/{raid.boss_max_hp}"
 
     db.commit()
     return result
+
+
+@app.get("/boss-templates")
+def list_boss_templates(user: User = Depends(get_current_user)):
+    """List available boss types for creating raids."""
+    return [
+        {
+            "key": key,
+            "name": t["name"],
+            "description": t["description"],
+            "hp": t["hp"],
+            "xp_reward": t["xp_reward"],
+            "stat_points": t["stat_points"],
+            "phases": t["phases"],
+            "mechanic": t["mechanic"],
+        }
+        for key, t in BOSS_TEMPLATES.items()
+    ]
+
+
+# ══════════════════════════════════════════════
+# STAT BONUSES (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/stats/bonuses", response_model=StatBonusesOut)
+def get_bonuses(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get all mechanical bonuses from stats and skills."""
+    return StatBonusesOut(**get_stat_bonuses(user, db))
+
+
+# ══════════════════════════════════════════════
+# HP POTION (protected)
+# ══════════════════════════════════════════════
+
+@app.post("/hp/potion")
+def use_hp_potion(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Use an HP potion. Costs XP, recovers HP."""
+    if (user.xp or 0) < HP_POTION_COST:
+        raise HTTPException(400, f"Need {HP_POTION_COST} XP for a potion, have {user.xp or 0}")
+    if (user.hp or 0) >= HP_MAX:
+        raise HTTPException(400, "HP already full")
+
+    user.xp = (user.xp or 0) - HP_POTION_COST
+    old_hp = user.hp or 0
+    user.hp = min(HP_MAX, old_hp + HP_POTION_HEAL)
+    db.commit()
+
+    return {
+        "hp": user.hp,
+        "hp_recovered": user.hp - old_hp,
+        "xp_cost": HP_POTION_COST,
+        "xp_remaining": user.xp,
+    }
+
+
+# ══════════════════════════════════════════════
+# QUEST CHAINS (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/quest-chains")
+def list_quest_chains(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get all quest chains with progress."""
+    return get_user_chains(user, db)
+
+
+@app.post("/quest-chains/{chain_key}/start")
+def start_chain(
+    chain_key: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Start a quest chain."""
+    result = start_quest_chain(user, chain_key, db)
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.post("/quest-chains/{chain_key}/check")
+def check_chain(
+    chain_key: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Check and advance current chain step if condition met."""
+    chain = db.query(QuestChain).filter(
+        QuestChain.user_id == user.id,
+        QuestChain.chain_key == chain_key,
+        QuestChain.status == QuestChainStatus.active,
+    ).first()
+    if not chain:
+        raise HTTPException(404, "No active chain found")
+
+    advanced = check_chain_step(user, chain, db)
+    if advanced:
+        check_achievements(user, None, db)
+
+    return {
+        "advanced": advanced,
+        "current_step": chain.current_step,
+        "status": chain.status.value,
+        "chain_key": chain_key,
+    }
+
+
+# ══════════════════════════════════════════════
+# SKILL TREE (protected)
+# ══════════════════════════════════════════════
+
+@app.get("/skills/tree")
+def skill_tree(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get full skill tree with class info and skill states."""
+    return get_skill_tree(user, db)
+
+
+@app.post("/skills/choose-class")
+def choose_class(
+    data: ChooseClassRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Choose or switch social class."""
+    result = choose_social_class(user, data.class_key, db)
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.post("/skills/unlock")
+def skill_unlock(
+    data: UnlockSkillRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Unlock or level up a skill using SP."""
+    result = unlock_skill(user, data.skill_key, db)
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+# ══════════════════════════════════════════════
+# CIRCLES (protected)
+# ══════════════════════════════════════════════
+
+def _circle_to_out(circle: Circle, db) -> dict:
+    members = []
+    for m in circle.members:
+        contact = db.query(Contact).filter(Contact.id == m.contact_id).first()
+        members.append({
+            "id": m.id,
+            "contact_id": m.contact_id,
+            "contact_name": contact.name if contact else "Unknown",
+            "joined_at": m.joined_at,
+        })
+    active_quests = db.query(CircleQuest).filter(
+        CircleQuest.circle_id == circle.id,
+        CircleQuest.status == "active",
+    ).all()
+    return {
+        "id": circle.id,
+        "user_id": circle.user_id,
+        "name": circle.name,
+        "description": circle.description,
+        "icon": circle.icon,
+        "xp_pool": circle.xp_pool or 0,
+        "level": circle.level or 1,
+        "created_at": circle.created_at,
+        "members": members,
+        "active_quests": [q for q in active_quests],
+    }
+
+
+@app.post("/circles")
+def create_circle(
+    data: CircleCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Create a new circle (contact group)."""
+    circle = Circle(
+        user_id=user.id,
+        name=sanitize(data.name),
+        description=sanitize(data.description),
+        icon=data.icon,
+    )
+    db.add(circle)
+    db.commit()
+    db.refresh(circle)
+
+    # Add contacts
+    for cid in data.contact_ids:
+        contact = db.query(Contact).filter(Contact.id == cid, Contact.user_id == user.id).first()
+        if contact:
+            member = CircleMember(circle_id=circle.id, contact_id=cid)
+            db.add(member)
+    db.commit()
+    db.refresh(circle)
+
+    # Check achievement
+    check_achievements(user, None, db)
+
+    return _circle_to_out(circle, db)
+
+
+@app.get("/circles")
+def list_circles(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List all user's circles."""
+    circles = db.query(Circle).filter(Circle.user_id == user.id).all()
+    return [_circle_to_out(c, db) for c in circles]
+
+
+@app.get("/circles/{circle_id}")
+def get_circle(
+    circle_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get circle details."""
+    circle = db.query(Circle).filter(Circle.id == circle_id, Circle.user_id == user.id).first()
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+    return _circle_to_out(circle, db)
+
+
+@app.post("/circles/{circle_id}/members/{contact_id}")
+def add_circle_member(
+    circle_id: int,
+    contact_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Add a contact to a circle."""
+    circle = db.query(Circle).filter(Circle.id == circle_id, Circle.user_id == user.id).first()
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+    contact = db.query(Contact).filter(Contact.id == contact_id, Contact.user_id == user.id).first()
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+
+    existing = db.query(CircleMember).filter(
+        CircleMember.circle_id == circle_id,
+        CircleMember.contact_id == contact_id,
+    ).first()
+    if existing:
+        raise HTTPException(400, "Contact already in circle")
+
+    member = CircleMember(circle_id=circle_id, contact_id=contact_id)
+    db.add(member)
+    db.commit()
+    return {"status": "added", "contact_name": contact.name}
+
+
+@app.delete("/circles/{circle_id}/members/{contact_id}")
+def remove_circle_member(
+    circle_id: int,
+    contact_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove a contact from a circle."""
+    circle = db.query(Circle).filter(Circle.id == circle_id, Circle.user_id == user.id).first()
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+
+    member = db.query(CircleMember).filter(
+        CircleMember.circle_id == circle_id,
+        CircleMember.contact_id == contact_id,
+    ).first()
+    if not member:
+        raise HTTPException(404, "Member not found")
+
+    db.delete(member)
+    db.commit()
+    return {"status": "removed"}
+
+
+@app.delete("/circles/{circle_id}")
+def delete_circle(
+    circle_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Delete a circle."""
+    circle = db.query(Circle).filter(Circle.id == circle_id, Circle.user_id == user.id).first()
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+
+    db.query(CircleQuest).filter(CircleQuest.circle_id == circle_id).delete()
+    db.query(CircleMember).filter(CircleMember.circle_id == circle_id).delete()
+    db.delete(circle)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.post("/circles/{circle_id}/quest")
+def start_circle_quest(
+    circle_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Start a circle quest: interact with all members."""
+    circle = db.query(Circle).filter(Circle.id == circle_id, Circle.user_id == user.id).first()
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+
+    # Check for existing active quest
+    existing = db.query(CircleQuest).filter(
+        CircleQuest.circle_id == circle_id,
+        CircleQuest.status == "active",
+    ).first()
+    if existing:
+        raise HTTPException(400, "Circle already has an active quest")
+
+    cq = create_circle_quest(circle, user, db)
+    if not cq:
+        raise HTTPException(400, "Circle has no members")
+    return cq
 
 
 # ══════════════════════════════════════════════

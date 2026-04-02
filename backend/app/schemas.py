@@ -6,7 +6,7 @@ from .models import (
     RelationshipType, ContactFrequency, InteractionType, LifeEventType,
     QuestType, QuestStatus, DifficultyTier,
     ActivityType, PartyStatus, ChallengeStatus, Recurrence,
-    HunterRank,
+    HunterRank, QuestChainStatus,
 )
 
 
@@ -96,6 +96,8 @@ class UserOut(BaseModel):
     hp: int = 100
     title: str = "Rookie Hunter"
     streak_freezes: int = 0
+    social_class: str = ""
+    skill_points: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -332,12 +334,13 @@ class ShadowExtractOut(BaseModel):
 # ── Boss Raid ──
 
 class BossRaidCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
+    title: str = Field("", max_length=200)
     description: str = Field("", max_length=1000)
     boss_name: str = Field("Shadow Beast", max_length=100)
     boss_hp: int = Field(100, ge=10, le=10000)
     xp_reward: int = Field(200, ge=10, le=5000)
     time_limit_days: int = Field(7, ge=1, le=30)
+    boss_type: str = Field("shadow_beast", max_length=30)
 
 
 class BossRaidOut(BaseModel):
@@ -354,6 +357,10 @@ class BossRaidOut(BaseModel):
     expires_at: Optional[datetime] = None
     cleared_at: Optional[datetime] = None
     created_at: datetime
+    boss_type: str = "shadow_beast"
+    phase: int = 1
+    total_phases: int = 1
+    stat_points_reward: int = 3
 
     model_config = {"from_attributes": True}
 
@@ -511,3 +518,130 @@ class DashboardOut(BaseModel):
     top_nudges: list[NudgeOut]
     ai_summary: str = ""
     gamification: Optional[GamificationDashboardOut] = None
+
+
+# ── Quest Chains ──
+
+class QuestChainStepOut(BaseModel):
+    step: int
+    title: str
+    description: str
+    xp_reward: int
+    completed: bool = False
+    current: bool = False
+
+
+class QuestChainOut(BaseModel):
+    chain_key: str
+    name: str
+    description: str
+    total_steps: int
+    current_step: int = 0
+    status: str = "available"
+    chain_bonus_xp: int = 0
+    chain_bonus_title: str = ""
+    steps: list[QuestChainStepOut] = []
+
+
+# ── Skill Tree ──
+
+class SkillOut(BaseModel):
+    name: str
+    description: str
+    max_level: int
+    current_level: int = 0
+    sp_cost: int = 1
+    unlocked: bool = False
+
+
+class ClassOut(BaseModel):
+    name: str
+    description: str
+    unlock_level: int
+    available: bool = False
+    selected: bool = False
+    skills: dict[str, SkillOut] = {}
+
+
+class SkillTreeOut(BaseModel):
+    social_class: str = ""
+    skill_points: int = 0
+    classes: dict[str, ClassOut] = {}
+
+
+class ChooseClassRequest(BaseModel):
+    class_key: str
+
+
+class UnlockSkillRequest(BaseModel):
+    skill_key: str
+
+
+# ── Circles ──
+
+class CircleCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field("", max_length=500)
+    icon: str = Field("users", max_length=20)
+    contact_ids: list[int] = []
+
+
+class CircleMemberOut(BaseModel):
+    id: int
+    contact_id: int
+    contact_name: str = ""
+    joined_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CircleQuestOut(BaseModel):
+    id: int
+    circle_id: int
+    title: str
+    description: str
+    quest_type: str
+    target: int
+    xp_reward: int
+    status: str
+    progress_data: str = "{}"
+    expires_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CircleOut(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    description: str
+    icon: str
+    xp_pool: int = 0
+    level: int = 1
+    created_at: datetime
+    members: list[CircleMemberOut] = []
+    active_quests: list[CircleQuestOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+# ── HP Potion ──
+
+class HPPotionRequest(BaseModel):
+    pass  # no params needed
+
+
+# ── Stat Bonuses ──
+
+class StatBonusesOut(BaseModel):
+    party_xp_mult: float = 1.0
+    relationship_xp_mult: float = 1.0
+    free_streak_freezes: int = 0
+    quest_xp_mult: float = 1.0
+    global_xp_mult: float = 1.0
+    max_active_quests: int = 3
+    hp_per_interaction: int = 0
+    party_size_bonus: int = 0
+    daily_checkin_xp_mult: float = 1.0

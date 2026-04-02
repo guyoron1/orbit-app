@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v16-production-hardening
+ARG CACHE_BUST=v17-gamification-frontend
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/
