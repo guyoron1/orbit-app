@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orbit-v4';
+const CACHE_NAME = 'orbit-v5';
 const SHELL_ASSETS = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-180.png'];
 
 // ── Install: cache the app shell ──
@@ -42,7 +42,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for static assets
+  // Network-first for HTML pages (ensures updates are always picked up)
+  const url = new URL(request.url);
+  if (request.mode === 'navigate' || url.pathname === '/') {
+    event.respondWith(
+      fetch(request).then(response => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (icons, manifest)
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
