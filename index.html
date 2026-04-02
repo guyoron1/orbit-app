@@ -8125,6 +8125,12 @@ const OW = {
   hoveredBuilding: null,
   active: true,
   animFrame: 0,
+  keys: {},
+  facing: 'down',
+  walking: false,
+  walkFrame: 0,
+  speed: 3,
+  enterCooldown: 0,
 };
 
 const BUILDING_DEFS = [
@@ -8212,6 +8218,23 @@ function initOverworld() {
     }
   });
 
+  // Keyboard movement
+  window.addEventListener('keydown', (e) => {
+    if (!OW.active) return;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      OW.keys[e.key] = true;
+    }
+    // Enter key to go into building you're standing on
+    if (e.key === 'Enter' && OW.active) {
+      const b = getCharBuilding();
+      if (b) enterBuilding(b);
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    OW.keys[e.key] = false;
+  });
+
   renderOverworldLoop();
 }
 
@@ -8250,9 +8273,50 @@ function showOverworld() {
   window.scrollTo(0, 0);
 }
 
+function getCharBuilding() {
+  // Check if character is overlapping any building door
+  for (const b of OW.buildings) {
+    const doorX = b.px + b.bw / 2;
+    const doorY = b.py + b.bh;
+    if (Math.abs(OW.charX - doorX) < 20 && Math.abs(OW.charY - doorY) < 20) {
+      return b;
+    }
+  }
+  return null;
+}
+
+function updateCharMovement() {
+  if (!OW.active) return;
+  if (OW.enterCooldown > 0) OW.enterCooldown--;
+
+  let dx = 0, dy = 0;
+  if (OW.keys['ArrowLeft'])  { dx -= OW.speed; OW.facing = 'left'; }
+  if (OW.keys['ArrowRight']) { dx += OW.speed; OW.facing = 'right'; }
+  if (OW.keys['ArrowUp'])   { dy -= OW.speed; OW.facing = 'up'; }
+  if (OW.keys['ArrowDown']) { dy += OW.speed; OW.facing = 'down'; }
+
+  OW.walking = (dx !== 0 || dy !== 0);
+  if (OW.walking) {
+    OW.walkFrame++;
+    // Clamp to bounds
+    OW.charX = Math.max(20, Math.min(OW.w - 20, OW.charX + dx));
+    OW.charY = Math.max(60, Math.min(OW.h * 0.72 - 5, OW.charY + dy));
+
+    // Auto-enter building when walking into the door
+    if (OW.enterCooldown <= 0) {
+      const b = getCharBuilding();
+      if (b) {
+        OW.enterCooldown = 60; // prevent immediate re-entry
+        enterBuilding(b);
+      }
+    }
+  }
+}
+
 function renderOverworldLoop() {
   if (!OW.ctx) return;
   OW.animFrame++;
+  updateCharMovement();
   drawOverworld();
   requestAnimationFrame(renderOverworldLoop);
 }
@@ -8418,37 +8482,98 @@ function drawOverworld() {
   ctx.fillStyle = '#8888bb';
   ctx.font = '7px "Press Start 2P"';
   ctx.textAlign = 'right';
-  ctx.fillText((user.name || 'Hunter') + '  |  Click a building to enter', W - 16, 22);
+  ctx.fillText((user.name || 'Hunter') + '  |  Arrow keys to move, Enter to enter', W - 16, 22);
 }
 
 function drawCharSprite(ctx, cx, cy) {
-  const frame = Math.floor(OW.animFrame / 30) % 2;
   const s = 4; // pixel size
-  // Simple RPG character sprite (8x12 pixels scaled up)
-  const sprite = [
-    '..0220..',
-    '.022220.',
-    '.021120.',
-    '.022220.',
-    '..3333..',
-    '.333333.',
-    '3.3333.3',
-    '..3333..',
-    '..4444..',
-    '..44.44.',
-    '..44.44.',
-    '..55.55.',
-  ];
+  const walkCycle = Math.floor(OW.walkFrame / 8) % 4; // 0,1,2,3
+
+  // Direction-aware sprites (down, up, left, right)
+  const sprites = {
+    down: [
+      '..0220..',
+      '.022220.',
+      '.021120.',
+      '.022220.',
+      '..3333..',
+      '.333333.',
+      '3.3333.3',
+      '..3333..',
+      '..4444..',
+      '..44.44.',
+      '..44.44.',
+      '..55.55.',
+    ],
+    up: [
+      '..0220..',
+      '.022220.',
+      '.022220.',
+      '.022220.',
+      '..3333..',
+      '.333333.',
+      '3.3333.3',
+      '..3333..',
+      '..4444..',
+      '..44.44.',
+      '..44.44.',
+      '..55.55.',
+    ],
+    left: [
+      '..0220..',
+      '.022220.',
+      '.012220.',
+      '.022220.',
+      '..3333..',
+      '.33333..',
+      '3.3333..',
+      '..3333..',
+      '..4444..',
+      '.44.44..',
+      '.44.44..',
+      '.55.55..',
+    ],
+    right: [
+      '..0220..',
+      '.022220.',
+      '.022210.',
+      '.022220.',
+      '..3333..',
+      '..33333.',
+      '..3333.3',
+      '..3333..',
+      '..4444..',
+      '..44.44.',
+      '..44.44.',
+      '..55.55.',
+    ],
+  };
+
+  const sprite = sprites[OW.facing] || sprites.down;
   const colors = { '0': '#3322aa', '1': '#eeddcc', '2': '#6655cc', '3': '#dd6644', '4': '#4444aa', '5': '#553322' };
   const ox = cx - 4 * s, oy = cy - 12 * s;
+
+  // Walk animation: leg movement
+  const legOffset = OW.walking ? [0, -s, 0, s][walkCycle] : 0;
+
   sprite.forEach((row, ry) => {
     [...row].forEach((c, rx) => {
       if (c !== '.') {
         ctx.fillStyle = colors[c] || '#fff';
-        ctx.fillRect(ox + rx * s, oy + ry * s + (frame && ry >= 10 ? -s : 0), s, s);
+        let yOff = 0;
+        // Animate legs (rows 9-11) and add a subtle bob (row 0-7)
+        if (OW.walking && ry >= 9) {
+          // Left leg (rx < 4) vs right leg (rx >= 4) offset
+          yOff = rx < 4 ? legOffset : -legOffset;
+        } else if (OW.walking && ry <= 7) {
+          // Subtle body bob
+          yOff = [0, -1, 0, -1][walkCycle];
+        }
+        ctx.fillRect(ox + rx * s, oy + ry * s + yOff, s, s);
       }
     });
   });
+
   // Character name
   ctx.fillStyle = '#ffffff';
   ctx.font = '7px "Press Start 2P"';
