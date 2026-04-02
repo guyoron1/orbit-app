@@ -6283,11 +6283,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function updateVerifyBanner() {
   const banner = document.getElementById('verifyBanner');
   if (!banner) return;
-  if (currentUser && !currentUser.email_verified && !sessionStorage.getItem('verify_dismissed')) {
-    banner.style.display = 'flex';
-  } else {
-    banner.style.display = 'none';
-  }
+  // Email verification disabled — no mail service configured
+  banner.style.display = 'none';
 }
 
 function dismissVerifyBanner() {
@@ -8472,19 +8469,18 @@ function darkenColor(hex, amt) {
 }
 
 // Hook into app initialization — show overworld when app loads
-const _origShowApp = typeof showApp === 'function' ? showApp : null;
 function initOverworldOnLoad() {
-  setTimeout(() => {
-    const mainApp = document.getElementById('mainApp');
-    if (mainApp && mainApp.style.display !== 'none') {
-      // App is showing — init overworld
-      const sidebar = document.querySelector('.sidebar');
-      const main = document.querySelector('.main');
-      if (sidebar) sidebar.style.display = 'none';
-      if (main) main.style.display = 'none';
-      initOverworld();
-    }
-  }, 500);
+  const mainApp = document.getElementById('mainApp');
+  if (!mainApp || mainApp.style.display === 'none') return;
+  if (OW.canvas) return; // already initialized
+  const sidebar = document.querySelector('.sidebar');
+  const main = document.querySelector('.main');
+  if (sidebar) sidebar.style.display = 'none';
+  if (main) main.style.display = 'none';
+  // Hide email verification banner in overworld
+  const vb = document.getElementById('verifyBanner');
+  if (vb) vb.style.display = 'none';
+  initOverworld();
 }
 
 // Override navigateTo so sidebar and main are visible when entering from overworld
@@ -8515,18 +8511,13 @@ document.querySelectorAll('.gsb-menu-btn').forEach(btn => {
   });
 });
 
-// Auto-init after login
-document.addEventListener('DOMContentLoaded', () => {
-  // Wait for app to show
-  const observer = new MutationObserver(() => {
-    const mainApp = document.getElementById('mainApp');
-    if (mainApp && mainApp.style.display !== 'none') {
-      observer.disconnect();
-      initOverworldOnLoad();
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-});
+// Patch showDashboard to trigger overworld after app becomes visible
+const _origShowDashboard = showDashboard;
+showDashboard = function() {
+  _origShowDashboard.apply(this, arguments);
+  // Small delay to let the DOM settle, then init overworld
+  setTimeout(initOverworldOnLoad, 300);
+};
 </script>
 <script src="native-bridge.js"></script>
 </body>
