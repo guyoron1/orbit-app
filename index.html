@@ -2167,7 +2167,47 @@
   @keyframes job-pulse { 0%,100% { box-shadow: 0 0 8px rgba(249,202,36,0.3); } 50% { box-shadow: 0 0 20px rgba(249,202,36,0.6); } }
   .job-advance-btn:hover { transform: scale(1.05); }
 
-  /* ═══ ACTIVE BUFFS BAR ═══ */
+  /* ═══ ACTIVE BUFFS HUD (MapleStory-style) ═══ */
+  .buffs-hud {
+    position: fixed; top: 8px; right: 8px; z-index: 90;
+    display: flex; gap: 4px; flex-wrap: wrap; max-width: 320px;
+    justify-content: flex-end;
+    pointer-events: none;
+  }
+  .buff-icon-box {
+    width: 40px; height: 48px;
+    background: linear-gradient(180deg, rgba(20,20,46,0.95), rgba(10,10,30,0.95));
+    border: 2px solid #4444aa; border-radius: 3px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; pointer-events: auto; cursor: default;
+    transition: border-color 0.3s;
+  }
+  .buff-icon-box:hover { border-color: #6666cc; }
+  .buff-icon-box.debuff { border-color: #aa3333; background: linear-gradient(180deg, rgba(40,10,10,0.95), rgba(20,5,5,0.95)); }
+  .buff-icon-emoji { font-size: 18px; line-height: 1; }
+  .buff-icon-timer {
+    font-family: var(--pixel-font); font-size: 6px; color: #aaa;
+    margin-top: 2px; text-shadow: 1px 1px 0 rgba(0,0,0,0.8);
+  }
+  .buff-icon-box.debuff .buff-icon-timer { color: #ff6b6b; }
+  .buff-tooltip {
+    position: absolute; bottom: 100%; right: 0; margin-bottom: 4px;
+    background: rgba(10,10,30,0.95); border: 2px solid #4444aa; border-radius: 4px;
+    padding: 6px 10px; white-space: nowrap; font-size: 11px;
+    color: var(--text-primary); display: none; z-index: 100;
+    pointer-events: none;
+  }
+  .buff-tooltip-name { font-weight: 700; font-family: var(--pixel-font); font-size: 7px; color: #00cec9; }
+  .buff-tooltip-desc { font-size: 10px; color: #aaa; margin-top: 2px; }
+  .buff-icon-box:hover .buff-tooltip { display: block; }
+  .buff-icon-box.debuff .buff-tooltip { border-color: #aa3333; }
+  .buff-icon-box.debuff .buff-tooltip-name { color: #ff6b6b; }
+
+  /* Buff flash animation for new buffs */
+  @keyframes buffAppear { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.3); } 100% { transform: scale(1); opacity: 1; } }
+  .buff-icon-box.new { animation: buffAppear 0.4s ease-out; }
+
+  /* Legacy chip style - keep for compatibility */
   .buffs-bar {
     display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; padding: 6px 10px;
     background: var(--glass); border-radius: var(--radius); min-height: 30px;
@@ -2184,6 +2224,116 @@
     background: rgba(214,48,49,0.12); color: #d63031; border-color: rgba(214,48,49,0.2);
   }
   .buff-timer { font-size: 9px; opacity: 0.7; }
+
+  /* ═══ FLOATING DAMAGE NUMBERS ═══ */
+  @keyframes dmgFloat { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-80px) scale(0.7); } }
+  @keyframes dmgCrit { 0% { opacity: 1; transform: translateY(0) scale(1.5); } 30% { transform: translateY(-20px) scale(1.8); } 100% { opacity: 0; transform: translateY(-100px) scale(0.8); } }
+  .dmg-number {
+    position: fixed; z-index: 200;
+    font-family: var(--pixel-font); font-size: 14px; font-weight: 900;
+    color: #ffd740; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    animation: dmgFloat 1.2s ease-out forwards;
+    pointer-events: none;
+  }
+  .dmg-number.crit {
+    font-size: 20px; color: #ff6b6b;
+    animation: dmgCrit 1.5s ease-out forwards;
+  }
+  .dmg-number.miss {
+    font-size: 10px; color: #888;
+    animation: dmgFloat 1s ease-out forwards;
+  }
+
+  /* ═══ BOSS FIGHT ENHANCED ═══ */
+  .boss-fight-view {
+    background: linear-gradient(180deg, rgba(30,10,10,0.3), rgba(10,10,30,0.6));
+    border: 2px solid #aa3333; border-radius: 6px; padding: 16px;
+    position: relative; overflow: hidden;
+  }
+  .boss-fight-view::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(200,50,50,0.05), transparent 70%);
+    pointer-events: none;
+  }
+  .boss-portrait {
+    font-size: 48px; text-align: center; margin-bottom: 8px;
+    filter: drop-shadow(0 0 12px rgba(255,50,50,0.4));
+  }
+  .boss-hp-container {
+    margin: 8px 0; position: relative;
+  }
+  .boss-hp-bar-big {
+    height: 18px; background: #1a0a0a; border: 2px solid #aa3333;
+    border-radius: 2px; overflow: hidden; position: relative;
+  }
+  .boss-hp-bar-big::after {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg, transparent 0px, transparent 8px, rgba(0,0,0,0.3) 8px, rgba(0,0,0,0.3) 10px);
+    pointer-events: none;
+  }
+  .boss-hp-fill-big {
+    height: 100%; transition: width 0.5s ease;
+    background: linear-gradient(180deg, #ff4444, #cc2222, #991111);
+    position: relative;
+  }
+  .boss-hp-fill-big::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 40%;
+    background: rgba(255,255,255,0.15);
+  }
+  .boss-hp-text-big {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: var(--pixel-font); font-size: 7px; color: white;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.9); z-index: 2;
+  }
+  .boss-mechanic-hint {
+    font-size: 10px; color: #fdcb6e; font-style: italic;
+    margin-top: 6px; padding: 4px 8px;
+    background: rgba(253,203,110,0.08); border-left: 2px solid rgba(253,203,110,0.3);
+  }
+  .boss-attack-log {
+    margin-top: 10px; max-height: 80px; overflow-y: auto;
+    font-size: 10px; color: #aaa; display: flex; flex-direction: column; gap: 2px;
+  }
+  .boss-log-entry { padding: 2px 0; border-bottom: 1px solid rgba(60,60,100,0.2); }
+  .boss-log-dmg { color: #ff6b6b; font-weight: 700; }
+  .boss-log-crit { color: #ffd740; }
+
+  /* ═══ LEVEL-UP OVERLAY ENHANCED ═══ */
+  .level-up-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes levelUpPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .level-up-card {
+    background: linear-gradient(180deg, #1e1e48, #14142e);
+    border: 3px solid #ffd740; border-radius: 12px;
+    padding: 32px 48px; text-align: center;
+    box-shadow: 0 0 60px rgba(255,215,64,0.3), inset 0 0 30px rgba(255,215,64,0.05);
+    animation: levelUpPulse 2s ease infinite;
+  }
+  .level-up-badge {
+    width: 80px; height: 80px; margin: 0 auto 16px;
+    background: linear-gradient(135deg, #ffd740, #ffaa00);
+    border-radius: 50%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    box-shadow: 0 0 30px rgba(255,215,64,0.5);
+  }
+  .level-up-num { font-family: var(--pixel-font); font-size: 20px; color: #1a1a3a; }
+  .level-up-label { font-family: var(--pixel-font); font-size: 7px; color: #1a1a3a; }
+  .level-up-title {
+    font-family: var(--pixel-font); font-size: 14px; color: #ffd740;
+    text-shadow: 0 0 20px rgba(255,215,64,0.5); margin-bottom: 8px;
+  }
+  .level-up-subtitle { font-size: 13px; color: #aaa; margin-bottom: 16px; }
+  .level-up-gains {
+    display: flex; gap: 12px; justify-content: center; margin-bottom: 16px;
+  }
+  .level-up-gain {
+    font-family: var(--pixel-font); font-size: 7px; padding: 4px 10px;
+    background: rgba(0,200,150,0.1); border: 1px solid rgba(0,200,150,0.3);
+    border-radius: 2px; color: #00c896;
+  }
 
   /* ═══ DAMAGE PREVIEW ═══ */
   .damage-preview {
@@ -4273,6 +4423,9 @@
 </div>
 
 <!-- MapleStory-style Bottom Status Bar (Desktop) -->
+<!-- Buff Icons HUD (MapleStory-style, top-right) -->
+<div class="buffs-hud" id="buffsHud"></div>
+
 <div class="game-status-bar" id="gameStatusBar">
   <!-- Character mini-sprite -->
   <div class="gsb-char">
@@ -5097,12 +5250,16 @@ function showXPToast(xp, achievements) {
   if (existing) existing.remove();
 
   const toast = createElement('div', { className: 'xp-toast' });
-  toast.appendChild(createElement('div', { className: 'xp-toast-icon' }, '\u2728'));
+  const icon = xp >= 50 ? '\uD83C\uDF1F' : xp >= 30 ? '\u2728' : '\u2B50';
+  toast.appendChild(createElement('div', { className: 'xp-toast-icon' }, icon));
   const textDiv = createElement('div');
   textDiv.appendChild(createElement('div', { className: 'xp-toast-amount' }, '+' + xp + ' XP'));
+
+  // Show buff multiplier if active
+  const buffMult = dashboardData?.gamification?.active_buffs?.find(b => !b.is_debuff && b.remaining_hours > 0);
   const label = achievements.length > 0
     ? 'New: ' + achievements.map(a => a.name).join(', ')
-    : 'Keep it up!';
+    : buffMult ? buffMult.name + ' active!' : 'Keep it up!';
   textDiv.appendChild(createElement('div', { className: 'xp-toast-label' }, label));
   const bar = createElement('div', { className: 'xp-toast-bar' });
   bar.appendChild(createElement('div', { className: 'xp-toast-bar-fill' }));
@@ -5110,8 +5267,10 @@ function showXPToast(xp, achievements) {
   toast.appendChild(textDiv);
   document.body.appendChild(toast);
 
-  // Trigger confetti for big XP or achievements
-  if (xp >= 30 || achievements.length > 0) {
+  // Confetti scales with XP
+  if (xp >= 100 || achievements.length > 1) {
+    launchMegaConfetti();
+  } else if (xp >= 30 || achievements.length > 0) {
     launchConfetti();
   }
 
@@ -5339,7 +5498,8 @@ function checkLevelUp() {
 }
 
 function showLevelUpOverlay(level) {
-  launchConfetti();
+  launchMegaConfetti();
+  playSound('levelup');
   const overlay = createElement('div', { className: 'level-up-overlay', onClick: function() { this.remove(); } });
   const card = createElement('div', { className: 'level-up-card' });
   card.addEventListener('click', (e) => e.stopPropagation());
@@ -5349,13 +5509,32 @@ function showLevelUpOverlay(level) {
   badge.appendChild(createElement('div', { className: 'level-up-label' }, 'Level'));
   card.appendChild(badge);
 
-  card.appendChild(createElement('div', { className: 'level-up-title' }, 'Level Up!'));
-  card.appendChild(createElement('div', { className: 'level-up-subtitle' }, 'You reached Level ' + level + '. Keep nurturing your relationships!'));
+  card.appendChild(createElement('div', { className: 'level-up-title' }, 'LEVEL UP!'));
+
+  // Show stat gains from leveling
+  const g = dashboardData?.gamification;
+  const gains = [];
+  gains.push('+1 SP');
+  if (g && g.stats) {
+    const socialClass = g.social_class || skillTreeData?.social_class;
+    if (socialClass === 'connector') gains.push('+2 CHA');
+    else if (socialClass === 'nurturer') gains.push('+2 EMP');
+    else if (socialClass === 'catalyst') gains.push('+2 INI');
+    else if (socialClass === 'sage') gains.push('+2 WIS');
+  }
+  if (level % 5 === 0) gains.push('+1 Stat Point');
+  if (level === 5 || level === 15 || level === 30 || level === 50) gains.push('Job Advancement Available!');
+
+  const gainsRow = createElement('div', { className: 'level-up-gains' });
+  gains.forEach(g => gainsRow.appendChild(createElement('div', { className: 'level-up-gain' }, g)));
+  card.appendChild(gainsRow);
+
+  card.appendChild(createElement('div', { className: 'level-up-subtitle' }, 'You reached Level ' + level + '!'));
   card.appendChild(createElement('button', { className: 'btn btn-primary', onClick: function() { overlay.remove(); } }, 'Continue'));
 
   overlay.appendChild(card);
   document.body.appendChild(overlay);
-  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 6000);
+  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 8000);
 }
 
 // === PARTIES ===
@@ -7382,12 +7561,19 @@ function getAvatarGradient(name) {
 async function performDailyCheckIn() {
   try {
     const data = await api('/daily/check-in', { method: 'POST' });
-    if (data && data.checked_in) {
+    if (!data) return;
+    if (data.checked_in) {
       playSound('reward');
       showDailyReward(data);
+      // Reload dashboard to reflect HP/XP changes
+      setTimeout(async () => {
+        await loadDashboard();
+        renderGamification();
+      }, 1000);
     }
+    // If already checked in today, silently skip (no error, no popup)
   } catch (e) {
-    // Silently fail — endpoint may not exist yet
+    console.log('Daily check-in:', e.message || 'error');
   }
 }
 
@@ -7466,6 +7652,24 @@ async function buyStreakFreeze() {
 // ═══════════════════════════════════════════
 // BOSS RAID SYSTEM
 // ═══════════════════════════════════════════
+const BOSS_PORTRAITS = {
+  shadow_beast: '\uD83D\uDC79', the_drifter: '\uD83C\uDF0A',
+  social_hydra: '\uD83D\uDC09', the_monarch: '\uD83D\uDC51'
+};
+const BOSS_TYPE_NAMES = {
+  shadow_beast: 'Shadow Beast', the_drifter: 'The Drifter',
+  social_hydra: 'Social Hydra', the_monarch: 'The Monarch'
+};
+const BOSS_MECHANIC_HINTS = {
+  shadow_beast: 'Any interaction deals damage. Keep connecting!',
+  the_drifter: 'Use 3+ different interaction types for 1.5x bonus damage!',
+  social_hydra: 'Hit with call + text + in-person within 24h for 3x massive damage!',
+  the_monarch: 'Damage scales with your streak. 30+ days = 2.5x power!',
+};
+
+// Attack log per boss (session-only)
+const bossAttackLogs = {};
+
 function renderBossRaids(raids) {
   const container = document.getElementById('bossRaidsSection');
   if (!container) return;
@@ -7476,56 +7680,163 @@ function renderBossRaids(raids) {
     return;
   }
 
-  const BOSS_TYPE_NAMES = {
-    shadow_beast: 'Shadow Beast', the_drifter: 'The Drifter',
-    social_hydra: 'Social Hydra', the_monarch: 'The Monarch'
-  };
   raids.forEach(r => {
-    const card = createElement('div', { className: 'boss-raid-card' });
-    const nameRow = createElement('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:4px;' });
-    nameRow.appendChild(createElement('div', { className: 'boss-name', style: 'margin-bottom:0' }, '\u{1F479} ' + (r.boss_name || 'Shadow Beast')));
+    const card = createElement('div', { className: 'boss-fight-view' });
+    card.id = 'bossCard-' + r.id;
+
+    // Boss portrait
+    const portrait = createElement('div', { className: 'boss-portrait' }, BOSS_PORTRAITS[r.boss_type] || '\uD83D\uDC79');
+    card.appendChild(portrait);
+
+    // Boss name + type
+    const nameRow = createElement('div', { style: 'display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px;' });
+    nameRow.appendChild(createElement('div', { style: 'font-family:var(--pixel-font);font-size:10px;color:var(--text-primary);' }, (BOSS_TYPE_NAMES[r.boss_type] || 'Boss').toUpperCase()));
     if (r.total_phases > 1) {
       nameRow.appendChild(createElement('span', { className: 'boss-phase-badge' }, 'Phase ' + r.phase + '/' + r.total_phases));
     }
     card.appendChild(nameRow);
-    if (r.boss_type && r.boss_type !== 'shadow_beast') {
-      card.appendChild(createElement('div', { className: 'boss-type-badge' }, BOSS_TYPE_NAMES[r.boss_type] || r.boss_type));
-    }
-    card.appendChild(createElement('div', { style: 'font-size:13px;color:var(--text-secondary);margin-bottom:4px;' }, r.title));
+    card.appendChild(createElement('div', { style: 'font-size:12px;color:var(--text-secondary);text-align:center;margin-bottom:8px;' }, r.title));
 
+    // Big HP bar
     const hpPct = Math.max(0, ((r.boss_hp || 0) / (r.boss_max_hp || 100)) * 100);
-    const hpBar = createElement('div', { className: 'boss-hp-bar' });
-    hpBar.appendChild(createElement('div', { className: 'boss-hp-fill', style: 'width:' + hpPct + '%' }));
-    card.appendChild(hpBar);
-    card.appendChild(createElement('div', { className: 'boss-hp-text' }, 'HP: ' + (r.boss_hp || 0) + '/' + (r.boss_max_hp || 100)));
-    if (r.stat_points_reward > 0) {
-      card.appendChild(createElement('div', { style: 'font-size:11px;color:#fdcb6e;margin-top:2px;' }, '+' + r.stat_points_reward + ' stat points on clear'));
-    }
+    const hpContainer = createElement('div', { className: 'boss-hp-container' });
+    const hpBar = createElement('div', { className: 'boss-hp-bar-big' });
+    hpBar.appendChild(createElement('div', { className: 'boss-hp-fill-big', style: 'width:' + hpPct + '%', id: 'bossHpFill-' + r.id }));
+    const hpText = createElement('div', { className: 'boss-hp-text-big' }, (r.boss_hp || 0) + ' / ' + (r.boss_max_hp || 100));
+    hpBar.appendChild(hpText);
+    hpContainer.appendChild(hpBar);
+    card.appendChild(hpContainer);
 
+    // Mechanic hint
+    const hint = BOSS_MECHANIC_HINTS[r.boss_type];
+    if (hint) card.appendChild(createElement('div', { className: 'boss-mechanic-hint' }, '\uD83D\uDCA1 ' + hint));
+
+    // Rewards
+    const rewardRow = createElement('div', { style: 'display:flex;gap:12px;justify-content:center;margin-top:8px;font-size:10px;' });
+    rewardRow.appendChild(createElement('span', { style: 'color:#fdcb6e;' }, '+' + (r.xp_reward || 0) + ' XP'));
+    if (r.stat_points_reward > 0) rewardRow.appendChild(createElement('span', { style: 'color:#74b9ff;' }, '+' + r.stat_points_reward + ' SP'));
+    card.appendChild(rewardRow);
+
+    // Attack button
     const atkBtn = createElement('button', {
       className: 'boss-attack-btn',
+      id: 'bossAtkBtn-' + r.id,
       onClick: () => attackBoss(r.id)
-    }, '\u2694\uFE0F Attack');
+    }, '\u2694\uFE0F ATTACK');
+    atkBtn.style.cssText = 'display:block;width:100%;margin-top:12px;';
     card.appendChild(atkBtn);
+
+    // Attack log
+    const logDiv = createElement('div', { className: 'boss-attack-log', id: 'bossLog-' + r.id });
+    const logs = bossAttackLogs[r.id] || [];
+    logs.slice(-5).forEach(log => {
+      const entry = createElement('div', { className: 'boss-log-entry' });
+      entry.innerHTML = log;
+      logDiv.appendChild(entry);
+    });
+    card.appendChild(logDiv);
+
     container.appendChild(card);
   });
 }
 
+function showFloatingDamage(damage, isCrit, targetEl) {
+  const num = createElement('div', { className: 'dmg-number' + (isCrit ? ' crit' : '') });
+  num.textContent = (isCrit ? 'CRIT! ' : '') + damage;
+  if (targetEl) {
+    const rect = targetEl.getBoundingClientRect();
+    num.style.left = (rect.left + rect.width / 2 - 30 + Math.random() * 60) + 'px';
+    num.style.top = (rect.top - 10) + 'px';
+  } else {
+    num.style.left = '50%';
+    num.style.top = '40%';
+  }
+  document.body.appendChild(num);
+  setTimeout(() => num.remove(), 1500);
+}
+
 async function attackBoss(bossId) {
+  const btn = document.getElementById('bossAtkBtn-' + bossId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Attacking...'; }
+
   try {
     playSound('attack');
     const data = await api('/boss-raids/' + bossId + '/attack', { method: 'POST' });
-    showToast(data.message || 'Attack landed!', data.status === 'cleared' ? 'success' : 'info');
+
+    // Show floating damage number
+    const card = document.getElementById('bossCard-' + bossId);
+    const dmg = data.damage_dealt || 0;
+    const isCrit = data.critical_hit || false;
+    showFloatingDamage(dmg, isCrit, card);
+
+    // Log the attack
+    if (!bossAttackLogs[bossId]) bossAttackLogs[bossId] = [];
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const logMsg = '<span class="boss-log-dmg">' + (isCrit ? '<span class="boss-log-crit">CRIT! </span>' : '') + '-' + dmg + ' DMG</span> <span style="color:#666;">' + now + '</span>';
+    bossAttackLogs[bossId].push(logMsg);
+
+    // Update log display
+    const logDiv = document.getElementById('bossLog-' + bossId);
+    if (logDiv) {
+      const entry = createElement('div', { className: 'boss-log-entry' });
+      entry.innerHTML = logMsg;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
     if (data.status === 'cleared') {
+      showToast('BOSS DEFEATED! ' + (data.message || ''), 'success');
       playSound('gateclear');
       launchMegaConfetti();
     }
+
     await loadDashboard();
     renderGamification();
   } catch (e) {
     showToast(e.message || 'Attack failed', 'info');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '\u2694\uFE0F ATTACK'; }
   }
 }
+
+// ═══════════════════════════════════════════
+// BUFF ICONS HUD (MapleStory-style)
+// ═══════════════════════════════════════════
+const BUFF_ICONS = {
+  social_surge: '\u26A1', deep_focus: '\uD83E\uDDE0', streak_fire: '\uD83D\uDD25',
+  boss_slayer: '\u2694\uFE0F', chain_momentum: '\uD83D\uDD17', circle_harmony: '\uD83E\uDD1D',
+  exhaustion: '\uD83D\uDCA4', gate_rush: '\uD83D\uDEAA',
+};
+
+function renderBuffsHud() {
+  const hud = document.getElementById('buffsHud');
+  if (!hud) return;
+  const buffs = dashboardData?.gamification?.active_buffs || [];
+  hud.innerHTML = '';
+  if (buffs.length === 0) return;
+
+  buffs.forEach(buff => {
+    const box = createElement('div', { className: 'buff-icon-box' + (buff.is_debuff ? ' debuff' : '') + ' new' });
+    const hours = buff.remaining_hours || 0;
+    const timeStr = hours >= 1 ? Math.round(hours) + 'h' : Math.round(hours * 60) + 'm';
+
+    box.appendChild(createElement('div', { className: 'buff-icon-emoji' }, BUFF_ICONS[buff.key] || BUFF_ICONS[buff.name?.toLowerCase().replace(/ /g, '_')] || '\u2728'));
+    box.appendChild(createElement('div', { className: 'buff-icon-timer' }, timeStr));
+
+    // Tooltip on hover
+    const tooltip = createElement('div', { className: 'buff-tooltip' });
+    tooltip.appendChild(createElement('div', { className: 'buff-tooltip-name' }, buff.name || 'Buff'));
+    tooltip.appendChild(createElement('div', { className: 'buff-tooltip-desc' }, buff.description || ''));
+    box.appendChild(tooltip);
+
+    hud.appendChild(box);
+  });
+}
+
+// Update buff timers every minute
+setInterval(() => {
+  if (dashboardData?.gamification?.active_buffs) renderBuffsHud();
+}, 60000);
 
 // ═══════════════════════════════════════════
 // TITLE SYSTEM
@@ -8340,22 +8651,8 @@ renderGamification = function() {
     if (xpSec) xpSec.insertBefore(jobBar, xpSec.querySelector('.hp-bar-container') || xpSec.firstChild);
   }
 
-  // ── Active Buffs Bar ──
-  if (!document.getElementById('buffsBar')) {
-    const buffs = dashboardData?.gamification?.active_buffs || [];
-    if (buffs.length > 0) {
-      const buffsBar = createElement('div', { className: 'buffs-bar', id: 'buffsBar' });
-      buffs.forEach(buff => {
-        const chip = createElement('div', { className: 'buff-chip' + (buff.is_debuff ? ' debuff' : '') });
-        const hours = buff.remaining_hours || 0;
-        const timeStr = hours >= 1 ? Math.round(hours) + 'h' : Math.round(hours * 60) + 'm';
-        chip.innerHTML = (buff.icon ? '' : '') + buff.name + ' <span class="buff-timer">' + timeStr + '</span>';
-        buffsBar.appendChild(chip);
-      });
-      const xpSec = document.getElementById('xpSection');
-      if (xpSec) xpSec.appendChild(buffsBar);
-    }
-  }
+  // ── Active Buffs HUD (MapleStory-style icons) ──
+  renderBuffsHud();
 
   // ── Damage Preview in Hunter Stats ──
   if (!document.getElementById('damagePreview') && dashboardData?.gamification?.damage_preview) {
