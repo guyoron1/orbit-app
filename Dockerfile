@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v18-deep-maplestory-mechanics
+ARG CACHE_BUST=v19-game-first-ui-overhaul
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/
