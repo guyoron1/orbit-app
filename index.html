@@ -2529,6 +2529,271 @@
   }
 
   /* ═══════════════════════════════════════════════
+     NPC DIALOG SYSTEM — MapleStory-style dialog boxes
+     ═══════════════════════════════════════════════ */
+  .npc-dialog-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 90px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .npc-dialog-overlay.active {
+    opacity: 1; pointer-events: auto;
+  }
+  .npc-dialog-box {
+    width: 90%; max-width: 680px;
+    background: linear-gradient(180deg, #1e1e48, #14142e);
+    border: 3px solid #6666bb;
+    border-radius: 4px;
+    padding: 0;
+    box-shadow: 0 -4px 30px rgba(80,80,180,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+    transform: translateY(20px);
+    transition: transform 0.25s;
+  }
+  .npc-dialog-overlay.active .npc-dialog-box {
+    transform: translateY(0);
+  }
+  .npc-dialog-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid rgba(102,102,187,0.3);
+  }
+  .npc-portrait {
+    width: 56px; height: 56px;
+    background: rgba(40,40,80,0.6);
+    border: 2px solid #5555aa;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .npc-name {
+    font-family: var(--pixel-font); font-size: 10px;
+    color: #ffd740; text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .npc-title {
+    font-family: var(--pixel-font); font-size: 6px;
+    color: #8888bb; margin-top: 2px;
+  }
+  .npc-dialog-text {
+    padding: 14px 18px;
+    font-family: var(--font); font-size: 14px;
+    color: #ddd; line-height: 1.6;
+    min-height: 60px;
+  }
+  .npc-dialog-text .highlight {
+    color: #ffd740; font-weight: 600;
+  }
+  .npc-dialog-choices {
+    padding: 0 18px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .npc-choice-btn {
+    background: rgba(40,40,80,0.5);
+    border: 2px solid #4444aa;
+    border-radius: 3px;
+    padding: 10px 14px;
+    color: #ccc; font-family: var(--font); font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .npc-choice-btn:hover {
+    background: rgba(60,60,120,0.6);
+    border-color: #7777cc;
+    color: white;
+  }
+  .npc-choice-btn .choice-arrow {
+    font-family: var(--pixel-font); font-size: 8px;
+    color: #ffd740; flex-shrink: 0;
+  }
+  .npc-dialog-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 10px 18px;
+    border-top: 1px solid rgba(102,102,187,0.2);
+  }
+  .npc-btn {
+    font-family: var(--pixel-font); font-size: 8px;
+    padding: 8px 20px;
+    border: 2px solid #5555aa;
+    background: linear-gradient(180deg, #3a3a7a, #2a2a5a);
+    color: #ddd; cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+  .npc-btn:hover {
+    border-color: #8888dd; color: white;
+    box-shadow: 0 0 10px rgba(100,100,200,0.3);
+  }
+  .npc-btn.primary {
+    background: linear-gradient(180deg, #4a5aaa, #3a4a8a);
+    border-color: #7788cc;
+    color: white;
+  }
+  @media (max-width: 768px) {
+    .npc-dialog-overlay { padding-bottom: 20px; align-items: center; }
+    .npc-dialog-box { width: 95%; }
+    .npc-portrait { width: 44px; height: 44px; font-size: 22px; }
+    .npc-dialog-text { font-size: 13px; }
+  }
+
+  /* ═══════════════════════════════════════════════
+     JOB ADVANCEMENT TREE — Branching class system
+     ═══════════════════════════════════════════════ */
+  .job-tree {
+    display: flex; flex-direction: column; gap: 16px;
+    padding: 8px 0;
+  }
+  .job-tier {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .job-tier-label {
+    font-family: var(--pixel-font); font-size: 7px;
+    color: #8888bb; text-transform: uppercase;
+    width: 60px; flex-shrink: 0; text-align: right;
+  }
+  .job-tier-nodes {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .job-node {
+    padding: 10px 16px;
+    background: rgba(30,30,60,0.6);
+    border: 2px solid #3a3a6a;
+    border-radius: 3px;
+    cursor: default;
+    transition: all 0.2s;
+    text-align: center; min-width: 100px;
+  }
+  .job-node.unlocked {
+    border-color: #5555aa;
+    cursor: pointer;
+  }
+  .job-node.unlocked:hover {
+    border-color: #7777cc;
+    background: rgba(50,50,100,0.6);
+  }
+  .job-node.active {
+    border-color: #ffd740;
+    background: linear-gradient(180deg, rgba(80,70,30,0.4), rgba(40,35,15,0.4));
+    box-shadow: 0 0 12px rgba(255,215,64,0.15);
+  }
+  .job-node.locked {
+    opacity: 0.4;
+  }
+  .job-node-name {
+    font-family: var(--pixel-font); font-size: 8px;
+    color: #ddd;
+  }
+  .job-node.active .job-node-name { color: #ffd740; }
+  .job-node-sub {
+    font-size: 11px; color: #8888bb; margin-top: 4px;
+  }
+  .job-node.active .job-node-sub { color: #bbaa66; }
+  .job-connector {
+    width: 2px; height: 16px;
+    background: #3a3a6a;
+    margin-left: 90px;
+  }
+  .job-connector.active { background: #ffd740; }
+
+  /* ═══════════════════════════════════════════════
+     ENHANCED QUEST LOG — Deeper quest display
+     ═══════════════════════════════════════════════ */
+  .quest-requirements {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 8px;
+  }
+  .quest-req-tag {
+    font-family: var(--pixel-font); font-size: 6px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    text-transform: uppercase;
+  }
+  .quest-req-tag.met {
+    background: rgba(0,200,150,0.15);
+    color: #00c896; border: 1px solid rgba(0,200,150,0.3);
+  }
+  .quest-req-tag.unmet {
+    background: rgba(200,60,60,0.15);
+    color: #cc5555; border: 1px solid rgba(200,60,60,0.3);
+  }
+  .quest-narrative {
+    font-style: italic; color: #aaa;
+    font-size: 12px; margin-top: 6px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(102,102,187,0.3);
+  }
+  .quest-chain-progress {
+    display: flex; align-items: center; gap: 4px;
+    margin-top: 8px;
+  }
+  .quest-chain-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%; border: 2px solid #4444aa;
+    background: transparent;
+  }
+  .quest-chain-dot.completed { background: #00c896; border-color: #00c896; }
+  .quest-chain-dot.current { background: #ffd740; border-color: #ffd740; }
+  .quest-chain-line {
+    width: 20px; height: 2px; background: #3a3a6a;
+  }
+  .quest-chain-line.completed { background: #00c896; }
+
+  /* ═══════════════════════════════════════════════
+     GUILD/CIRCLE UPGRADES — Ranks, GP, BBS
+     ═══════════════════════════════════════════════ */
+  .circle-rank-badge {
+    font-family: var(--pixel-font); font-size: 6px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    text-transform: uppercase;
+  }
+  .circle-rank-master {
+    background: rgba(255,215,64,0.2); color: #ffd740;
+    border: 1px solid rgba(255,215,64,0.3);
+  }
+  .circle-rank-officer {
+    background: rgba(116,185,255,0.2); color: #74b9ff;
+    border: 1px solid rgba(116,185,255,0.3);
+  }
+  .circle-rank-member {
+    background: rgba(136,136,187,0.2); color: #8888bb;
+    border: 1px solid rgba(136,136,187,0.3);
+  }
+  .circle-gp-bar {
+    height: 6px; background: rgba(30,30,60,0.6);
+    border-radius: 3px; overflow: hidden; margin-top: 6px;
+  }
+  .circle-gp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+    border-radius: 3px;
+    transition: width 0.5s;
+  }
+  .circle-bbs-post {
+    padding: 10px;
+    background: rgba(20,20,45,0.5);
+    border: 1px solid rgba(102,102,187,0.2);
+    border-radius: 3px;
+    margin-top: 8px;
+  }
+  .circle-bbs-author {
+    font-family: var(--pixel-font); font-size: 7px;
+    color: #74b9ff;
+  }
+  .circle-bbs-time {
+    font-size: 11px; color: #666;
+  }
+  .circle-bbs-content {
+    font-size: 13px; color: #bbb; margin-top: 4px;
+  }
+
+  /* ═══════════════════════════════════════════════
      MAPLESTORY BOTTOM STATUS BAR
      ═══════════════════════════════════════════════ */
   .game-status-bar {
@@ -2937,6 +3202,22 @@
   </div>
   <div class="ow-tooltip" id="owTooltip"></div>
   <button class="return-to-map-btn" id="returnToMapBtn" onclick="showOverworld()">&#9664; RETURN TO TOWN</button>
+
+  <!-- NPC Dialog System -->
+  <div class="npc-dialog-overlay" id="npcDialogOverlay">
+    <div class="npc-dialog-box">
+      <div class="npc-dialog-header">
+        <div class="npc-portrait" id="npcPortrait"></div>
+        <div>
+          <div class="npc-name" id="npcName"></div>
+          <div class="npc-title" id="npcTitle"></div>
+        </div>
+      </div>
+      <div class="npc-dialog-text" id="npcDialogText"></div>
+      <div class="npc-dialog-choices" id="npcDialogChoices"></div>
+      <div class="npc-dialog-footer" id="npcDialogFooter"></div>
+    </div>
+  </div>
   <!-- Sidebar -->
   <aside class="sidebar" role="navigation" aria-label="Main navigation">
     <div class="logo">
@@ -3186,6 +3467,13 @@
         </div>
         <div id="socialClassLabel" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;"></div>
         <div class="skill-tree-container" id="skillTreeGrid"></div>
+
+        <!-- Job Advancement Tree -->
+        <div class="section-header" style="margin-top:24px;">
+          <div class="section-title">Class Advancement</div>
+          <div style="font-size:11px;color:var(--text-secondary);">Your growth path</div>
+        </div>
+        <div id="jobTreeContainer"></div>
       </div>
 
       <!-- Circles / Guilds -->
@@ -7586,6 +7874,10 @@ function renderSkillTree() {
     }
     grid.appendChild(card);
   });
+
+  // Render job advancement tree
+  const jobContainer = document.getElementById('jobTreeContainer');
+  if (jobContainer) renderJobTree(jobContainer);
 }
 
 async function chooseClassAction(classKey) {
@@ -8116,6 +8408,340 @@ if ('serviceWorker' in navigator) {
 }
 
 // ═══════════════════════════════════════════════════
+// NPC DIALOG SYSTEM — MapleStory-style conversations
+// ═══════════════════════════════════════════════════
+
+const NPC_DEFS = {
+  dashboard: {
+    name: 'Sage Ori', title: 'Growth Guide', portrait: '🧙',
+    greeting: 'Welcome back, <span class="highlight">{name}</span>! Your journey of growth continues. What would you like to focus on today?',
+    choices: [
+      { text: 'View my progress & stats', icon: '📊', action: 'enter' },
+      { text: 'Tell me about my growth path', icon: '🌱', action: 'dialog', next: 'growth_advice' },
+      { text: 'I\'m just passing through', icon: '👋', action: 'close' },
+    ],
+    dialogs: {
+      growth_advice: {
+        text: 'Every interaction you nurture, every skill you develop, shapes who you become. Your <span class="highlight">level {level}</span> reflects the effort you\'ve put in. Keep pushing forward — the next advancement awaits at <span class="highlight">level {nextAdvLevel}</span>!',
+        buttons: ['ok'],
+      }
+    }
+  },
+  contacts: {
+    name: 'Guildmaster Rex', title: 'Party & Guild Hall', portrait: '⚔️',
+    greeting: 'The Guild Hall bustles with life! You have <span class="highlight">{contactCount} allies</span> in your network. What brings you here?',
+    choices: [
+      { text: 'Manage my party members', icon: '👥', action: 'enter' },
+      { text: 'How do I strengthen bonds?', icon: '💡', action: 'dialog', next: 'bond_tips' },
+      { text: 'Leave the Guild Hall', icon: '🚪', action: 'close' },
+    ],
+    dialogs: {
+      bond_tips: {
+        text: 'Strong bonds are forged through <span class="highlight">consistent interaction</span>. Log calls, meetups, and messages to keep relationships healthy. Each interaction earns you <span class="highlight">XP</span> and strengthens your social skill tree. Neglected bonds will decay over time — don\'t let them fade!',
+        buttons: ['ok'],
+      }
+    }
+  },
+  quests: {
+    name: 'Quest Master Finn', title: 'Daily Quests & Chains', portrait: '📜',
+    greeting: 'Adventurer! I have tasks that will push your growth. Completing quests earns <span class="highlight">XP, skills, and achievements</span>. Ready?',
+    choices: [
+      { text: 'Show me today\'s quests', icon: '⚡', action: 'enter' },
+      { text: 'View my quest chains', icon: '🔗', action: 'enter_section', section: 'questChainsSection' },
+      { text: 'What are quest requirements?', icon: '❓', action: 'dialog', next: 'quest_info' },
+      { text: 'Not right now', icon: '👋', action: 'close' },
+    ],
+    dialogs: {
+      quest_info: {
+        text: 'Quests have <span class="highlight">requirements</span> you must meet: minimum level, completed prerequisite quests, or specific skills unlocked. <span class="highlight">Quest chains</span> tell a story — completing one chapter unlocks the next. Daily quests reset every 24 hours for steady XP gains.',
+        buttons: ['ok'],
+      }
+    }
+  },
+  gates: {
+    name: 'Gate Warden Kira', title: 'Dungeon Gates', portrait: '🏰',
+    greeting: 'The gates shimmer with challenge! Each gate tests your <span class="highlight">dedication and consistency</span>. Clear them to prove your worth.',
+    choices: [
+      { text: 'Enter the dungeon gates', icon: '⚔️', action: 'enter' },
+      { text: 'How do gates work?', icon: '❓', action: 'dialog', next: 'gate_info' },
+      { text: 'I\'ll come back later', icon: '🚪', action: 'close' },
+    ],
+    dialogs: {
+      gate_info: {
+        text: 'Gates are <span class="highlight">timed challenges</span> that require specific actions to clear. Each gate has a rank — higher ranks mean tougher requirements but better rewards. Clear gates to earn <span class="highlight">bonus XP</span> and unlock exclusive achievements. Some gates require a <span class="highlight">party</span> to attempt!',
+        buttons: ['ok'],
+      }
+    }
+  },
+  orbit: {
+    name: 'Stargazer Luna', title: 'Observatory Guide', portrait: '🔭',
+    greeting: 'From the observatory, you can see the <span class="highlight">constellation of your relationships</span> — who\'s close, who\'s drifting away.',
+    choices: [
+      { text: 'View my orbit map', icon: '🌐', action: 'enter' },
+      { text: 'Explain the orbit view', icon: '❓', action: 'dialog', next: 'orbit_info' },
+      { text: 'Return to town', icon: '🚪', action: 'close' },
+    ],
+    dialogs: {
+      orbit_info: {
+        text: 'Your orbit shows <span class="highlight">relationship distances</span>. Inner circle contacts are your closest bonds. The further out someone drifts, the more attention they need. Regular interactions pull people closer — neglect pushes them away.',
+        buttons: ['ok'],
+      }
+    }
+  },
+  skills: {
+    name: 'Master Yuki', title: 'Training Grounds Instructor', portrait: '🥋',
+    greeting: 'Welcome to the training grounds! Here you develop your <span class="highlight">skill tree</span> — each skill represents a dimension of personal growth.',
+    choices: [
+      { text: 'View my skill tree', icon: '🌳', action: 'enter' },
+      { text: 'How does advancement work?', icon: '🎯', action: 'dialog', next: 'advancement_info' },
+      { text: 'Leave training grounds', icon: '🚪', action: 'close' },
+    ],
+    dialogs: {
+      advancement_info: {
+        text: 'Your <span class="highlight">class</span> evolves as you grow. Starting as a <span class="highlight">Social Novice</span>, you\'ll branch into specializations based on your strongest skills: Connector, Empath, Initiator, or Mentor. Each path unlocks unique abilities and stat bonuses. Advance by reaching level milestones and meeting skill requirements!',
+        buttons: ['ok'],
+      }
+    }
+  },
+  achievements: {
+    name: 'Historian Milo', title: 'Trophy Hall Keeper', portrait: '🏆',
+    greeting: 'Every milestone deserves recognition! Your achievements tell the story of your <span class="highlight">personal growth journey</span>.',
+    choices: [
+      { text: 'View my achievements', icon: '🏅', action: 'enter' },
+      { text: 'What achievements can I earn?', icon: '❓', action: 'dialog', next: 'ach_info' },
+      { text: 'Just browsing', icon: '👋', action: 'close' },
+    ],
+    dialogs: {
+      ach_info: {
+        text: 'Achievements are earned by reaching milestones: <span class="highlight">interaction counts, streak days, quest completions, level thresholds</span>, and more. Some achievements are hidden — discovered only through exploration. Each achievement grants <span class="highlight">XP and titles</span> you can display!',
+        buttons: ['ok'],
+      }
+    }
+  },
+  settings: {
+    name: 'Innkeeper Rose', title: 'The Cozy Inn', portrait: '🏨',
+    greeting: 'Welcome to the Inn! Take a rest, adjust your settings, or review your profile.',
+    choices: [
+      { text: 'Open settings', icon: '⚙️', action: 'enter' },
+      { text: 'Just resting', icon: '😴', action: 'close' },
+    ],
+  },
+};
+
+let npcDialogState = { building: null, step: 'greeting', dialogKey: null };
+
+function openNpcDialog(buildingId) {
+  const npc = NPC_DEFS[buildingId];
+  if (!npc) { enterBuildingDirect(buildingId); return; }
+
+  npcDialogState = { building: buildingId, step: 'greeting', dialogKey: null };
+  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
+
+  document.getElementById('npcPortrait').textContent = npc.portrait;
+  document.getElementById('npcName').textContent = npc.name;
+  document.getElementById('npcTitle').textContent = npc.title;
+
+  renderNpcStep(npc, user);
+  document.getElementById('npcDialogOverlay').classList.add('active');
+}
+
+function renderNpcStep(npc, user) {
+  const textEl = document.getElementById('npcDialogText');
+  const choicesEl = document.getElementById('npcDialogChoices');
+  const footerEl = document.getElementById('npcDialogFooter');
+
+  choicesEl.innerHTML = '';
+  footerEl.innerHTML = '';
+
+  if (npcDialogState.step === 'greeting') {
+    textEl.innerHTML = fillNpcTemplate(npc.greeting, user);
+    if (npc.choices) {
+      npc.choices.forEach((c, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'npc-choice-btn';
+        btn.innerHTML = '<span class="choice-arrow">▶</span> ' + c.icon + ' ' + c.text;
+        btn.onclick = () => handleNpcChoice(c, npc, user);
+        choicesEl.appendChild(btn);
+      });
+    }
+  } else if (npcDialogState.step === 'dialog' && npcDialogState.dialogKey) {
+    const dialog = npc.dialogs[npcDialogState.dialogKey];
+    if (dialog) {
+      textEl.innerHTML = fillNpcTemplate(dialog.text, user);
+      if (dialog.buttons.includes('ok')) {
+        const btn = document.createElement('button');
+        btn.className = 'npc-btn primary';
+        btn.textContent = 'OK';
+        btn.onclick = () => {
+          npcDialogState.step = 'greeting';
+          renderNpcStep(npc, user);
+        };
+        footerEl.appendChild(btn);
+      }
+    }
+  }
+}
+
+function handleNpcChoice(choice, npc, user) {
+  if (choice.action === 'enter') {
+    closeNpcDialog();
+    enterBuildingDirect(npcDialogState.building);
+  } else if (choice.action === 'enter_section') {
+    closeNpcDialog();
+    const b = npcDialogState.building;
+    enterBuildingDirect('dashboard');
+    setTimeout(() => {
+      const sec = document.getElementById(choice.section);
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 400);
+  } else if (choice.action === 'dialog') {
+    npcDialogState.step = 'dialog';
+    npcDialogState.dialogKey = choice.next;
+    renderNpcStep(npc, user);
+  } else if (choice.action === 'close') {
+    closeNpcDialog();
+  }
+}
+
+function closeNpcDialog() {
+  document.getElementById('npcDialogOverlay').classList.remove('active');
+  // Return to overworld if we came from it
+  OW.active = true;
+  OW.enterCooldown = 30;
+}
+
+function fillNpcTemplate(text, user) {
+  const lp = calcLevelProgress(user.xp || 0);
+  const contactCount = window._cachedContacts ? window._cachedContacts.length : '?';
+  const nextAdvLevel = getNextAdvancementLevel(lp.level);
+  return text
+    .replace(/{name}/g, user.name || 'Adventurer')
+    .replace(/{level}/g, lp.level)
+    .replace(/{xp}/g, user.xp || 0)
+    .replace(/{contactCount}/g, contactCount)
+    .replace(/{nextAdvLevel}/g, nextAdvLevel);
+}
+
+function getNextAdvancementLevel(level) {
+  const milestones = [5, 10, 15, 20, 30, 50];
+  for (const m of milestones) {
+    if (level < m) return m;
+  }
+  return level + 10;
+}
+
+// ═══════════════════════════════════════════════════
+// JOB ADVANCEMENT TREE — Personal Growth Classes
+// ═══════════════════════════════════════════════════
+
+const JOB_TREE = {
+  tiers: [
+    {
+      label: 'Tier 1',
+      levelReq: 1,
+      jobs: [
+        { id: 'novice', name: 'Social Novice', desc: 'Beginning your journey', icon: '🌱' },
+      ],
+    },
+    {
+      label: 'Tier 2',
+      levelReq: 5,
+      jobs: [
+        { id: 'connector', name: 'Connector', desc: 'Build wide networks', icon: '🔗', requires: 'novice', statReq: 'CHA >= 5' },
+        { id: 'empath', name: 'Empath', desc: 'Deep emotional bonds', icon: '💜', requires: 'novice', statReq: 'EMP >= 5' },
+        { id: 'initiator', name: 'Initiator', desc: 'Take bold action', icon: '🚀', requires: 'novice', statReq: 'INI >= 5' },
+        { id: 'scholar', name: 'Scholar', desc: 'Knowledge seeker', icon: '📚', requires: 'novice', statReq: 'WIS >= 5' },
+      ],
+    },
+    {
+      label: 'Tier 3',
+      levelReq: 15,
+      jobs: [
+        { id: 'networker', name: 'Networker', desc: 'Master of connections', icon: '🌐', requires: 'connector' },
+        { id: 'diplomat', name: 'Diplomat', desc: 'Bridge between worlds', icon: '🤝', requires: 'connector' },
+        { id: 'counselor', name: 'Counselor', desc: 'Emotional guide', icon: '🕊️', requires: 'empath' },
+        { id: 'healer', name: 'Healer', desc: 'Restore broken bonds', icon: '💚', requires: 'empath' },
+        { id: 'leader', name: 'Leader', desc: 'Rally and inspire', icon: '👑', requires: 'initiator' },
+        { id: 'adventurer', name: 'Adventurer', desc: 'Seek new frontiers', icon: '🗺️', requires: 'initiator' },
+        { id: 'mentor', name: 'Mentor', desc: 'Teach and elevate', icon: '🎓', requires: 'scholar' },
+        { id: 'strategist', name: 'Strategist', desc: 'Plan and optimize', icon: '♟️', requires: 'scholar' },
+      ],
+    },
+    {
+      label: 'Tier 4',
+      levelReq: 30,
+      jobs: [
+        { id: 'ambassador', name: 'Ambassador', desc: 'Legendary networker', icon: '🌟', requires: 'networker' },
+        { id: 'peacemaker', name: 'Peacemaker', desc: 'Resolve any conflict', icon: '☮️', requires: 'diplomat' },
+        { id: 'sage', name: 'Sage', desc: 'Wisdom incarnate', icon: '🧙', requires: 'counselor' },
+        { id: 'guardian', name: 'Guardian', desc: 'Protect all bonds', icon: '🛡️', requires: 'healer' },
+        { id: 'champion', name: 'Champion', desc: 'Inspire greatness', icon: '⚡', requires: 'leader' },
+        { id: 'explorer', name: 'Explorer', desc: 'No boundary untested', icon: '🌍', requires: 'adventurer' },
+        { id: 'grandmaster', name: 'Grandmaster', desc: 'Supreme teacher', icon: '📖', requires: 'mentor' },
+        { id: 'architect', name: 'Architect', desc: 'Design destinies', icon: '🏛️', requires: 'strategist' },
+      ],
+    },
+  ],
+};
+
+function getPlayerJob() {
+  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
+  return user.job_class || 'novice';
+}
+
+function getJobAncestry(jobId) {
+  const ancestry = [jobId];
+  let current = jobId;
+  for (const tier of JOB_TREE.tiers) {
+    for (const job of tier.jobs) {
+      if (job.id === current && job.requires) {
+        ancestry.unshift(job.requires);
+        current = job.requires;
+      }
+    }
+  }
+  return ancestry;
+}
+
+function isJobUnlocked(jobId, playerLevel, playerJobId) {
+  const ancestry = getJobAncestry(playerJobId);
+  // Current job and its ancestors are "active"
+  if (ancestry.includes(jobId)) return 'active';
+  // Check if this job's prerequisite is the player's current job
+  for (const tier of JOB_TREE.tiers) {
+    const job = tier.jobs.find(j => j.id === jobId);
+    if (job && job.requires === playerJobId && playerLevel >= tier.levelReq) return 'unlocked';
+  }
+  return 'locked';
+}
+
+function renderJobTree(container) {
+  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
+  const lp = calcLevelProgress(user.xp || 0);
+  const playerJob = getPlayerJob();
+  const ancestry = getJobAncestry(playerJob);
+
+  let html = '<div class="job-tree">';
+  JOB_TREE.tiers.forEach((tier, ti) => {
+    if (ti > 0) {
+      html += '<div class="job-connector' + (lp.level >= tier.levelReq ? ' active' : '') + '"></div>';
+    }
+    html += '<div class="job-tier"><div class="job-tier-label">Lv.' + tier.levelReq + '+</div><div class="job-tier-nodes">';
+    tier.jobs.forEach(job => {
+      const status = isJobUnlocked(job.id, lp.level, playerJob);
+      html += '<div class="job-node ' + status + '" title="' + (job.statReq || '') + '">';
+      html += '<div style="font-size:20px;margin-bottom:4px">' + job.icon + '</div>';
+      html += '<div class="job-node-name">' + job.name + '</div>';
+      html += '<div class="job-node-sub">' + job.desc + '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
 // PIXEL ART OVERWORLD MAP — Town with clickable buildings
 // ═══════════════════════════════════════════════════
 const OW = {
@@ -8220,6 +8846,14 @@ function initOverworld() {
 
   // Keyboard movement
   window.addEventListener('keydown', (e) => {
+    // ESC closes NPC dialog
+    if (e.key === 'Escape') {
+      const overlay = document.getElementById('npcDialogOverlay');
+      if (overlay && overlay.classList.contains('active')) {
+        closeNpcDialog();
+        return;
+      }
+    }
     if (!OW.active) return;
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
       e.preventDefault();
@@ -8239,26 +8873,29 @@ function initOverworld() {
 }
 
 function enterBuilding(b) {
-  // Hide overworld, show the relevant page/section
+  // Show NPC dialog instead of directly entering
   OW.active = false;
+  openNpcDialog(b.id);
+}
+
+function enterBuildingDirect(buildingId) {
+  // Actually navigate to the page/section
+  const b = BUILDING_DEFS.find(bd => bd.id === buildingId) || { id: buildingId };
   const ow = document.getElementById('gameOverworld');
   ow.classList.add('hidden');
   document.getElementById('owTooltip').classList.remove('visible');
-  // Show return button
   document.getElementById('returnToMapBtn').classList.add('visible');
-  // Show sidebar and main content
   document.querySelector('.sidebar').style.display = '';
   document.querySelector('.main').style.display = '';
 
   if (b.isDashSection) {
     navigateTo('dashboard');
-    // Scroll to the section
     setTimeout(() => {
       const sec = document.getElementById(b.isDashSection);
       if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 400);
   } else {
-    navigateTo(b.id);
+    navigateTo(buildingId);
   }
 }
 
