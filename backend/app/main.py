@@ -93,6 +93,10 @@ from .gamification import (
     choose_social_class, unlock_skill, get_skill_tree, SOCIAL_CLASSES,
     create_circle_quest, circle_level_from_xp, CIRCLE_XP_BONUS,
     QUEST_CHAIN_DEFS, check_achievements,
+    # Phase 8-12: Deep MapleStory mechanics
+    check_job_advancement, perform_job_advancement, get_job_advancement_info,
+    get_active_buffs, get_enhanced_dashboard, get_circle_details,
+    BUFF_DEFINITIONS, JOB_ADVANCEMENT, SKILL_PREREQUISITES,
 )
 
 
@@ -110,6 +114,16 @@ limiter = Limiter(key_func=_get_real_ip)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    # Add new columns if missing (Phase 8-12)
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    if insp.has_table("users"):
+        cols = {c["name"] for c in insp.get_columns("users")}
+        with engine.begin() as conn:
+            if "job_tier" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN job_tier INTEGER DEFAULT 0"))
+            if "active_buffs" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN active_buffs TEXT DEFAULT '{}'"))
     yield
 
 
@@ -1997,6 +2011,14 @@ def get_dashboard(
             for g in active_gates
         ],
         active_boss_raids=[BossRaidOut.model_validate(r) for r in active_boss_raid_models],
+        # Phase 8-12: Deep mechanics
+        job_tier=user.job_tier or 0,
+        job_title=user.title or "Novice",
+        social_class=user.social_class or "",
+        skill_points=user.skill_points or 0,
+        active_buffs=get_active_buffs(user),
+        damage_preview=get_enhanced_dashboard(user, db).get("damage_preview", {}),
+        job_advancement=get_job_advancement_info(user, db),
     )
 
     return DashboardOut(
@@ -3170,6 +3192,59 @@ def serve_icon_512():
 @app.get("/icon-180.png")
 def serve_icon_180():
     return FileResponse(_STATIC_ROOT / "icon-180.png", media_type="image/png")
+
+
+# ── Phase 8-12: Deep MapleStory Mechanics Routes ──
+
+@app.get("/gamification/job-advancement")
+def get_job_advancement(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get job advancement state and requirements."""
+    return get_job_advancement_info(user, db)
+
+
+@app.post("/gamification/job-advancement/advance")
+def advance_job(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Perform job advancement to next tier."""
+    result = perform_job_advancement(user, db)
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.get("/gamification/buffs")
+def get_buffs(
+    user: User = Depends(get_current_user),
+):
+    """Get all active buffs and debuffs."""
+    return {"buffs": get_active_buffs(user), "definitions": BUFF_DEFINITIONS}
+
+
+@app.get("/gamification/enhanced-dashboard")
+def enhanced_dashboard(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get enhanced dashboard with all deep mechanics data."""
+    return get_enhanced_dashboard(user, db)
+
+
+@app.get("/circles/{circle_id}/details")
+def get_circle_detail(
+    circle_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get detailed circle info with GP economy, ranks, capacity."""
+    circle = db.query(Circle).filter(Circle.id == circle_id, Circle.user_id == user.id).first()
+    if not circle:
+        raise HTTPException(404, "Circle not found")
+    return get_circle_details(circle, user, db)
 
 
 @app.get("/native-bridge.js")

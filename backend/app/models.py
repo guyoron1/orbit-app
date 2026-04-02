@@ -201,9 +201,11 @@ class User(Base):
     title = Column(String(100), default="Rookie Hunter")
     streak_freezes = Column(Integer, default=0)
 
-    # Skill tree
+    # Skill tree & job advancement
     social_class = Column(String(20), default="")  # "", "connector", "nurturer", "catalyst", "sage"
     skill_points = Column(Integer, default=0)  # SP earned per level, spent on skills
+    job_tier = Column(Integer, default=0)  # 0=Beginner, 1=1st Job, 2=2nd, 3=3rd, 4=4th
+    active_buffs = Column(Text, default="{}")  # JSON: {buff_key: {applied_at, expires_at, ...}}
 
     contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")
     nudges = relationship("Nudge", back_populates="user", cascade="all, delete-orphan")

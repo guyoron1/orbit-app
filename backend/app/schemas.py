@@ -383,6 +383,14 @@ class GamificationDashboardOut(BaseModel):
     daily_quest_streak: int = 0
     active_gates: list[GateOut] = []
     active_boss_raids: list["BossRaidOut"] = []
+    # Phase 8-12: Deep mechanics
+    job_tier: int = 0
+    job_title: str = "Novice"
+    social_class: str = ""
+    skill_points: int = 0
+    active_buffs: list[dict] = []
+    damage_preview: dict = {}
+    job_advancement: dict = {}
 
 
 # ── Party / Hangout ──

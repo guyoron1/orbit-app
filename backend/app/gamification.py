@@ -203,9 +203,11 @@ def award_interaction_xp(user: User, contact: Contact, interaction: Interaction,
     duration_bonus = min(30, int(interaction.duration_minutes * XP_DURATION_BONUS))
     raw_total = base + duration_bonus
 
-    # Apply stat multipliers
-    xp_mult = bonuses["global_xp_mult"] * get_xp_penalty(user)
-    relationship_mult = bonuses["relationship_xp_mult"]
+    # Apply stat multipliers + buff multipliers
+    buff_xp_mult = get_active_buff_multiplier(user, "xp_mult")
+    xp_mult = bonuses["global_xp_mult"] * get_xp_penalty(user) * buff_xp_mult
+    buff_rel_mult = get_active_buff_multiplier(user, "relationship_xp_mult")
+    relationship_mult = bonuses["relationship_xp_mult"] * buff_rel_mult
 
     total = int(raw_total * xp_mult)
 
@@ -219,6 +221,14 @@ def award_interaction_xp(user: User, contact: Contact, interaction: Interaction,
         levels_gained = user.level - old_level
         user.stat_points = (user.stat_points or 0) + (3 * levels_gained)
         user.skill_points = (user.skill_points or 0) + (1 * levels_gained)
+        # Apply class-specific level-up bonuses (MapleStory-style)
+        apply_levelup_bonuses(user, levels_gained)
+
+    # Trigger buffs based on interaction conditions
+    if (interaction.duration_minutes or 0) >= 30:
+        check_and_apply_buffs(user, "long_interaction", db)
+    if (user.streak_days or 0) >= 7:
+        check_and_apply_buffs(user, "streak_7", db)
 
     # Update contact relationship XP (with empathy bonus)
     rel_xp = int(raw_total * relationship_mult)
@@ -994,35 +1004,126 @@ BOSS_TEMPLATES = {
 }
 
 
+"""
+MapleStory-style damage formula adapted for CRM:
+  damage = ((class_mult * mainstat + secondary_stat) / 100) * attack_power * mastery_range
+  - mainstat depends on social class (Connector=CHA, Nurturer=EMP, Catalyst=INI, Sage=WIS)
+  - secondary_stat is the second-highest stat
+  - attack_power comes from interaction quality (type + duration)
+  - mastery_range adds variance (0.8-1.0 for beginners, 0.9-1.0 for masters)
+"""
+
+# Interaction "attack power" — replaces weapon attack in MapleStory
+INTERACTION_ATTACK_POWER = {
+    InteractionType.in_person: 30,
+    InteractionType.video_call: 22,
+    InteractionType.call: 18,
+    InteractionType.email: 12,
+    InteractionType.text: 10,
+    InteractionType.social_media: 8,
+}
+
+# Class multipliers — which stat is "main" for each class (like STR for Warriors)
+CLASS_MAIN_STAT = {
+    "connector": "stat_charisma",
+    "nurturer": "stat_empathy",
+    "catalyst": "stat_initiative",
+    "sage": "stat_wisdom",
+}
+
+CLASS_WEAPON_MULT = {
+    "connector": 4.0,   # Broad reach, moderate per-hit
+    "nurturer": 3.5,    # Steady, reliable damage
+    "catalyst": 4.5,    # High burst from groups
+    "sage": 3.0,        # Lower base but streak scaling
+}
+
+
+def _get_main_secondary_stats(user: User) -> tuple:
+    """Get main stat value and secondary stat value based on class."""
+    class_key = user.social_class or "connector"
+    main_attr = CLASS_MAIN_STAT.get(class_key, "stat_charisma")
+    main_val = getattr(user, main_attr, 1) or 1
+
+    # Secondary = second highest stat (like DEX for Warriors in MapleStory)
+    all_stats = {
+        "stat_charisma": user.stat_charisma or 1,
+        "stat_empathy": user.stat_empathy or 1,
+        "stat_consistency": user.stat_consistency or 1,
+        "stat_initiative": user.stat_initiative or 1,
+        "stat_wisdom": user.stat_wisdom or 1,
+    }
+    del all_stats[main_attr]
+    secondary_val = max(all_stats.values())
+
+    return main_val, secondary_val
+
+
+def calculate_damage(user: User, interaction: Interaction) -> dict:
+    """MapleStory-style damage formula. Returns breakdown dict."""
+    class_key = user.social_class or "connector"
+    weapon_mult = CLASS_WEAPON_MULT.get(class_key, 4.0)
+    main_val, secondary_val = _get_main_secondary_stats(user)
+
+    # Attack power from interaction type + duration bonus
+    atk = INTERACTION_ATTACK_POWER.get(interaction.interaction_type, 10)
+    duration_atk = min(15, int((interaction.duration_minutes or 0) * 0.3))
+    total_atk = atk + duration_atk
+
+    # Core formula: ((weapon_mult * mainstat + secondary) / 100) * attack
+    raw_max = ((weapon_mult * main_val + secondary_val) / 100) * total_atk
+    raw_max = max(raw_max, 1)
+
+    # Mastery range (MapleStory: skills increase mastery from 20% to 60%)
+    # Here: job tier increases mastery
+    job_tier = user.job_tier or 0
+    mastery = 0.5 + job_tier * 0.1  # 0.5 base, up to 0.9 at 4th job
+    min_damage = int(raw_max * mastery)
+    max_damage = int(raw_max)
+
+    # Apply critical hit (10% chance, 1.5x damage)
+    is_crit = random.random() < 0.10 + (user.stat_initiative or 1) * 0.005
+    actual = random.randint(min_damage, max(min_damage, max_damage))
+    if is_crit:
+        actual = int(actual * 1.5)
+
+    return {
+        "damage": max(1, actual),
+        "min_damage": min_damage,
+        "max_damage": max_damage,
+        "is_crit": is_crit,
+        "main_stat": main_val,
+        "attack_power": total_atk,
+        "mastery": mastery,
+    }
+
+
 def calculate_boss_damage(user: User, interaction: Interaction, boss: BossRaid, bonuses: dict, db: Session) -> int:
-    """Calculate damage dealt to a boss based on interaction and boss type."""
+    """Calculate damage dealt to a boss using MapleStory-style formula + boss mechanics."""
     boss_type = boss.boss_type or "shadow_beast"
     template = BOSS_TEMPLATES.get(boss_type, BOSS_TEMPLATES["shadow_beast"])
     mechanic = template["mechanic"]
     mechanic_data = json.loads(boss.mechanic_data or "{}")
 
-    damage = 0
+    # Base damage from stat formula
+    dmg_result = calculate_damage(user, interaction)
+    base_damage = dmg_result["damage"]
 
     if mechanic == "basic":
-        # Any interaction deals 10-25 damage + stat bonus
-        base_dmg = random.randint(10, 25)
-        charisma_bonus = (user.stat_charisma or 1) - 1  # +1 per charisma point
-        damage = base_dmg + charisma_bonus
+        damage = base_damage
 
     elif mechanic == "diverse":
-        # Track unique interaction types used against this boss
         types_used = set(mechanic_data.get("types_used", []))
         types_used.add(interaction.interaction_type.value)
         mechanic_data["types_used"] = list(types_used)
         boss.mechanic_data = json.dumps(mechanic_data)
 
         if len(types_used) >= 3:
-            damage = random.randint(20, 40) + (user.stat_empathy or 1)
+            damage = int(base_damage * 1.5)  # 1.5x when diverse
         else:
-            damage = random.randint(5, 10)  # weak hit until diverse
+            damage = int(base_damage * 0.4)  # weak until diverse
 
     elif mechanic == "hydra":
-        # Track which heads are hit within 24h windows
         now = datetime.utcnow()
         heads = mechanic_data.get("heads", {"call": None, "text": None, "in_person": None})
 
@@ -1034,7 +1135,6 @@ def calculate_boss_damage(user: User, interaction: Interaction, boss: BossRaid, 
         elif itype == "in_person":
             heads["in_person"] = now.isoformat()
 
-        # Check if all 3 heads hit within 24h
         all_hit = True
         for head_time in heads.values():
             if head_time is None:
@@ -1049,27 +1149,23 @@ def calculate_boss_damage(user: User, interaction: Interaction, boss: BossRaid, 
         boss.mechanic_data = json.dumps(mechanic_data)
 
         if all_hit:
-            damage = random.randint(50, 80) + (user.stat_initiative or 1) * 2
-            # Reset heads after big hit
+            damage = int(base_damage * 3.0)  # massive hit when all 3 heads
             mechanic_data["heads"] = {"call": None, "text": None, "in_person": None}
             boss.mechanic_data = json.dumps(mechanic_data)
         else:
-            damage = random.randint(5, 15)  # chip damage
+            damage = int(base_damage * 0.3)  # chip damage
 
     elif mechanic == "monarch":
-        # Damage scales with streak and all stats
         streak = user.streak_days or 0
-        total_stats = sum([
-            user.stat_charisma or 1,
-            user.stat_empathy or 1,
-            user.stat_consistency or 1,
-            user.stat_initiative or 1,
-            user.stat_wisdom or 1,
-        ])
-        base_dmg = random.randint(8, 20)
-        streak_mult = 1 + min(streak, 30) * 0.05  # up to 2.5x at 30-day streak
-        stat_bonus = total_stats // 5
-        damage = int((base_dmg + stat_bonus) * streak_mult)
+        streak_mult = 1.0 + min(streak, 30) * 0.05  # up to 2.5x at 30-day streak
+        damage = int(base_damage * streak_mult)
+
+    else:
+        damage = base_damage
+
+    # Apply buff multipliers
+    buff_mult = get_active_buff_multiplier(user, "boss_damage")
+    damage = int(damage * buff_mult)
 
     # Apply wisdom global bonus
     damage = int(damage * bonuses.get("global_xp_mult", 1.0))
@@ -1198,7 +1294,7 @@ def choose_social_class(user: User, class_key: str, db: Session) -> dict:
 
 
 def unlock_skill(user: User, skill_key: str, db: Session) -> dict:
-    """Unlock or level up a skill using SP."""
+    """Unlock or level up a skill using SP. Checks prerequisites and job tier."""
     if not user.social_class:
         return {"error": "Choose a social class first"}
 
@@ -1209,6 +1305,11 @@ def unlock_skill(user: User, skill_key: str, db: Session) -> dict:
     skill_def = cls["skills"].get(skill_key)
     if not skill_def:
         return {"error": "Skill not available for your class"}
+
+    # Check prerequisites (MapleStory-style)
+    prereq_check = check_skill_prerequisites(user, skill_key, db)
+    if not prereq_check["met"]:
+        return {"error": prereq_check["reason"]}
 
     existing = db.query(UserSkill).filter(
         UserSkill.user_id == user.id,
@@ -1368,3 +1469,616 @@ def create_circle_quest(circle: Circle, user: User, db: Session) -> CircleQuest:
     db.commit()
     db.refresh(cq)
     return cq
+
+
+# ══════════════════════════════════════════════
+# PHASE 8: JOB ADVANCEMENT SYSTEM
+# (MapleStory-style: Beginner → 1st → 2nd → 3rd → 4th Job)
+# ══════════════════════════════════════════════
+
+JOB_ADVANCEMENT = {
+    # tier: {level_req, stat_req, title_suffix, stat_bonus, hp_bonus, sp_bonus}
+    0: {"name": "Beginner", "level_req": 1, "stat_bonus": {}, "hp_bonus": 0, "sp_bonus": 0},
+    1: {
+        "name": "1st Job",
+        "level_req": 5,
+        "stat_req": 10,  # main stat must be >= 10
+        "hp_bonus": 20,
+        "sp_bonus": 3,
+        "stat_bonus": {"main": 3},  # +3 to main stat
+    },
+    2: {
+        "name": "2nd Job",
+        "level_req": 15,
+        "stat_req": 25,
+        "hp_bonus": 40,
+        "sp_bonus": 5,
+        "stat_bonus": {"main": 5, "secondary": 2},
+        "quest_req": "complete_5_quests",
+    },
+    3: {
+        "name": "3rd Job",
+        "level_req": 30,
+        "stat_req": 50,
+        "hp_bonus": 60,
+        "sp_bonus": 8,
+        "stat_bonus": {"main": 8, "secondary": 4, "all": 2},
+        "quest_req": "clear_3_gates",
+    },
+    4: {
+        "name": "4th Job",
+        "level_req": 50,
+        "stat_req": 80,
+        "hp_bonus": 100,
+        "sp_bonus": 15,
+        "stat_bonus": {"main": 12, "secondary": 6, "all": 5},
+        "quest_req": "clear_boss_monarch",
+        "title": "Master",
+    },
+}
+
+# Job advancement titles per class
+JOB_TITLES = {
+    "connector": ["Novice", "Networker", "Influencer", "Socialite", "Grand Connector"],
+    "nurturer": ["Novice", "Caretaker", "Counselor", "Guardian", "Grand Nurturer"],
+    "catalyst": ["Novice", "Organizer", "Coordinator", "Director", "Grand Catalyst"],
+    "sage": ["Novice", "Apprentice", "Scholar", "Philosopher", "Grand Sage"],
+}
+
+
+def check_job_advancement(user: User, db: Session) -> dict:
+    """Check if user can advance to next job tier. Returns advancement info."""
+    current_tier = user.job_tier or 0
+    next_tier = current_tier + 1
+
+    if next_tier not in JOB_ADVANCEMENT:
+        return {"can_advance": False, "reason": "Already at maximum job tier"}
+
+    req = JOB_ADVANCEMENT[next_tier]
+
+    # Level check
+    if (user.level or 1) < req["level_req"]:
+        return {"can_advance": False, "reason": f"Need level {req['level_req']} (currently {user.level or 1})"}
+
+    # Must have chosen a class first
+    if not user.social_class:
+        return {"can_advance": False, "reason": "Choose a social class first"}
+
+    # Main stat check
+    main_attr = CLASS_MAIN_STAT.get(user.social_class, "stat_charisma")
+    main_val = getattr(user, main_attr, 1) or 1
+    if main_val < req.get("stat_req", 0):
+        return {"can_advance": False, "reason": f"Need {main_attr.replace('stat_', '').title()} >= {req['stat_req']} (currently {main_val})"}
+
+    # Quest requirement check
+    quest_req = req.get("quest_req")
+    if quest_req:
+        if quest_req == "complete_5_quests":
+            count = db.query(func.count(Quest.id)).filter(
+                Quest.user_id == user.id, Quest.status == QuestStatus.completed
+            ).scalar() or 0
+            if count < 5:
+                return {"can_advance": False, "reason": f"Need 5 completed quests (have {count})"}
+        elif quest_req == "clear_3_gates":
+            count = db.query(func.count(Gate.id)).filter(
+                Gate.creator_id == user.id, Gate.status == "cleared"
+            ).scalar() or 0
+            if count < 3:
+                return {"can_advance": False, "reason": f"Need 3 cleared gates (have {count})"}
+        elif quest_req == "clear_boss_monarch":
+            count = db.query(func.count(BossRaid.id)).filter(
+                BossRaid.creator_id == user.id, BossRaid.boss_type == "the_monarch",
+                BossRaid.status == "cleared",
+            ).scalar() or 0
+            if count < 1:
+                return {"can_advance": False, "reason": "Must defeat The Monarch boss"}
+
+    return {"can_advance": True, "next_tier": next_tier, "requirements": req}
+
+
+def perform_job_advancement(user: User, db: Session) -> dict:
+    """Advance user to next job tier. Awards stat bonuses, HP, SP."""
+    check = check_job_advancement(user, db)
+    if not check.get("can_advance"):
+        return {"error": check.get("reason", "Cannot advance")}
+
+    next_tier = check["next_tier"]
+    req = JOB_ADVANCEMENT[next_tier]
+
+    # Apply stat bonuses (MapleStory gives permanent stat boosts on job advancement)
+    main_attr = CLASS_MAIN_STAT.get(user.social_class, "stat_charisma")
+    stat_bonus = req.get("stat_bonus", {})
+
+    if "main" in stat_bonus:
+        current = getattr(user, main_attr, 1) or 1
+        setattr(user, main_attr, current + stat_bonus["main"])
+
+    if "secondary" in stat_bonus:
+        # Add to all non-main stats
+        for attr in ["stat_charisma", "stat_empathy", "stat_consistency", "stat_initiative", "stat_wisdom"]:
+            if attr != main_attr:
+                current = getattr(user, attr, 1) or 1
+                setattr(user, attr, current + stat_bonus["secondary"])
+                break  # only highest secondary
+
+    if "all" in stat_bonus:
+        for attr in ["stat_charisma", "stat_empathy", "stat_consistency", "stat_initiative", "stat_wisdom"]:
+            current = getattr(user, attr, 1) or 1
+            setattr(user, attr, current + stat_bonus["all"])
+
+    # HP bonus (MapleStory Warriors get +200-350 HP on job advancement)
+    user.hp = min(HP_MAX, (user.hp or 0) + req.get("hp_bonus", 0))
+
+    # SP bonus
+    user.skill_points = (user.skill_points or 0) + req.get("sp_bonus", 0)
+
+    # Update job tier
+    user.job_tier = next_tier
+
+    # Update title to job title
+    class_key = user.social_class or "connector"
+    titles = JOB_TITLES.get(class_key, JOB_TITLES["connector"])
+    if next_tier < len(titles):
+        user.title = titles[next_tier]
+
+    db.commit()
+
+    return {
+        "new_tier": next_tier,
+        "tier_name": req["name"],
+        "title": user.title,
+        "stat_bonuses": stat_bonus,
+        "hp_bonus": req.get("hp_bonus", 0),
+        "sp_bonus": req.get("sp_bonus", 0),
+    }
+
+
+def get_job_advancement_info(user: User, db: Session) -> dict:
+    """Get full job advancement state for display."""
+    current_tier = user.job_tier or 0
+    class_key = user.social_class or ""
+    titles = JOB_TITLES.get(class_key, ["Novice"] * 5)
+
+    tiers = []
+    for tier_num, req in JOB_ADVANCEMENT.items():
+        tiers.append({
+            "tier": tier_num,
+            "name": req["name"],
+            "title": titles[tier_num] if tier_num < len(titles) else "???",
+            "level_req": req["level_req"],
+            "stat_req": req.get("stat_req", 0),
+            "quest_req": req.get("quest_req", ""),
+            "completed": current_tier >= tier_num,
+            "current": current_tier == tier_num,
+        })
+
+    check = check_job_advancement(user, db)
+
+    return {
+        "current_tier": current_tier,
+        "current_title": titles[current_tier] if current_tier < len(titles) else "Master",
+        "social_class": class_key,
+        "tiers": tiers,
+        "can_advance": check.get("can_advance", False),
+        "advance_reason": check.get("reason", ""),
+    }
+
+
+# ══════════════════════════════════════════════
+# PHASE 9: BUFF / DEBUFF TEMPORARY EFFECTS
+# (MapleStory: skills grant temporary stat boosts with duration)
+# ══════════════════════════════════════════════
+
+BUFF_DEFINITIONS = {
+    "social_surge": {
+        "name": "Social Surge",
+        "description": "+20% XP for all interactions",
+        "duration_hours": 24,
+        "effect": {"xp_mult": 1.2},
+        "trigger": "party_complete",
+        "icon": "zap",
+    },
+    "deep_focus": {
+        "name": "Deep Focus",
+        "description": "+30% relationship XP",
+        "duration_hours": 12,
+        "effect": {"relationship_xp_mult": 1.3},
+        "trigger": "long_interaction",  # 30+ min interaction
+        "icon": "brain",
+    },
+    "streak_fire": {
+        "name": "Streak Fire",
+        "description": "+15% global XP (7+ day streak)",
+        "duration_hours": 48,
+        "effect": {"xp_mult": 1.15},
+        "trigger": "streak_7",
+        "icon": "flame",
+    },
+    "boss_slayer": {
+        "name": "Boss Slayer",
+        "description": "+25% boss damage",
+        "duration_hours": 24,
+        "effect": {"boss_damage": 1.25},
+        "trigger": "boss_clear",
+        "icon": "sword",
+    },
+    "chain_momentum": {
+        "name": "Chain Momentum",
+        "description": "+10% XP, stacks per active chain step",
+        "duration_hours": 72,
+        "effect": {"xp_mult": 1.1},
+        "trigger": "chain_step_complete",
+        "icon": "link",
+    },
+    "circle_harmony": {
+        "name": "Circle Harmony",
+        "description": "+20% circle XP when all members contacted this week",
+        "duration_hours": 168,  # 7 days
+        "effect": {"circle_xp_mult": 1.2},
+        "trigger": "circle_quest_complete",
+        "icon": "sparkles",
+    },
+    "exhaustion": {
+        "name": "Exhaustion",
+        "description": "-50% XP (HP reached 0)",
+        "duration_hours": 24,
+        "effect": {"xp_mult": 0.5},
+        "trigger": "hp_zero",
+        "icon": "dizzy",
+        "is_debuff": True,
+    },
+    "gate_rush": {
+        "name": "Gate Rush",
+        "description": "+30% gate clear speed",
+        "duration_hours": 12,
+        "effect": {"gate_speed": 1.3},
+        "trigger": "gate_clear",
+        "icon": "door",
+    },
+}
+
+
+def apply_buff(user: User, buff_key: str, db: Session):
+    """Apply a timed buff to user. Stored as JSON in user.active_buffs."""
+    if buff_key not in BUFF_DEFINITIONS:
+        return
+
+    buff_def = BUFF_DEFINITIONS[buff_key]
+    now = datetime.utcnow()
+    expires = now + timedelta(hours=buff_def["duration_hours"])
+
+    buffs = json.loads(user.active_buffs or "{}") if hasattr(user, 'active_buffs') and user.active_buffs else {}
+
+    buffs[buff_key] = {
+        "applied_at": now.isoformat(),
+        "expires_at": expires.isoformat(),
+        "name": buff_def["name"],
+        "icon": buff_def["icon"],
+        "is_debuff": buff_def.get("is_debuff", False),
+    }
+
+    if hasattr(user, 'active_buffs'):
+        user.active_buffs = json.dumps(buffs)
+    db.commit()
+
+
+def get_active_buffs(user: User) -> list:
+    """Get currently active (non-expired) buffs."""
+    if not hasattr(user, 'active_buffs') or not user.active_buffs:
+        return []
+
+    buffs = json.loads(user.active_buffs or "{}")
+    now = datetime.utcnow()
+    active = []
+    expired_keys = []
+
+    for key, data in buffs.items():
+        expires = datetime.fromisoformat(data["expires_at"])
+        if now < expires:
+            remaining_seconds = (expires - now).total_seconds()
+            buff_def = BUFF_DEFINITIONS.get(key, {})
+            active.append({
+                "key": key,
+                "name": data.get("name", key),
+                "icon": data.get("icon", "star"),
+                "is_debuff": data.get("is_debuff", False),
+                "description": buff_def.get("description", ""),
+                "remaining_hours": round(remaining_seconds / 3600, 1),
+                "remaining_seconds": int(remaining_seconds),
+            })
+        else:
+            expired_keys.append(key)
+
+    # Clean up expired buffs
+    if expired_keys:
+        for k in expired_keys:
+            del buffs[k]
+        if hasattr(user, 'active_buffs'):
+            user.active_buffs = json.dumps(buffs)
+
+    return active
+
+
+def get_active_buff_multiplier(user: User, effect_key: str) -> float:
+    """Get combined multiplier from all active buffs for a given effect."""
+    if not hasattr(user, 'active_buffs') or not user.active_buffs:
+        return 1.0
+
+    buffs = json.loads(user.active_buffs or "{}")
+    now = datetime.utcnow()
+    total_mult = 1.0
+
+    for key, data in buffs.items():
+        expires = datetime.fromisoformat(data["expires_at"])
+        if now < expires:
+            buff_def = BUFF_DEFINITIONS.get(key, {})
+            effect = buff_def.get("effect", {})
+            if effect_key in effect:
+                total_mult *= effect[effect_key]
+
+    return total_mult
+
+
+def check_and_apply_buffs(user: User, trigger: str, db: Session):
+    """Check if any buff should be applied based on trigger event."""
+    for buff_key, buff_def in BUFF_DEFINITIONS.items():
+        if buff_def["trigger"] == trigger:
+            apply_buff(user, buff_key, db)
+
+
+# ══════════════════════════════════════════════
+# PHASE 10: SKILL PREREQUISITES
+# (MapleStory: skills require previous skills at certain levels)
+# ══════════════════════════════════════════════
+
+SKILL_PREREQUISITES = {
+    # Connector tree
+    "speed_dial": {"requires": "social_butterfly", "min_level": 2},
+    "first_impression": {"requires": "wide_net", "min_level": 1},
+    "network_effect": {"requires": "speed_dial", "min_level": 1},
+    "hub_master": {"requires": "first_impression", "min_level": 1},
+    # Nurturer tree
+    "emotional_intel": {"requires": "deep_roots", "min_level": 2},
+    "inner_strength": {"requires": "healing_touch", "min_level": 2},
+    "bond_master": {"requires": "emotional_intel", "min_level": 1},
+    "soulmate": {"requires": "inner_strength", "min_level": 1},
+    # Catalyst tree
+    "challenge_master": {"requires": "party_leader", "min_level": 2},
+    "event_horizon": {"requires": "rally_cry", "min_level": 2},
+    "mob_mentality": {"requires": "challenge_master", "min_level": 1},
+    "legendary_host": {"requires": "event_horizon", "min_level": 1},
+    # Sage tree
+    "discipline": {"requires": "iron_will", "min_level": 2},
+    "time_mastery": {"requires": "meditation", "min_level": 2},
+    "zen_master": {"requires": "discipline", "min_level": 1},
+    "enlightened": {"requires": "time_mastery", "min_level": 1},
+}
+
+# Job tier requirements for skills (MapleStory: 2nd job skills need 2nd job, etc.)
+SKILL_JOB_TIER_REQ = {
+    # Tier 1 skills (1st job) - cost 1 SP
+    "wide_net": 1, "social_butterfly": 1,
+    "deep_roots": 1, "healing_touch": 1,
+    "party_leader": 1, "rally_cry": 1,
+    "iron_will": 1, "meditation": 1,
+    # Tier 2 skills (2nd job) - cost 2 SP
+    "speed_dial": 2, "first_impression": 2,
+    "emotional_intel": 2, "inner_strength": 2,
+    "challenge_master": 2, "event_horizon": 2,
+    "discipline": 2, "time_mastery": 2,
+    # Tier 3 skills (3rd job) - cost 3 SP
+    "network_effect": 3, "hub_master": 3,
+    "bond_master": 3, "soulmate": 3,
+    "mob_mentality": 3, "legendary_host": 3,
+    "zen_master": 3, "enlightened": 3,
+}
+
+
+def check_skill_prerequisites(user: User, skill_key: str, db: Session) -> dict:
+    """Check if user meets prerequisites for a skill."""
+    # Job tier check
+    tier_req = SKILL_JOB_TIER_REQ.get(skill_key, 0)
+    if (user.job_tier or 0) < tier_req:
+        return {"met": False, "reason": f"Requires {JOB_ADVANCEMENT[tier_req]['name']} advancement"}
+
+    # Prerequisite skill check
+    prereq = SKILL_PREREQUISITES.get(skill_key)
+    if prereq:
+        req_skill = prereq["requires"]
+        req_level = prereq["min_level"]
+        existing = db.query(UserSkill).filter(
+            UserSkill.user_id == user.id,
+            UserSkill.skill_key == req_skill,
+        ).first()
+        current_level = existing.level if existing else 0
+        if current_level < req_level:
+            # Look up the display name
+            cls = SOCIAL_CLASSES.get(user.social_class, {})
+            skill_name = cls.get("skills", {}).get(req_skill, {}).get("name", req_skill)
+            return {"met": False, "reason": f"Requires {skill_name} Lv{req_level} (have Lv{current_level})"}
+
+    return {"met": True}
+
+
+# ══════════════════════════════════════════════
+# PHASE 11: CLASS-SPECIFIC LEVEL-UP BONUSES
+# (MapleStory: Warriors gain +200-350 HP, Mages gain +450 MP per level)
+# ══════════════════════════════════════════════
+
+CLASS_LEVELUP_BONUSES = {
+    "connector": {
+        "main_stat_gain": 2,  # +2 Charisma per level
+        "main_stat": "stat_charisma",
+        "hp_gain": 3,         # small HP per level
+        "description": "+2 CHA per level",
+    },
+    "nurturer": {
+        "main_stat_gain": 2,  # +2 Empathy per level
+        "main_stat": "stat_empathy",
+        "hp_gain": 5,         # more HP (like Warriors)
+        "description": "+2 EMP, +5 HP per level",
+    },
+    "catalyst": {
+        "main_stat_gain": 2,  # +2 Initiative per level
+        "main_stat": "stat_initiative",
+        "hp_gain": 4,
+        "description": "+2 INI per level",
+    },
+    "sage": {
+        "main_stat_gain": 2,  # +2 Wisdom per level
+        "main_stat": "stat_wisdom",
+        "hp_gain": 2,         # least HP (like Mages)
+        "int_gain": 1,        # +1 to ALL stats (wisdom of the sage)
+        "description": "+2 WIS, +1 all stats per level",
+    },
+}
+
+
+def apply_levelup_bonuses(user: User, levels_gained: int):
+    """Apply class-specific stat gains on level up (MapleStory-style)."""
+    class_key = user.social_class
+    if not class_key or class_key not in CLASS_LEVELUP_BONUSES:
+        return
+
+    bonus = CLASS_LEVELUP_BONUSES[class_key]
+
+    for _ in range(levels_gained):
+        # Main stat gain
+        main_attr = bonus["main_stat"]
+        current = getattr(user, main_attr, 1) or 1
+        setattr(user, main_attr, current + bonus["main_stat_gain"])
+
+        # HP gain (MapleStory: Warriors +200-350 HP per level)
+        hp_gain = bonus.get("hp_gain", 2)
+        # HP gain also scales with consistency (like INT scaling MP in MapleStory)
+        consistency_bonus = ((user.stat_consistency or 1) - 1) // 10
+        user.hp = min(HP_MAX, (user.hp or 0) + hp_gain + consistency_bonus)
+
+        # Sage special: +1 all stats (like maple mage INT bonus)
+        if bonus.get("int_gain"):
+            for attr in ["stat_charisma", "stat_empathy", "stat_consistency", "stat_initiative", "stat_wisdom"]:
+                if attr != main_attr:
+                    cur = getattr(user, attr, 1) or 1
+                    setattr(user, attr, cur + bonus["int_gain"])
+
+
+# ══════════════════════════════════════════════
+# PHASE 12: CIRCLE / GUILD ECONOMY
+# (MapleStory: Guild GP, ranks, capacity, emblem costs)
+# ══════════════════════════════════════════════
+
+CIRCLE_RANKS = ["Initiate", "Member", "Officer", "Captain", "Leader"]
+CIRCLE_CAPACITY_BY_LEVEL = [5, 8, 12, 18, 25, 35, 50, 75]  # members per circle level
+CIRCLE_GP_PER_INTERACTION = 5
+CIRCLE_RANK_THRESHOLDS = [0, 50, 200, 500, 1000]  # GP needed for each rank
+
+# GP costs for circle upgrades (like MapleStory guild costs)
+CIRCLE_UPGRADE_COSTS = {
+    "expand_capacity": 100,    # +5 members
+    "create_quest": 50,        # create circle quest
+    "change_emblem": 200,      # change circle icon
+    "boost_xp": 500,           # temporary circle XP boost
+}
+
+
+def get_circle_details(circle, user: User, db: Session) -> dict:
+    """Get detailed circle info with GP economy, ranks, capacity."""
+    members = db.query(CircleMember).filter(CircleMember.circle_id == circle.id).all()
+    member_count = len(members)
+
+    level = circle.level or 1
+    level_idx = min(level - 1, len(CIRCLE_CAPACITY_BY_LEVEL) - 1)
+    capacity = CIRCLE_CAPACITY_BY_LEVEL[level_idx]
+
+    gp = circle.xp_pool or 0  # GP = circle's XP pool
+
+    # Calculate member ranks based on individual GP contributions
+    member_details = []
+    for mem in members:
+        contact = db.query(Contact).filter(Contact.id == mem.contact_id).first()
+        if contact:
+            member_gp = contact.relationship_xp or 0
+            rank_idx = 0
+            for i, threshold in enumerate(CIRCLE_RANK_THRESHOLDS):
+                if member_gp >= threshold:
+                    rank_idx = i
+            member_details.append({
+                "contact_id": contact.id,
+                "name": contact.name,
+                "rank": CIRCLE_RANKS[min(rank_idx, len(CIRCLE_RANKS) - 1)],
+                "rank_index": rank_idx,
+                "gp": member_gp,
+            })
+
+    return {
+        "id": circle.id,
+        "name": circle.name,
+        "level": level,
+        "gp": gp,
+        "next_level_gp": CIRCLE_LEVEL_THRESHOLDS[min(level, len(CIRCLE_LEVEL_THRESHOLDS) - 1)],
+        "capacity": capacity,
+        "member_count": member_count,
+        "members": member_details,
+        "can_add_members": member_count < capacity,
+        "upgrade_costs": CIRCLE_UPGRADE_COSTS,
+    }
+
+
+# ══════════════════════════════════════════════
+# ENHANCED DASHBOARD DATA
+# ══════════════════════════════════════════════
+
+def get_enhanced_dashboard(user: User, db: Session) -> dict:
+    """Get full enhanced dashboard data including all new systems."""
+    bonuses = get_stat_bonuses(user, db)
+    buffs = get_active_buffs(user)
+    job_info = get_job_advancement_info(user, db)
+    skill_tree = get_skill_tree(user, db)
+
+    # Add prerequisite info to skill tree
+    for class_key, class_info in skill_tree["classes"].items():
+        for skill_key, skill_info in class_info["skills"].items():
+            prereq = SKILL_PREREQUISITES.get(skill_key)
+            if prereq:
+                skill_info["prerequisite"] = prereq
+                prereq_check = check_skill_prerequisites(user, skill_key, db)
+                skill_info["prereq_met"] = prereq_check["met"]
+                skill_info["prereq_reason"] = prereq_check.get("reason", "")
+            else:
+                skill_info["prerequisite"] = None
+                skill_info["prereq_met"] = True
+                skill_info["prereq_reason"] = ""
+
+            # Job tier requirement
+            skill_info["job_tier_req"] = SKILL_JOB_TIER_REQ.get(skill_key, 0)
+
+    return {
+        "stat_bonuses": bonuses,
+        "active_buffs": buffs,
+        "job_advancement": job_info,
+        "skill_tree": skill_tree,
+        "damage_preview": _get_damage_preview(user),
+    }
+
+
+def _get_damage_preview(user: User) -> dict:
+    """Show user their current damage range (like MapleStory stat window)."""
+    class_key = user.social_class or "connector"
+    weapon_mult = CLASS_WEAPON_MULT.get(class_key, 4.0)
+    main_val, secondary_val = _get_main_secondary_stats(user)
+
+    # Use average interaction ATK for preview
+    avg_atk = 18
+    raw_max = ((weapon_mult * main_val + secondary_val) / 100) * avg_atk
+    job_tier = user.job_tier or 0
+    mastery = 0.5 + job_tier * 0.1
+
+    return {
+        "min_damage": max(1, int(raw_max * mastery)),
+        "max_damage": max(1, int(raw_max)),
+        "main_stat": main_val,
+        "secondary_stat": secondary_val,
+        "weapon_mult": weapon_mult,
+        "mastery": mastery,
+        "class": class_key,
+    }

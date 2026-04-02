@@ -1609,7 +1609,74 @@
     display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px;
     font-size: 11px; font-weight: 700; background: rgba(108,92,231,0.15); color: var(--accent-light);
   }
+  .skill-row.locked { opacity: 0.35; position: relative; }
+  .skill-row .prereq-label {
+    font-size: 9px; color: #e17055; font-weight: 600; white-space: nowrap;
+  }
+  .skill-row .tier-badge {
+    font-size: 8px; padding: 1px 5px; border-radius: 4px; font-weight: 700;
+    background: rgba(255,165,0,0.15); color: #f0932b;
+  }
   @media (max-width: 600px) { .skill-tree-container { grid-template-columns: 1fr; } }
+
+  /* ═══ JOB ADVANCEMENT ═══ */
+  .job-advancement-bar {
+    display: flex; gap: 4px; align-items: center; margin: 10px 0; padding: 10px 14px;
+    background: var(--glass); border-radius: var(--radius); border: 1px solid var(--border);
+  }
+  .job-tier {
+    flex: 1; text-align: center; padding: 6px 4px; border-radius: 6px;
+    font-size: 10px; font-weight: 700; color: var(--text-muted);
+    position: relative; transition: all 0.3s;
+  }
+  .job-tier.completed { background: rgba(108,92,231,0.15); color: var(--accent-light); }
+  .job-tier.current { background: var(--accent); color: white; box-shadow: 0 0 12px var(--accent-glow); }
+  .job-tier.locked { opacity: 0.4; }
+  .job-tier-title { font-size: 11px; font-weight: 700; margin-top: 2px; }
+  .job-tier-level { font-size: 9px; opacity: 0.7; }
+  .job-advance-btn {
+    padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    border: none; cursor: pointer; transition: all 0.3s;
+    background: linear-gradient(135deg, #f9ca24, #f0932b); color: #2d3436;
+    animation: job-pulse 2s infinite;
+  }
+  @keyframes job-pulse { 0%,100% { box-shadow: 0 0 8px rgba(249,202,36,0.3); } 50% { box-shadow: 0 0 20px rgba(249,202,36,0.6); } }
+  .job-advance-btn:hover { transform: scale(1.05); }
+
+  /* ═══ ACTIVE BUFFS BAR ═══ */
+  .buffs-bar {
+    display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; padding: 6px 10px;
+    background: var(--glass); border-radius: var(--radius); min-height: 30px;
+    border: 1px solid var(--border);
+  }
+  .buffs-bar:empty { display: none; }
+  .buff-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+    border-radius: 20px; font-size: 10px; font-weight: 600; white-space: nowrap;
+    background: rgba(0,206,201,0.12); color: #00cec9; border: 1px solid rgba(0,206,201,0.2);
+    transition: all 0.3s;
+  }
+  .buff-chip.debuff {
+    background: rgba(214,48,49,0.12); color: #d63031; border-color: rgba(214,48,49,0.2);
+  }
+  .buff-timer { font-size: 9px; opacity: 0.7; }
+
+  /* ═══ DAMAGE PREVIEW ═══ */
+  .damage-preview {
+    display: flex; gap: 12px; align-items: center; padding: 8px 12px;
+    background: rgba(253,121,168,0.06); border-radius: var(--radius);
+    border: 1px solid rgba(253,121,168,0.15); margin-top: 8px;
+  }
+  .damage-preview .damage-range {
+    font-size: 18px; font-weight: 800; color: #fd79a8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .damage-preview .damage-label {
+    font-size: 10px; color: var(--text-muted); font-weight: 600;
+  }
+  .damage-preview .damage-stats {
+    display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-secondary);
+  }
 
   /* ═══ CIRCLES / GUILDS ═══ */
   .circles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -6592,10 +6659,24 @@ function renderSkillTree() {
 
     const skillList = createElement('div', { className: 'skill-list' });
     Object.entries(cls.skills).forEach(([skey, skill]) => {
-      const row = createElement('div', { className: 'skill-row' + (skill.current_level > 0 ? ' unlocked' : '') });
+      const isLocked = skill.prerequisite && !skill.prereq_met;
+      const tierLocked = skill.job_tier_req && (dashboardData?.gamification?.job_tier || 0) < skill.job_tier_req;
+      const row = createElement('div', { className: 'skill-row' + (skill.current_level > 0 ? ' unlocked' : '') + ((isLocked || tierLocked) ? ' locked' : '') });
       row.appendChild(createElement('span', { className: 'skill-name' }, skill.name));
       row.appendChild(createElement('span', { className: 'skill-level' }, skill.current_level + '/' + skill.max_level));
-      if (cls.selected && skill.current_level < skill.max_level && sp >= skill.sp_cost) {
+
+      // Show job tier badge
+      if (skill.job_tier_req && skill.job_tier_req > 1) {
+        const tierNames = ['', '1st', '2nd', '3rd', '4th'];
+        row.appendChild(createElement('span', { className: 'tier-badge' }, tierNames[skill.job_tier_req] + ' Job'));
+      }
+
+      // Show prerequisite label
+      if (isLocked && skill.prereq_reason) {
+        row.appendChild(createElement('span', { className: 'prereq-label' }, skill.prereq_reason));
+      } else if (tierLocked) {
+        row.appendChild(createElement('span', { className: 'prereq-label' }, 'Needs job advancement'));
+      } else if (cls.selected && skill.current_level < skill.max_level && sp >= skill.sp_cost) {
         const btn = createElement('button', { className: 'skill-unlock-btn', onClick: () => unlockSkillAction(skey) },
           skill.current_level === 0 ? 'Unlock (' + skill.sp_cost + ' SP)' : 'Upgrade (' + skill.sp_cost + ' SP)');
         row.appendChild(btn);
@@ -6633,6 +6714,17 @@ async function unlockSkillAction(skillKey) {
     await loadSkillTree();
     renderSkillTree();
   } catch (e) { showToast(e.message || 'Cannot unlock skill', 'error'); }
+}
+
+async function performJobAdvance() {
+  try {
+    const data = await api('/gamification/job-advancement/advance', { method: 'POST' });
+    showToast('Job Advanced to ' + (data.tier_name || 'next tier') + '! Title: ' + (data.title || ''), 'success');
+    launchConfetti();
+    playSound('levelup');
+    await loadDashboard();
+    renderGamification();
+  } catch (e) { showToast(e.message || 'Cannot advance job', 'error'); }
 }
 
 // ═══════════════════════════════════════════
@@ -6861,6 +6953,57 @@ renderGamification = function() {
         hpContainer.querySelector('.hp-bar-label').appendChild(exhaustBadge);
       }
       hpContainer.appendChild(potionBtn);
+    }
+  }
+
+  // ── Job Advancement Bar ──
+  if (!document.getElementById('jobAdvancementBar') && dashboardData?.gamification?.job_advancement) {
+    const jobData = dashboardData.gamification.job_advancement;
+    const jobBar = createElement('div', { className: 'job-advancement-bar', id: 'jobAdvancementBar' });
+    (jobData.tiers || []).forEach(tier => {
+      const cls = tier.completed && !tier.current ? 'completed' : tier.current ? 'current' : 'locked';
+      const tierEl = createElement('div', { className: 'job-tier ' + cls });
+      tierEl.appendChild(createElement('div', { className: 'job-tier-title' }, tier.title || tier.name));
+      tierEl.appendChild(createElement('div', { className: 'job-tier-level' }, 'Lv.' + tier.level_req));
+      jobBar.appendChild(tierEl);
+    });
+    if (jobData.can_advance) {
+      const advBtn = createElement('button', { className: 'job-advance-btn', onClick: performJobAdvance }, 'ADVANCE');
+      jobBar.appendChild(advBtn);
+    }
+    const xpSec = document.getElementById('xpSection');
+    if (xpSec) xpSec.insertBefore(jobBar, xpSec.querySelector('.hp-bar-container') || xpSec.firstChild);
+  }
+
+  // ── Active Buffs Bar ──
+  if (!document.getElementById('buffsBar')) {
+    const buffs = dashboardData?.gamification?.active_buffs || [];
+    if (buffs.length > 0) {
+      const buffsBar = createElement('div', { className: 'buffs-bar', id: 'buffsBar' });
+      buffs.forEach(buff => {
+        const chip = createElement('div', { className: 'buff-chip' + (buff.is_debuff ? ' debuff' : '') });
+        const hours = buff.remaining_hours || 0;
+        const timeStr = hours >= 1 ? Math.round(hours) + 'h' : Math.round(hours * 60) + 'm';
+        chip.innerHTML = (buff.icon ? '' : '') + buff.name + ' <span class="buff-timer">' + timeStr + '</span>';
+        buffsBar.appendChild(chip);
+      });
+      const xpSec = document.getElementById('xpSection');
+      if (xpSec) xpSec.appendChild(buffsBar);
+    }
+  }
+
+  // ── Damage Preview in Hunter Stats ──
+  if (!document.getElementById('damagePreview') && dashboardData?.gamification?.damage_preview) {
+    const dp = dashboardData.gamification.damage_preview;
+    if (dp.min_damage) {
+      const preview = createElement('div', { className: 'damage-preview', id: 'damagePreview' });
+      preview.innerHTML = '<div><div class="damage-label">ATK RANGE</div><div class="damage-range">' +
+        dp.min_damage + ' ~ ' + dp.max_damage + '</div></div>' +
+        '<div class="damage-stats"><span>Main Stat: ' + dp.main_stat + '</span>' +
+        '<span>Mastery: ' + Math.round(dp.mastery * 100) + '%</span>' +
+        '<span>Class: ' + (dp.class || 'none').toUpperCase() + '</span></div>';
+      const statsSec = document.getElementById('hunterStatsSection');
+      if (statsSec) statsSec.appendChild(preview);
     }
   }
 
