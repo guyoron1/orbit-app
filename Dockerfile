@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v20-maplestory-game-world-ui
+ARG CACHE_BUST=v21-pixel-art-overworld-map
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/
