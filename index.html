@@ -8611,12 +8611,12 @@ function closeNpcDialog() {
 }
 
 function fillNpcTemplate(text, user) {
-  const lp = calcLevelProgress(user.xp || 0);
+  const level = user.level || 1;
   const contactCount = window._cachedContacts ? window._cachedContacts.length : '?';
-  const nextAdvLevel = getNextAdvancementLevel(lp.level);
+  const nextAdvLevel = getNextAdvancementLevel(level);
   return text
     .replace(/{name}/g, user.name || 'Adventurer')
-    .replace(/{level}/g, lp.level)
+    .replace(/{level}/g, level)
     .replace(/{xp}/g, user.xp || 0)
     .replace(/{contactCount}/g, contactCount)
     .replace(/{nextAdvLevel}/g, nextAdvLevel);
@@ -8717,18 +8717,18 @@ function isJobUnlocked(jobId, playerLevel, playerJobId) {
 
 function renderJobTree(container) {
   const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
-  const lp = calcLevelProgress(user.xp || 0);
+  const level = user.level || 1;
   const playerJob = getPlayerJob();
   const ancestry = getJobAncestry(playerJob);
 
   let html = '<div class="job-tree">';
   JOB_TREE.tiers.forEach((tier, ti) => {
     if (ti > 0) {
-      html += '<div class="job-connector' + (lp.level >= tier.levelReq ? ' active' : '') + '"></div>';
+      html += '<div class="job-connector' + (level >= tier.levelReq ? ' active' : '') + '"></div>';
     }
     html += '<div class="job-tier"><div class="job-tier-label">Lv.' + tier.levelReq + '+</div><div class="job-tier-nodes">';
     tier.jobs.forEach(job => {
-      const status = isJobUnlocked(job.id, lp.level, playerJob);
+      const status = isJobUnlocked(job.id, level, playerJob);
       html += '<div class="job-node ' + status + '" title="' + (job.statReq || '') + '">';
       html += '<div style="font-size:20px;margin-bottom:4px">' + job.icon + '</div>';
       html += '<div class="job-node-name">' + job.name + '</div>';
