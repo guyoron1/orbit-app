@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v25-npc-dialog-job-tree
+ARG CACHE_BUST=v26-enhanced-all-systems
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/

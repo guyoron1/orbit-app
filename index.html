@@ -4987,6 +4987,40 @@ function buildQuestCard(q) {
   card.appendChild(createElement('div', { className: 'quest-title' }, q.title));
   card.appendChild(createElement('div', { className: 'quest-desc' }, q.description));
 
+  // Narrative flavor text (MapleStory quest dialog style)
+  const narratives = {
+    'Call a friend': '"A true adventurer never forgets their allies..."',
+    'Send a message': '"Even a short note can light up someone\'s day."',
+    'Plan an outing': '"The greatest quests begin with gathering your party."',
+    'Check in on someone': '"The bonds we nurture become our greatest strength."',
+    'Meet someone new': '"Every stranger is a potential companion on your journey."',
+    'Exercise together': '"Train alongside your comrades to grow stronger together."',
+    'Share a meal': '"Breaking bread together forges unbreakable bonds."',
+  };
+  const matchedNarrative = Object.entries(narratives).find(([key]) => q.title && q.title.includes(key));
+  if (matchedNarrative) {
+    card.appendChild(createElement('div', { className: 'quest-narrative' }, matchedNarrative[1]));
+  }
+
+  // Quest requirements (level gate + difficulty-based requirements)
+  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
+  const userLevel = user.level || 1;
+  const reqs = [];
+  if (q.difficulty === 'hard') {
+    reqs.push({ label: 'Lv.5+', met: userLevel >= 5 });
+    reqs.push({ label: '3+ contacts', met: (contacts || []).length >= 3 });
+  } else if (q.difficulty === 'epic') {
+    reqs.push({ label: 'Lv.10+', met: userLevel >= 10 });
+    reqs.push({ label: '5+ contacts', met: (contacts || []).length >= 5 });
+  }
+  if (reqs.length > 0) {
+    const reqRow = createElement('div', { className: 'quest-requirements' });
+    reqs.forEach(r => {
+      reqRow.appendChild(createElement('span', { className: 'quest-req-tag ' + (r.met ? 'met' : 'unmet') }, (r.met ? '\u2713 ' : '\u2717 ') + r.label));
+    });
+    card.appendChild(reqRow);
+  }
+
   const footer = createElement('div', { className: 'quest-footer' });
   footer.appendChild(createElement('div', { className: 'quest-xp' }, '+' + q.xp_reward + ' XP'));
 
@@ -5363,14 +5397,35 @@ function buildPartyCard(p) {
   const info = createElement('div', { className: 'party-info' });
   info.appendChild(createElement('div', { className: 'party-title' }, p.title));
   const metaParts = [p.activity_type];
-  if (p.location) metaParts.push(p.location);
-  if (p.is_recurring) metaParts.push('\u{1F501} ' + (p.recurrence || 'recurring'));
+  if (p.location) metaParts.push('\uD83D\uDCCD ' + p.location);
+  if (p.is_recurring) metaParts.push('\uD83D\uDD01 ' + (p.recurrence || 'recurring'));
   info.appendChild(createElement('div', { className: 'party-meta' }, metaParts.join(' \u00B7 ')));
   header.appendChild(icon);
   header.appendChild(info);
-  const statusBadge = createElement('div', { className: 'party-status-badge ' + p.status }, p.status === 'waiting' ? 'Lobby' : p.status);
+  const statusLabels = { waiting: 'Lobby', active: 'In Progress', completed: 'Complete' };
+  const statusBadge = createElement('div', { className: 'party-status-badge ' + p.status }, statusLabels[p.status] || p.status);
   header.appendChild(statusBadge);
   card.appendChild(header);
+
+  // Party quest stage progress (MapleStory PQ style)
+  const totalMembers = (p.members || []).length;
+  const joinedMembers = (p.members || []).filter(m => m.status === 'joined').length;
+  if (totalMembers > 0) {
+    const stageDiv = createElement('div', { style: 'display:flex;align-items:center;gap:8px;margin:8px 0;' });
+    // Stage indicators
+    const stages = ['Gather', 'Ready', 'Go!'];
+    stages.forEach((stage, i) => {
+      if (i > 0) stageDiv.appendChild(createElement('div', { style: 'width:20px;height:2px;background:' + (i <= (p.status === 'active' ? 2 : p.status === 'waiting' ? Math.min(1, joinedMembers > 0 ? 1 : 0) : 3) ? '#00c896' : '#3a3a6a') }));
+      const isActive = (p.status === 'waiting' && i === 0) || (p.status === 'active' && i <= 1) || (p.status === 'completed' && true);
+      const dot = createElement('div', {
+        style: 'width:8px;height:8px;border-radius:50%;border:2px solid ' + (isActive ? '#00c896' : '#4444aa') + ';background:' + (isActive ? '#00c896' : 'transparent') + ';',
+        title: stage,
+      });
+      stageDiv.appendChild(dot);
+    });
+    stageDiv.appendChild(createElement('span', { style: 'font-size:10px;color:#888;margin-left:8px;' }, joinedMembers + '/' + totalMembers + ' ready'));
+    card.appendChild(stageDiv);
+  }
 
   // Members
   if (p.members && p.members.length > 0) {
@@ -5387,9 +5442,21 @@ function buildPartyCard(p) {
     card.appendChild(membersDiv);
   }
 
+  // Scheduled time
+  if (p.scheduled_at) {
+    const when = new Date(p.scheduled_at);
+    const now = new Date();
+    const diffMs = when - now;
+    let timeLabel = when.toLocaleDateString();
+    if (diffMs > 0 && diffMs < 86400000) timeLabel = 'Today at ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    else if (diffMs > 0 && diffMs < 172800000) timeLabel = 'Tomorrow';
+    card.appendChild(createElement('div', { style: 'font-size:10px;color:#74b9ff;margin:4px 0;' }, '\u23F0 ' + timeLabel));
+  }
+
   const footer = createElement('div', { className: 'party-footer' });
-  const joined = (p.members || []).filter(m => m.status === 'joined').length;
-  footer.appendChild(createElement('div', { className: 'party-xp' }, '+' + p.xp_reward + ' XP' + (joined >= 1 ? ' (1.5x group bonus!)' : '')));
+  const xpText = '+' + p.xp_reward + ' XP';
+  const bonusText = joinedMembers >= 1 ? ' (1.5x party bonus!)' : '';
+  footer.appendChild(createElement('div', { className: 'party-xp' }, xpText + bonusText));
 
   const actions = createElement('div', { className: 'party-actions' });
   if (p.status === 'waiting') {
@@ -5508,13 +5575,21 @@ function buildChallengeCard(c) {
 
   const header = createElement('div', { className: 'challenge-header' });
   header.appendChild(createElement('div', { className: 'challenge-icon' }, ACTIVITY_ICONS[c.activity_type] || '\u{26A1}'));
-  header.appendChild(createElement('div', { className: 'challenge-title' }, c.title));
+  const headerInfo = createElement('div', { style: 'flex:1;' });
+  headerInfo.appendChild(createElement('div', { className: 'challenge-title' }, c.title));
+  headerInfo.appendChild(createElement('div', { style: 'font-size:10px;color:#ff6b6b;margin-top:2px;' }, '\u2694\uFE0F vs ' + c.contact_name));
+  header.appendChild(headerInfo);
+  // Status badge
+  const statusColors = { pending: '#fdcb6e', accepted: '#00c896', completed: '#74b9ff' };
+  header.appendChild(createElement('div', {
+    style: 'font-size:9px;padding:3px 8px;border-radius:2px;background:' + (statusColors[c.status] || '#888') + '20;color:' + (statusColors[c.status] || '#888') + ';border:1px solid ' + (statusColors[c.status] || '#888') + '40;text-transform:uppercase;'
+  }, c.status));
   card.appendChild(header);
 
   if (c.description) card.appendChild(createElement('div', { className: 'challenge-desc' }, c.description));
 
   const footer = createElement('div', { className: 'challenge-footer' });
-  footer.appendChild(createElement('div', { className: 'challenge-target' }, 'vs ' + c.contact_name));
+  footer.appendChild(createElement('div', { className: 'quest-xp' }, '+' + c.xp_reward + ' XP'));
 
   const actions = createElement('div', { className: 'party-actions' });
   if (c.status === 'pending' || c.status === 'accepted') {
@@ -5523,7 +5598,6 @@ function buildChallengeCard(c) {
       onClick: (e) => { e.stopPropagation(); completeChallenge(c.id); }
     }, 'Done!'));
   }
-  footer.appendChild(createElement('div', { className: 'quest-xp' }, '+' + c.xp_reward + ' XP'));
   footer.appendChild(actions);
   card.appendChild(footer);
 
@@ -7729,12 +7803,26 @@ function renderQuestChains() {
 function buildChainCard(chain) {
   const card = createElement('div', { className: 'chain-card' + (chain.status === 'completed' ? ' completed' : '') });
   const header = createElement('div', { className: 'chain-header' });
-  header.appendChild(createElement('div', { className: 'chain-name' }, chain.name));
-  header.appendChild(createElement('span', { className: 'chain-status ' + chain.status }, chain.status));
-  card.appendChild(header);
-  card.appendChild(createElement('div', { className: 'chain-desc' }, chain.description));
 
-  // Step progress dots
+  // Chain icon based on theme
+  const chainIcons = { 'reconnection_saga': '\uD83D\uDD17', 'party_animal': '\uD83C\uDF89', 'the_marathon': '\uD83C\uDFC3', 'shadow_hunter': '\uD83D\uDC7B', 'gate_crawler': '\uD83D\uDEAA' };
+  const chainIcon = chainIcons[chain.chain_key] || '\u26D3';
+  header.appendChild(createElement('div', { style: 'font-size:18px;margin-right:8px;' }, chainIcon));
+
+  const headerInfo = createElement('div', { style: 'flex:1;' });
+  headerInfo.appendChild(createElement('div', { className: 'chain-name' }, chain.name));
+  // Total XP available in chain
+  const totalXp = (chain.steps || []).reduce((sum, s) => sum + (s.xp || 0), 0) + (chain.chain_bonus_xp || 0);
+  if (totalXp > 0) headerInfo.appendChild(createElement('div', { style: 'font-size:10px;color:#aaa;margin-top:2px;' }, totalXp + ' total XP'));
+  header.appendChild(headerInfo);
+
+  header.appendChild(createElement('span', { className: 'chain-status ' + chain.status }, chain.status === 'completed' ? '\u2713 Done' : chain.status));
+  card.appendChild(header);
+
+  // Narrative flavor text
+  card.appendChild(createElement('div', { className: 'quest-narrative' }, '"' + chain.description + '"'));
+
+  // Step progress — improved visualization with step names
   const progress = createElement('div', { className: 'chain-progress' });
   for (let i = 0; i < chain.total_steps; i++) {
     if (i > 0) {
@@ -7742,26 +7830,41 @@ function buildChainCard(chain) {
       progress.appendChild(conn);
     }
     const cls = i < chain.current_step ? 'done' : i === chain.current_step && chain.status === 'active' ? 'current' : '';
-    const dot = createElement('div', { className: 'chain-step-dot ' + cls }, String(i + 1));
+    const stepLabel = (chain.steps && chain.steps[i]) ? chain.steps[i].title : String(i + 1);
+    const dot = createElement('div', {
+      className: 'chain-step-dot ' + cls,
+      title: stepLabel,
+    }, String(i + 1));
     progress.appendChild(dot);
   }
   card.appendChild(progress);
 
-  // Current step info
+  // Show ALL steps as a mini roadmap (not just current)
   if (chain.steps && chain.steps.length > 0) {
-    const currentStep = chain.steps.find(s => s.current);
-    if (currentStep) {
-      card.appendChild(createElement('div', { style: 'font-size:12px;color:var(--text-primary);font-weight:600;' }, 'Step ' + currentStep.step + ': ' + currentStep.title));
-      card.appendChild(createElement('div', { style: 'font-size:11px;color:var(--text-muted);margin-top:2px;' }, currentStep.description));
-    }
+    const stepsDiv = createElement('div', { style: 'margin-top:10px;' });
+    chain.steps.forEach((s, i) => {
+      const isDone = i < (chain.current_step || 0);
+      const isCurrent = s.current;
+      const stepRow = createElement('div', {
+        style: 'display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;' +
+          (isDone ? 'color:#00c896;text-decoration:line-through;opacity:0.7;' : isCurrent ? 'color:var(--text-primary);font-weight:600;' : 'color:#666;')
+      });
+      stepRow.appendChild(createElement('span', { style: 'min-width:16px;text-align:center;' }, isDone ? '\u2713' : isCurrent ? '\u25B6' : '\u25CB'));
+      stepRow.appendChild(createElement('span', {}, s.title));
+      if (s.xp) stepRow.appendChild(createElement('span', { style: 'margin-left:auto;color:#fdcb6e;font-size:10px;' }, '+' + s.xp + ' XP'));
+      stepsDiv.appendChild(stepRow);
+    });
+    card.appendChild(stepsDiv);
   }
 
   if (chain.chain_bonus_xp > 0) {
-    card.appendChild(createElement('div', { className: 'chain-bonus' }, 'Chain Bonus: +' + chain.chain_bonus_xp + ' XP' + (chain.chain_bonus_title ? ' + "' + chain.chain_bonus_title + '" title' : '')));
+    const bonusDiv = createElement('div', { className: 'chain-bonus', style: 'margin-top:10px;' });
+    bonusDiv.innerHTML = '\u2728 Chain Bonus: <strong>+' + chain.chain_bonus_xp + ' XP</strong>' + (chain.chain_bonus_title ? ' + <em>"' + chain.chain_bonus_title + '"</em> title' : '');
+    card.appendChild(bonusDiv);
   }
 
   if (chain.status === 'available') {
-    const btn = createElement('button', { className: 'chain-action-btn', onClick: () => startChain(chain.chain_key) }, 'Start Chain');
+    const btn = createElement('button', { className: 'chain-action-btn', onClick: () => startChain(chain.chain_key) }, 'Accept Quest Chain');
     card.appendChild(btn);
   } else if (chain.status === 'active') {
     const btn = createElement('button', { className: 'chain-action-btn', onClick: () => checkChainStep(chain.chain_key) }, 'Check Progress');
@@ -7944,21 +8047,43 @@ const CIRCLE_COLORS = ['#6c5ce7', '#00cec9', '#fd79a8', '#fdcb6e', '#55efc4', '#
 
 function buildCircleCard(circle) {
   const card = createElement('div', { className: 'circle-card' });
+  card.style.cursor = 'pointer';
+  card.onclick = () => loadCircleDetails(circle.id);
+
   const header = createElement('div', { className: 'circle-card-header' });
   header.appendChild(createElement('div', { className: 'circle-name' }, circle.name));
-  header.appendChild(createElement('div', { className: 'circle-level-badge' }, 'Lv.' + circle.level));
+
+  const headerRight = createElement('div', { style: 'display:flex;align-items:center;gap:6px;' });
+  // Capacity indicator
+  const memberCount = (circle.members || []).length;
+  const capacity = [5, 8, 12, 18, 25, 35, 50, 75][Math.min((circle.level || 1) - 1, 7)];
+  headerRight.appendChild(createElement('div', { style: 'font-size:10px;color:#888;' }, memberCount + '/' + capacity));
+  headerRight.appendChild(createElement('div', { className: 'circle-level-badge' }, 'Lv.' + circle.level));
+  header.appendChild(headerRight);
   card.appendChild(header);
+
   if (circle.description) card.appendChild(createElement('div', { className: 'circle-desc' }, circle.description));
 
-  // Member avatars
+  // Member avatars with rank badges
   if (circle.members && circle.members.length > 0) {
     const membersRow = createElement('div', { className: 'circle-members-row' });
+    const RANK_NAMES = ['Initiate', 'Member', 'Officer', 'Captain', 'Leader'];
     circle.members.slice(0, 6).forEach((m, i) => {
+      const memberDiv = createElement('div', { style: 'position:relative;' });
       const av = createElement('div', { className: 'circle-member-avatar',
         style: 'background:' + CIRCLE_COLORS[i % CIRCLE_COLORS.length],
-        title: m.contact_name || 'Member'
-      }, (m.contact_name || '?')[0].toUpperCase());
-      membersRow.appendChild(av);
+        title: (m.contact_name || m.name || 'Member') + (m.rank ? ' (' + m.rank + ')' : '')
+      }, (m.contact_name || m.name || '?')[0].toUpperCase());
+      memberDiv.appendChild(av);
+      // Show rank badge for officers+
+      if (m.rank_index >= 2) {
+        const rankCls = m.rank_index >= 4 ? 'circle-rank-master' : m.rank_index >= 2 ? 'circle-rank-officer' : 'circle-rank-member';
+        const badge = createElement('div', { className: 'circle-rank-badge ' + rankCls,
+          style: 'position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);font-size:5px;white-space:nowrap;'
+        }, m.rank || RANK_NAMES[m.rank_index]);
+        memberDiv.appendChild(badge);
+      }
+      membersRow.appendChild(memberDiv);
     });
     if (circle.members.length > 6) {
       const more = createElement('div', { className: 'circle-member-avatar',
@@ -7969,13 +8094,18 @@ function buildCircleCard(circle) {
     card.appendChild(membersRow);
   }
 
-  // XP bar
+  // GP (Guild Points) bar instead of raw XP bar
+  const gp = circle.xp_pool || 0;
   const xpForNext = circle.level * circle.level * 200;
-  const pct = Math.min(100, (circle.xp_pool / xpForNext) * 100);
-  const xpBar = createElement('div', { className: 'circle-xp-bar' });
-  xpBar.appendChild(createElement('div', { className: 'circle-xp-fill', style: 'width:' + pct + '%' }));
-  card.appendChild(xpBar);
-  card.appendChild(createElement('div', { className: 'circle-xp-label' }, circle.xp_pool + ' / ' + xpForNext + ' XP'));
+  const pct = Math.min(100, (gp / xpForNext) * 100);
+  const gpBarContainer = createElement('div', { style: 'margin-top:8px;' });
+  gpBarContainer.appendChild(createElement('div', { style: 'display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:3px;' }));
+  gpBarContainer.lastChild.appendChild(createElement('span', {}, 'Guild Points'));
+  gpBarContainer.lastChild.appendChild(createElement('span', {}, gp + ' / ' + xpForNext + ' GP'));
+  const gpBar = createElement('div', { className: 'circle-gp-bar' });
+  gpBar.appendChild(createElement('div', { className: 'circle-gp-fill', style: 'width:' + pct + '%' }));
+  gpBarContainer.appendChild(gpBar);
+  card.appendChild(gpBarContainer);
 
   // Active quests
   if (circle.active_quests && circle.active_quests.length > 0) {
@@ -7997,6 +8127,54 @@ function buildCircleCard(circle) {
   card.appendChild(deleteBtn);
 
   return card;
+}
+
+async function loadCircleDetails(circleId) {
+  try {
+    const details = await api('/circles/' + circleId + '/details');
+    showCircleDetailModal(details);
+  } catch(e) {
+    // Fallback: just show basic info
+  }
+}
+
+function showCircleDetailModal(details) {
+  // Create a modal overlay for circle details with BBS
+  let modal = document.getElementById('circleDetailModal');
+  if (!modal) {
+    modal = createElement('div', { id: 'circleDetailModal', className: 'modal-overlay' });
+    document.body.appendChild(modal);
+  }
+  modal.classList.add('active');
+
+  const RANK_COLORS = { Leader: '#ffd740', Captain: '#ff6b6b', Officer: '#74b9ff', Member: '#8888bb', Initiate: '#666' };
+
+  let html = '<div class="modal-content" style="max-width:500px;">';
+  html += '<div class="modal-header"><h3>' + (details.name || 'Circle') + ' <span style="font-size:12px;color:#aaa;">Lv.' + details.level + '</span></h3>';
+  html += '<button class="modal-close" onclick="document.getElementById(\'circleDetailModal\').classList.remove(\'active\')">\u00D7</button></div>';
+
+  // GP & Capacity
+  html += '<div style="display:flex;gap:16px;margin:12px 0;">';
+  html += '<div style="flex:1;"><div style="font-size:10px;color:#888;">Guild Points</div><div style="font-size:18px;font-weight:700;color:#a29bfe;">' + (details.gp || 0) + '</div></div>';
+  html += '<div style="flex:1;"><div style="font-size:10px;color:#888;">Members</div><div style="font-size:18px;font-weight:700;">' + details.member_count + '/' + details.capacity + '</div></div>';
+  html += '</div>';
+
+  // Member list with ranks
+  html += '<div style="font-size:12px;font-weight:600;margin:12px 0 6px;">Members</div>';
+  (details.members || []).forEach(m => {
+    const rankColor = RANK_COLORS[m.rank] || '#888';
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;">';
+    html += '<div style="color:' + rankColor + ';min-width:60px;font-size:10px;">' + (m.rank || 'Initiate') + '</div>';
+    html += '<div style="flex:1;">' + m.name + '</div>';
+    html += '<div style="font-size:10px;color:#aaa;">' + (m.gp || 0) + ' GP</div>';
+    html += '</div>';
+  });
+
+  html += '<div style="margin-top:16px;text-align:center;">';
+  html += '<button class="chain-action-btn" onclick="document.getElementById(\'circleDetailModal\').classList.remove(\'active\')" style="margin:0;">Close</button>';
+  html += '</div></div>';
+
+  modal.innerHTML = html;
 }
 
 function openCreateCircle() {
@@ -8715,30 +8893,74 @@ function isJobUnlocked(jobId, playerLevel, playerJobId) {
   return 'locked';
 }
 
-function renderJobTree(container) {
+async function renderJobTree(container) {
   const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
   const level = user.level || 1;
   const playerJob = getPlayerJob();
   const ancestry = getJobAncestry(playerJob);
 
+  // Fetch real advancement data from backend
+  let jobData = null;
+  try {
+    jobData = await api('/gamification/job-advancement');
+  } catch(e) { /* fall back to visual-only */ }
+
   let html = '<div class="job-tree">';
+
+  // Show current advancement status from backend
+  if (jobData) {
+    const tierNames = ['Beginner', '1st Advancement', '2nd Advancement', '3rd Advancement', '4th Advancement'];
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:10px;background:rgba(30,30,60,0.5);border:1px solid #4444aa;border-radius:6px;">';
+    html += '<div style="font-size:24px;">' + (jobData.social_class ? { connector: '\uD83D\uDD17', empath: '\uD83D\uDC9C', initiator: '\uD83D\uDE80', scholar: '\uD83D\uDCDA' }[jobData.social_class] || '\uD83C\uDF31' : '\uD83C\uDF31') + '</div>';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-weight:700;color:var(--text-primary);font-size:14px;">' + (jobData.current_title || 'Novice') + '</div>';
+    html += '<div style="font-size:11px;color:#aaa;">Tier ' + (jobData.current_tier || 0) + ' \u2022 ' + (tierNames[jobData.current_tier] || 'Beginner') + '</div>';
+    html += '</div>';
+    if (jobData.can_advance) {
+      html += '<button class="chain-action-btn" onclick="performAdvancement()" style="margin:0;padding:6px 14px;font-size:11px;">Advance!</button>';
+    } else if (jobData.advance_reason) {
+      html += '<div style="font-size:10px;color:#cc5555;max-width:140px;text-align:right;">' + jobData.advance_reason + '</div>';
+    }
+    html += '</div>';
+  }
+
   JOB_TREE.tiers.forEach((tier, ti) => {
     if (ti > 0) {
       html += '<div class="job-connector' + (level >= tier.levelReq ? ' active' : '') + '"></div>';
     }
     html += '<div class="job-tier"><div class="job-tier-label">Lv.' + tier.levelReq + '+</div><div class="job-tier-nodes">';
     tier.jobs.forEach(job => {
-      const status = isJobUnlocked(job.id, level, playerJob);
+      let status = isJobUnlocked(job.id, level, playerJob);
+      // Use backend tier data to mark completed tiers
+      if (jobData && jobData.tiers) {
+        const backendTier = jobData.tiers.find(t => t.tier === ti);
+        if (backendTier && backendTier.completed && ancestry.includes(job.id)) status = 'active';
+      }
       html += '<div class="job-node ' + status + '" title="' + (job.statReq || '') + '">';
       html += '<div style="font-size:20px;margin-bottom:4px">' + job.icon + '</div>';
       html += '<div class="job-node-name">' + job.name + '</div>';
       html += '<div class="job-node-sub">' + job.desc + '</div>';
+      if (job.statReq && status !== 'active') {
+        html += '<div style="font-size:9px;color:#888;margin-top:3px;">' + job.statReq + '</div>';
+      }
       html += '</div>';
     });
     html += '</div></div>';
   });
   html += '</div>';
   container.innerHTML = html;
+}
+
+async function performAdvancement() {
+  try {
+    const result = await api('/gamification/job-advancement/advance', { method: 'POST' });
+    if (result.error) { showToast(result.error, 'error'); return; }
+    showToast('Job Advancement complete! You are now ' + (result.new_title || 'promoted') + '!', 'success');
+    playSound('reward');
+    launchMegaConfetti();
+    await loadDashboard();
+    await renderAll();
+  } catch(e) { showToast(e.message || 'Cannot advance yet', 'error'); }
 }
 
 // ═══════════════════════════════════════════════════
