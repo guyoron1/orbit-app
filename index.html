@@ -9462,7 +9462,7 @@ function fillNpcTemplate(text, user) {
     .replace(/{xp}/g, dashboardData?.gamification?.xp || user.xp || 0)
     .replace(/{contactCount}/g, contactCount)
     .replace(/{nextAdvLevel}/g, nextAdvLevel)
-    .replace(/{dailyFlavor}/g, dailyFlavor ? '<em style="color:#a29bfe">' + fillNpcTemplate(dailyFlavor, user).replace(/{dailyFlavor}/g, '') + '</em>' : '');
+    .replace(/{dailyFlavor}/g, dailyFlavor ? '<em style="color:#a29bfe">' + dailyFlavor.replace(/{name}/g, user.name || 'Adventurer').replace(/{level}/g, level) + '</em>' : '');
 }
 
 function getNextAdvancementLevel(level) {
