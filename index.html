@@ -5238,10 +5238,115 @@ function buildAchievementBadge(a) {
   return badge;
 }
 
+// ── Quest Completion Cutscene ──
+const QUEST_COMPLETE_DIALOGS = [
+  { npc: 'Quest Master Finn', portrait: '📜', lines: [
+    '*stamps scroll with approval*',
+    'Outstanding work, {name}! This quest is officially <span class="highlight">CLEARED</span>!',
+  ]},
+  { npc: 'Quest Master Finn', portrait: '📜', lines: [
+    '*rolls up the scroll triumphantly*',
+    'Another tale for the archives! You\'ve proven yourself once again, {name}.',
+  ]},
+  { npc: 'Quest Master Finn', portrait: '📜', lines: [
+    '*adjusts monocle excitedly*',
+    'Magnificent! The quest board trembles at your prowess, {name}!',
+  ]},
+  { npc: 'Quest Master Finn', portrait: '📜', lines: [
+    '*scribbles notes furiously*',
+    'I\'m recording this for posterity — {name} completes yet another quest!',
+  ]},
+];
+
+const QUEST_ACCEPT_DIALOGS = {
+  easy: { lines: ['A fine choice for a warm-up. This should be straightforward.', 'Go forth and return victorious!'] },
+  medium: { lines: ['A worthy challenge! This will test your commitment.', 'I believe in you, {name}. Don\'t let me down.'] },
+  hard: { lines: ['*voice drops low* This is no ordinary task...', 'Only seasoned adventurers should attempt this. Are you sure you\'re ready?'] },
+  epic: { lines: ['*ancient scroll glows* A LEGENDARY quest! Few have dared attempt this.', 'The rewards will be... extraordinary. But so will the difficulty.'] },
+};
+
+function showQuestCutscene(type, quest, xpEarned, achievements) {
+  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
+  const name = user.name || 'Adventurer';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'quest-cutscene-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:260;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);animation:npcTextFade 0.3s ease';
+
+  if (type === 'complete') {
+    const dialog = QUEST_COMPLETE_DIALOGS[Math.floor(Math.random() * QUEST_COMPLETE_DIALOGS.length)];
+    const linesHtml = dialog.lines.map(l => l.replace(/{name}/g, name)).join('<br>');
+    playSound('gateclear');
+
+    overlay.innerHTML = `
+      <div style="background:linear-gradient(180deg,rgba(10,30,10,0.98),rgba(10,10,30,0.98));border:2px solid #00c896;border-radius:8px;padding:0;max-width:420px;width:90%;box-shadow:0 0 60px rgba(0,200,150,0.2);overflow:hidden">
+        <div style="background:rgba(0,200,150,0.1);padding:16px 20px;border-bottom:1px solid rgba(0,200,150,0.2);display:flex;align-items:center;gap:12px">
+          <span style="font-size:32px">${dialog.portrait}</span>
+          <div>
+            <div style="font-family:var(--pixel-font);font-size:11px;color:#00c896">${dialog.npc}</div>
+            <div style="font-family:var(--pixel-font);font-size:7px;color:#888;margin-top:2px">QUEST COMPLETE!</div>
+          </div>
+        </div>
+        <div style="padding:20px;font-family:var(--font);font-size:14px;color:#ccc;line-height:1.6">
+          ${linesHtml}
+        </div>
+        <div style="padding:12px 20px;display:flex;align-items:center;gap:16px;border-top:1px solid rgba(0,200,150,0.15)">
+          <div style="font-family:var(--pixel-font);font-size:9px;color:#666">QUEST:</div>
+          <div style="font-family:var(--font);font-size:13px;color:#aaa;flex:1">${quest?.title || 'Quest'}</div>
+        </div>
+        <div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:rgba(0,200,150,0.05)">
+          <div style="display:flex;gap:16px">
+            <span style="font-family:var(--pixel-font);font-size:12px;color:#ffd740">+${xpEarned || 0} XP</span>
+            ${(achievements || []).length > 0 ? '<span style="font-family:var(--pixel-font);font-size:10px;color:#ff6b6b">🏆 NEW ACHIEVEMENT!</span>' : ''}
+          </div>
+          <button onclick="this.closest('.quest-cutscene-overlay').remove()" style="font-family:var(--pixel-font);font-size:10px;background:#00c896;color:#1a1a2e;border:none;padding:8px 20px;cursor:pointer;border-radius:3px">CONTINUE</button>
+        </div>
+      </div>
+    `;
+  } else {
+    // Accept cutscene
+    const diff = quest?.difficulty || 'easy';
+    const acceptDialog = QUEST_ACCEPT_DIALOGS[diff] || QUEST_ACCEPT_DIALOGS.easy;
+    const linesHtml = acceptDialog.lines.map(l => l.replace(/{name}/g, name)).join('<br>');
+    playSound('click');
+
+    overlay.innerHTML = `
+      <div style="background:linear-gradient(180deg,rgba(30,20,10,0.98),rgba(10,10,30,0.98));border:2px solid #fdcb6e;border-radius:8px;padding:0;max-width:420px;width:90%;box-shadow:0 0 40px rgba(253,203,110,0.15);overflow:hidden">
+        <div style="background:rgba(253,203,110,0.1);padding:16px 20px;border-bottom:1px solid rgba(253,203,110,0.2);display:flex;align-items:center;gap:12px">
+          <span style="font-size:32px">📜</span>
+          <div>
+            <div style="font-family:var(--pixel-font);font-size:11px;color:#fdcb6e">Quest Master Finn</div>
+            <div style="font-family:var(--pixel-font);font-size:7px;color:#888;margin-top:2px">NEW QUEST!</div>
+          </div>
+        </div>
+        <div style="padding:20px;font-family:var(--font);font-size:14px;color:#ccc;line-height:1.6">
+          ${linesHtml}
+        </div>
+        <div style="padding:12px 20px;border-top:1px solid rgba(253,203,110,0.15)">
+          <div style="font-family:var(--pixel-font);font-size:9px;color:#666;margin-bottom:6px">QUEST BRIEFING:</div>
+          <div style="font-family:var(--font);font-size:15px;color:#fdcb6e;font-weight:bold">${quest?.title || 'Quest'}</div>
+          <div style="font-family:var(--font);font-size:12px;color:#999;margin-top:4px">${quest?.description || ''}</div>
+        </div>
+        <div style="padding:12px 20px;display:flex;justify-content:flex-end;gap:8px;background:rgba(253,203,110,0.05)">
+          <button onclick="this.closest('.quest-cutscene-overlay').remove()" style="font-family:var(--pixel-font);font-size:10px;background:transparent;color:#888;border:1px solid #444;padding:8px 16px;cursor:pointer;border-radius:3px">DECLINE</button>
+          <button onclick="this.closest('.quest-cutscene-overlay').remove()" style="font-family:var(--pixel-font);font-size:10px;background:#fdcb6e;color:#1a1a2e;border:none;padding:8px 20px;cursor:pointer;border-radius:3px">ACCEPT!</button>
+        </div>
+      </div>
+    `;
+  }
+
+  document.body.appendChild(overlay);
+  if (type === 'complete') launchConfetti();
+}
+
 async function completeQuest(questId) {
   try {
+    // Find quest data before completing
+    const quests = dashboardData?.quests || [];
+    const quest = quests.find(q => q.id === questId);
     const result = await api('/quests/' + questId + '/complete', { method: 'POST' });
-    showXPToast(result.xp_earned, result.new_achievements || []);
+    // Show cutscene instead of plain toast
+    showQuestCutscene('complete', quest, result.xp_earned, result.new_achievements);
     await loadDashboard();
     await renderAll();
   } catch (e) {
@@ -9330,6 +9435,49 @@ const NPC_DEFS = {
 
 let npcDialogState = { building: null, step: 'greeting', dialogKey: null, history: [] };
 
+// ── NPC Daily Gift System ──
+const NPC_GIFT_MESSAGES = {
+  dashboard: { gift: 'a Scroll of Wisdom', xp: 8 },
+  contacts:  { gift: 'a Guild Badge', xp: 6 },
+  quests:    { gift: 'a Quest Compass', xp: 10 },
+  gates:     { gift: 'a Gate Key Fragment', xp: 7 },
+  orbit:     { gift: 'a Star Chart', xp: 5 },
+  skills:    { gift: 'a Training Manual', xp: 8 },
+  achievements: { gift: 'a Golden Ink Pen', xp: 6 },
+  settings:  { gift: 'a Warm Cookie', xp: 4 },
+};
+
+function checkNpcDailyGift(buildingId, npcName) {
+  const today = new Date().toDateString();
+  const giftKey = 'orbit_npc_gift_' + buildingId + '_' + today;
+  if (localStorage.getItem(giftKey)) return;
+  localStorage.setItem(giftKey, '1');
+
+  const giftData = NPC_GIFT_MESSAGES[buildingId];
+  if (!giftData) return;
+
+  // Show gift notification after a short delay so greeting renders first
+  setTimeout(() => {
+    playSound('reward');
+    const giftBanner = document.createElement('div');
+    giftBanner.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:270;background:linear-gradient(90deg,rgba(255,215,64,0.15),rgba(255,215,64,0.05));border:1px solid rgba(255,215,64,0.4);border-radius:6px;padding:10px 20px;display:flex;align-items:center;gap:12px;animation:npcTextFade 0.4s ease;pointer-events:auto';
+    giftBanner.innerHTML = `
+      <span style="font-size:24px">🎁</span>
+      <div>
+        <div style="font-family:var(--pixel-font);font-size:8px;color:#ffd740">DAILY GIFT from ${npcName}!</div>
+        <div style="font-family:var(--font);font-size:12px;color:#ccc;margin-top:2px">You received <span style="color:#ffd740">${giftData.gift}</span>! <span style="color:#00c896;font-family:var(--pixel-font);font-size:9px">+${giftData.xp} XP</span></div>
+      </div>
+    `;
+    document.body.appendChild(giftBanner);
+    setTimeout(() => {
+      giftBanner.style.transition = 'opacity 0.5s, transform 0.5s';
+      giftBanner.style.opacity = '0';
+      giftBanner.style.transform = 'translateX(-50%) translateY(-20px)';
+      setTimeout(() => giftBanner.remove(), 500);
+    }, 3500);
+  }, 600);
+}
+
 function openNpcDialog(buildingId) {
   const npc = NPC_DEFS[buildingId];
   if (!npc) { enterBuildingDirect(buildingId); return; }
@@ -9342,6 +9490,7 @@ function openNpcDialog(buildingId) {
   document.getElementById('npcTitle').textContent = npc.title;
 
   playSound('click');
+  checkNpcDailyGift(buildingId, npc.name);
   renderNpcStep(npc, user);
   document.getElementById('npcDialogOverlay').classList.add('active');
 }
@@ -9499,6 +9648,76 @@ function checkRandomEvent() {
   lastEventTime = now;
   const event = TOWN_EVENTS[Math.floor(Math.random() * TOWN_EVENTS.length)];
   showTownEvent(event);
+}
+
+const TOWN_OBJECT_INTERACTIONS = {
+  fountain: {
+    title: 'Town Fountain',
+    messages: [
+      'The fountain sparkles in the moonlight. You toss in a coin and make a wish... 🌟',
+      'Clear water flows endlessly. It reminds you that growth, like water, never stops.',
+      'You cup your hands and take a sip. Refreshing! You feel slightly more energized.',
+      'The fountain whispers ancient wisdom: "Connection is the source of all power."',
+    ],
+    xp: 2,
+  },
+  signpost: {
+    title: 'Town Signpost',
+    messages: [
+      '← GUILD HALL   QUEST BOARD →\n↑ DUNGEON GATE   ↓ TRAINING GROUNDS\n\n"Every direction leads to growth."',
+      'Someone carved into the post: "Day 47 of my streak. If I can do it, so can you." — Anonymous',
+      'A notice reads: "WANTED: Brave adventurers to reconnect with lost friends. Reward: 💛"',
+      'The signpost has been here since Orbit Town was founded. It\'s seen many adventurers come and go.',
+    ],
+    xp: 1,
+  },
+  campfire: {
+    title: 'Campfire',
+    messages: [
+      'The warm flames crackle gently. You sit for a moment and reflect on your journey so far...',
+      'Someone left a journal entry near the fire: "The hardest quest was the first call. After that, everything was easier."',
+      'The fire\'s warmth reminds you of shared moments with friends. +Motivation!',
+      'You roast a marshmallow. Simple pleasures matter too. 🔥',
+    ],
+    xp: 3,
+  },
+  chest: {
+    title: 'Old Chest',
+    messages: [
+      'The chest creaks open... Inside: a dusty scroll! "True treasure is the friends you keep."',
+      'You find a small trinket inside. It glows faintly with residual XP energy!',
+      'The chest contains an old letter: "Dear future adventurer, don\'t forget to call your mom." 💌',
+      'Empty today, but the chest refills itself each day with small surprises.',
+    ],
+    xp: 5,
+  },
+  well: {
+    title: 'Wishing Well',
+    messages: [
+      'You peer into the deep well. Your reflection stares back, wearing a smile you didn\'t notice. 🪞',
+      'The well echoes back your thoughts: "Who should I reach out to today?"',
+      'A coin splashes at the bottom. Legend says wishes made here come true... eventually.',
+      'You shout into the well: "HELLO!" — and swear you heard it reply: "CALL A FRIEND!"',
+    ],
+    xp: 4,
+  },
+};
+
+function interactWithObject(obj) {
+  const today = new Date().toDateString();
+  const interactKey = 'orbit_obj_' + obj.id + '_' + today;
+  if (localStorage.getItem(interactKey)) {
+    showToast('You already visited the ' + obj.label + ' today!', 'info');
+    return;
+  }
+  localStorage.setItem(interactKey, '1');
+
+  const data = TOWN_OBJECT_INTERACTIONS[obj.id];
+  if (!data) return;
+
+  const message = data.messages[Math.floor(Math.random() * data.messages.length)];
+  playSound('reward');
+  showTownEvent({ emoji: obj.emoji, title: data.title, message, xp: data.xp });
 }
 
 function showTownEvent(event) {
@@ -9795,6 +10014,15 @@ function initOverworld() {
     if (e.key === 'Enter' && OW.active) {
       const b = getCharBuilding();
       if (b) enterBuilding(b);
+    }
+    // Space key to interact with nearby town objects
+    if (e.key === ' ' && OW.active && OW.townObjects) {
+      e.preventDefault();
+      const nearObj = OW.townObjects.find(obj => {
+        const objX = obj.x * OW.w, objY = obj.y * OW.h;
+        return Math.hypot(OW.charX - objX, OW.charY - objY) < 50;
+      });
+      if (nearObj) interactWithObject(nearObj);
     }
   });
   window.addEventListener('keyup', (e) => {
@@ -10230,6 +10458,37 @@ function drawOverworld() {
     }
   });
 
+  // ── Interactive town objects ──
+  if (!OW.townObjects) {
+    OW.townObjects = [
+      { id: 'fountain', x: 0.42, y: 0.78, w: 28, h: 20, emoji: '⛲', label: 'Town Fountain' },
+      { id: 'signpost', x: 0.55, y: 0.58, w: 12, h: 24, emoji: '🪧', label: 'Signpost' },
+      { id: 'campfire', x: 0.35, y: 0.82, w: 20, h: 16, emoji: '🔥', label: 'Campfire' },
+      { id: 'chest', x: 0.68, y: 0.80, w: 16, h: 14, emoji: '📦', label: 'Old Chest' },
+      { id: 'well', x: 0.08, y: 0.82, w: 18, h: 16, emoji: '🪣', label: 'Wishing Well' },
+    ];
+  }
+  OW.townObjects.forEach(obj => {
+    const objX = Math.round(obj.x * W);
+    const objY = Math.round(obj.y * H);
+    // Check if player is nearby
+    const dist = Math.hypot(OW.charX - objX, OW.charY - objY);
+    const isNear = dist < 50;
+    // Draw object
+    ctx.font = isNear ? '18px serif' : '14px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(obj.emoji, objX, objY);
+    // Interaction prompt when near
+    if (isNear) {
+      ctx.fillStyle = 'rgba(255,215,64,0.8)';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.fillText(obj.label, objX, objY - 14);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.fillText('[SPACE]', objX, objY - 8);
+    }
+  });
+
   // ── Character sprite ──
   drawCharSprite(ctx, OW.charX, OW.charY);
 
@@ -10385,26 +10644,117 @@ function drawCharSprite(ctx, cx, cy) {
   ctx.ellipse(cx, cy + 4, 14, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Level badge above character
+  // ── Equipment overlays based on class & job tier ──
   const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
   const level = dashboardData?.gamification?.level || 1;
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  const nameW = ctx.measureText(user.name || 'You').width;
+  const jobTier = level >= 50 ? 4 : level >= 30 ? 3 : level >= 15 ? 2 : level >= 5 ? 1 : 0;
 
-  // Name plate
+  // Hat/headgear
+  if (jobTier >= 1) {
+    const hatColors = {
+      connector: '#cc4444', empath: '#9944cc', initiator: '#dd8833', mentor: '#44aa66',
+    };
+    const hatColor = hatColors[socialClass] || '#6666cc';
+    if (jobTier >= 3) {
+      // Crown/wizard hat for 3rd+ job
+      ctx.fillStyle = '#ffd740';
+      ctx.fillRect(ox + 4*s, oy - 2*s, 6*s, s);
+      ctx.fillRect(ox + 5*s, oy - 3*s, 4*s, s);
+      ctx.fillRect(ox + 6*s, oy - 4*s, 2*s, s);
+      // Gem on crown
+      ctx.fillStyle = hatColor;
+      ctx.fillRect(ox + 6*s, oy - 3*s, 2*s, s);
+    } else {
+      // Simple headband/bandana for 1st-2nd job
+      ctx.fillStyle = hatColor;
+      ctx.fillRect(ox + 3*s, oy + s, 8*s, s);
+      if (jobTier >= 2) {
+        // Feather/accessory
+        ctx.fillStyle = '#ffd740';
+        ctx.fillRect(ox + 10*s, oy, s, 2*s);
+        ctx.fillRect(ox + 11*s, oy - s, s, s);
+      }
+    }
+  }
+
+  // Weapon (visible when facing left or right)
+  if (jobTier >= 1 && (OW.facing === 'left' || OW.facing === 'right')) {
+    const weaponColors = {
+      connector: '#aaaadd', empath: '#bb88ee', initiator: '#ffaa44', mentor: '#88ddaa',
+    };
+    const wColor = weaponColors[socialClass] || '#aaaacc';
+    const wSide = OW.facing === 'right' ? 1 : -1;
+    const wx = OW.facing === 'right' ? ox + 13*s : ox - 3*s;
+    if (jobTier >= 3) {
+      // Staff/scepter for 3rd+ job
+      ctx.fillStyle = '#886644';
+      ctx.fillRect(wx, oy + 4*s, s, 14*s);
+      ctx.fillStyle = wColor;
+      ctx.fillRect(wx - s, oy + 2*s, 3*s, 3*s);
+      // Glow
+      ctx.globalAlpha = 0.3 + Math.sin(OW.animFrame * 0.08) * 0.15;
+      ctx.fillStyle = wColor;
+      ctx.fillRect(wx - 2*s, oy + s, 5*s, 5*s);
+      ctx.globalAlpha = 1;
+    } else {
+      // Simple sword for 1st-2nd job
+      ctx.fillStyle = '#888899';
+      ctx.fillRect(wx, oy + 6*s, s, 10*s);
+      ctx.fillStyle = '#886644';
+      ctx.fillRect(wx - s, oy + 10*s, 3*s, s);
+      ctx.fillStyle = wColor;
+      ctx.fillRect(wx, oy + 5*s, s, 2*s);
+    }
+  }
+
+  // Cape/cloak for 4th job
+  if (jobTier >= 4) {
+    const capeColors = {
+      connector: 'rgba(200,60,60,0.4)', empath: 'rgba(150,60,200,0.4)',
+      initiator: 'rgba(220,140,40,0.4)', mentor: 'rgba(60,180,100,0.4)',
+    };
+    const capeColor = capeColors[socialClass] || 'rgba(100,100,200,0.4)';
+    ctx.fillStyle = capeColor;
+    const capeWave = Math.sin(OW.animFrame * 0.05) * s;
+    ctx.fillRect(ox + 2*s, oy + 8*s, 10*s, 8*s);
+    ctx.fillRect(ox + s + capeWave, oy + 12*s, 12*s, 6*s);
+  }
+
+  // Level badge above character
+  // Name plate with class color accent
+  const classAccentColors = { connector: '#cc4444', empath: '#9944cc', initiator: '#dd8833', mentor: '#44aa66' };
+  const accentColor = classAccentColors[socialClass] || '#6666bb';
+
   ctx.font = '7px "Press Start 2P"';
   ctx.textAlign = 'center';
   const nameText = user.name || 'You';
   const textW = ctx.measureText(nameText).width;
-  ctx.fillStyle = 'rgba(10,10,40,0.7)';
-  ctx.fillRect(cx - textW / 2 - 4, oy - 18, textW + 8, 14);
+  ctx.fillStyle = 'rgba(10,10,40,0.8)';
+  ctx.fillRect(cx - textW / 2 - 5, oy - 19, textW + 10, 15);
+  // Accent bar under name
+  ctx.fillStyle = accentColor;
+  ctx.fillRect(cx - textW / 2 - 5, oy - 5, textW + 10, 1);
   ctx.fillStyle = '#ffffff';
   ctx.fillText(nameText, cx, oy - 8);
 
   // Lv. badge
   ctx.fillStyle = '#ffd740';
   ctx.font = '6px "Press Start 2P"';
-  ctx.fillText('Lv.' + level, cx, oy - 22);
+  ctx.fillText('Lv.' + level, cx, oy - 23);
+
+  // Job title (small text under level)
+  if (jobTier >= 1) {
+    const jobTitles = {
+      connector: ['Networker', 'Social Catalyst', 'Connector', 'Grand Connector'],
+      empath: ['Listener', 'Counselor', 'Empath', 'Grand Empath'],
+      initiator: ['Starter', 'Motivator', 'Initiator', 'Grand Initiator'],
+      mentor: ['Guide', 'Teacher', 'Mentor', 'Grand Mentor'],
+    };
+    const titles = jobTitles[socialClass] || ['Adventurer', 'Veteran', 'Elite', 'Legend'];
+    ctx.fillStyle = accentColor;
+    ctx.font = '5px "Press Start 2P"';
+    ctx.fillText(titles[Math.min(jobTier - 1, 3)], cx, oy - 28);
+  }
 }
 
 function lightenColor(hex, amt) {
