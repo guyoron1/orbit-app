@@ -8592,8 +8592,8 @@ const originalRenderGamification = renderGamification;
 renderGamification = function() {
   originalRenderGamification();
   // Add boss raids section if not exists
-  const gamSection = document.querySelector('#page-dashboard .gamification-section') ||
-                     document.querySelector('#page-dashboard .section:last-child');
+  const gamSection = document.getElementById('gatesSection')?.parentElement ||
+                     document.getElementById('page-dashboard');
   if (gamSection && !document.getElementById('bossRaidsSection')) {
     const section = createElement('div', { id: 'bossRaidsSection', style: 'margin-top:16px;' });
     const header = createElement('div', { style: 'font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;' });
@@ -8613,8 +8613,8 @@ renderGamification = function() {
     freezeDiv.appendChild(createElement('span', { style: 'font-size:12px;color:var(--text-secondary);' }, '❄️ Streak Freezes: ' + freezeCount));
     const buyBtn = createElement('button', { className: 'freeze-btn', onClick: buyStreakFreeze }, '+ Buy (100 XP)');
     freezeDiv.appendChild(buyBtn);
-    const gamEl = document.querySelector('#page-dashboard .gamification-section') ||
-                  document.querySelector('#page-dashboard .section:last-child');
+    const gamEl = document.getElementById('gatesSection')?.parentElement ||
+                  document.getElementById('page-dashboard');
     if (gamEl) gamEl.appendChild(freezeDiv);
   }
 
@@ -8682,8 +8682,8 @@ renderGamification = function() {
       style: 'margin-top:12px;',
       onClick: showWeeklyReport
     }, '📊 Weekly Report');
-    const gamEl = document.querySelector('#page-dashboard .gamification-section') ||
-                  document.querySelector('#page-dashboard .section:last-child');
+    const gamEl = document.getElementById('gatesSection')?.parentElement ||
+                  document.getElementById('page-dashboard');
     if (gamEl) gamEl.appendChild(reportBtn);
   }
 
@@ -8694,8 +8694,8 @@ renderGamification = function() {
       style: 'margin-top:8px;',
       onClick: requestNotificationPermission
     }, '🔔 Enable Notifications');
-    const gamEl = document.querySelector('#page-dashboard .gamification-section') ||
-                  document.querySelector('#page-dashboard .section:last-child');
+    const gamEl = document.getElementById('gatesSection')?.parentElement ||
+                  document.getElementById('page-dashboard');
     if (gamEl) gamEl.appendChild(notifBtn);
   }
 };
