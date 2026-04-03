@@ -2741,6 +2741,8 @@
     padding: 0 18px 14px;
     display: flex; flex-direction: column; gap: 6px;
   }
+  @keyframes npcTextFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes npcChoiceSlide { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
   .npc-choice-btn {
     background: rgba(40,40,80,0.5);
     border: 2px solid #4444aa;
@@ -2751,16 +2753,20 @@
     text-align: left;
     transition: all 0.15s;
     display: flex; align-items: center; gap: 10px;
+    animation: npcChoiceSlide 0.3s ease backwards;
   }
   .npc-choice-btn:hover {
     background: rgba(60,60,120,0.6);
     border-color: #7777cc;
     color: white;
+    transform: translateX(4px);
   }
   .npc-choice-btn .choice-arrow {
     font-family: var(--pixel-font); font-size: 8px;
     color: #ffd740; flex-shrink: 0;
+    transition: transform 0.15s;
   }
+  .npc-choice-btn:hover .choice-arrow { transform: translateX(3px); }
   .npc-dialog-footer {
     display: flex; justify-content: flex-end; gap: 8px;
     padding: 10px 18px;
@@ -5142,18 +5148,45 @@ function buildQuestCard(q) {
 
   // Narrative flavor text (MapleStory quest dialog style)
   const narratives = {
-    'Call a friend': '"A true adventurer never forgets their allies..."',
-    'Send a message': '"Even a short note can light up someone\'s day."',
-    'Plan an outing': '"The greatest quests begin with gathering your party."',
-    'Check in on someone': '"The bonds we nurture become our greatest strength."',
-    'Meet someone new': '"Every stranger is a potential companion on your journey."',
-    'Exercise together': '"Train alongside your comrades to grow stronger together."',
-    'Share a meal': '"Breaking bread together forges unbreakable bonds."',
+    'Call': '"A true adventurer never forgets their allies. Pick up the phone — your words carry power."',
+    'Send a message': '"Even a short note can light up someone\'s day. The pen is mightier than the sword."',
+    'Plan an outing': '"The greatest quests begin with gathering your party. Rally your allies!"',
+    'Check in': '"The bonds we nurture become our greatest strength. Don\'t let them fade to shadow."',
+    'Meet someone new': '"Every stranger is a potential companion on your journey through this world."',
+    'Exercise': '"Train alongside your comrades to grow stronger together. Shared sweat builds trust."',
+    'Share a meal': '"Breaking bread together forges unbreakable bonds. The table is sacred ground."',
+    'Reconnect': '"Distant stars can be pulled back into orbit. It only takes one spark."',
+    'Walk': '"Side-by-side walks reveal truths that face-to-face never could."',
+    'Coffee': '"A warm cup shared is worth more XP than any solo grind."',
+    'Outdoor': '"Fresh air + friendship = magic. The ancient formula never fails."',
+    'Dinner': '"The feast is not about the food — it\'s about who sits beside you."',
+    'Video': '"Distance means nothing when the connection is strong. Pixels carry warmth."',
+    'Text': '"A message sent at the right moment can change everything."',
+    'social': '"Your network is your net worth — in XP, in bonds, in life."',
+    'streak': '"Consistency is the quiet superpower. Day by day, you become unstoppable."',
+    'contact': '"Every name in your guild hall represents a story worth continuing."',
+    'Explore': '"The unknown beckons! New experiences forge the sharpest bonds."',
+    'party': '"Together, you are more than the sum of your parts."',
+    'challenge': '"To challenge a friend is the highest form of respect."',
+    'morning': '"The early adventurer catches the golden XP. Rise and connect!"',
+    'help': '"True heroes don\'t seek glory — they seek to lift others higher."',
+    'listen': '"Sometimes the most powerful action is simply being present."',
+    'surprise': '"An unexpected act of kindness? That\'s a critical hit to loneliness."',
+    'invite': '"Open doors. Open hearts. The guild grows stronger with each new face."',
+    'visit': '"Showing up in person sends a message no text ever could."',
+    'celebrate': '"Mark the victories — yours AND your allies\'. Joy shared is joy doubled."',
+    'learn': '"Growth happens when you step outside your comfort zone — together."',
+    'mentor': '"Pass on what you\'ve learned. The greatest legacy is a raised torch."',
+    'gratitude': '"A simple \'thank you\' is an XP multiplier for the soul."',
   };
-  const matchedNarrative = Object.entries(narratives).find(([key]) => q.title && q.title.includes(key));
-  if (matchedNarrative) {
-    card.appendChild(createElement('div', { className: 'quest-narrative' }, matchedNarrative[1]));
-  }
+  const matchedNarrative = Object.entries(narratives).find(([key]) =>
+    q.title && q.title.toLowerCase().includes(key.toLowerCase())
+  );
+  // Fallback: pick a random narrative for quests without a specific match
+  const allNarratives = Object.values(narratives);
+  const fallbackNarrative = allNarratives[Math.abs(hashCode(q.title || '')) % allNarratives.length];
+  const narrativeText = matchedNarrative ? matchedNarrative[1] : fallbackNarrative;
+  card.appendChild(createElement('div', { className: 'quest-narrative' }, narrativeText));
 
   // Quest requirements (level gate + difficulty-based requirements)
   const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
@@ -8886,136 +8919,429 @@ if ('serviceWorker' in navigator) {
 // NPC DIALOG SYSTEM — MapleStory-style conversations
 // ═══════════════════════════════════════════════════
 
+// ── Daily flavor text rotations for each NPC ──
+const NPC_DAILY_FLAVORS = {
+  dashboard: [
+    'The air hums with potential today, {name}.',
+    'I\'ve been watching your journey, {name}. Impressive.',
+    'Another day, another chance to grow stronger.',
+    'The stars aligned well for you today, {name}.',
+    'I sense great determination in you today.',
+    '*adjusts spectacles* Ah, {name}! Right on time.',
+    'Your aura is... different today. Stronger.',
+  ],
+  contacts: [
+    'The Guild Hall echoes with tales of your bonds!',
+    '*sharpens sword* Ah, {name}! Your reputation precedes you.',
+    'Your allies have been asking about you, {name}.',
+    'Every great warrior needs a strong guild behind them.',
+    '*slams table* More allies means more POWER!',
+    'I just polished all the guild trophies. Looking good!',
+  ],
+  quests: [
+    '*unrolls ancient scroll* Fresh quests, hot off the press!',
+    'The quest board is overflowing today, {name}!',
+    'I had to add extra nails to hold all these quests up.',
+    '*squints at parchment* This one has YOUR name on it.',
+    'Heroes don\'t wait for quests to find them.',
+    'Every quest completed is a story worth telling.',
+    '*adjusts monocle* Today\'s quests are... interesting.',
+  ],
+  gates: [
+    '*lightning crackles* The gates are restless today...',
+    'I can feel the energy beyond these gates, {name}.',
+    'Only the worthy may pass. Are you worthy?',
+    '*touches gate symbols* They respond to your presence...',
+    'Today\'s gates hold rare treasures for the brave.',
+    'The dungeon whispers your name, {name}...',
+  ],
+  orbit: [
+    '*peers through telescope* The stars tell stories tonight.',
+    'Each point of light is a relationship, {name}.',
+    'I\'ve charted three new constellation patterns today!',
+    '*adjusts lens* Some stars burn brighter than others.',
+    'The cosmos of connection never stops moving.',
+    'Look closely — some stars are drifting. Reach them.',
+  ],
+  skills: [
+    '*cracks knuckles* Ready to train, {name}?',
+    'Discipline is the bridge between goals and achievement.',
+    'I see raw potential in you. Let\'s sharpen it.',
+    '*strikes training dummy* Every skill starts with practice!',
+    'Your technique has improved since last time.',
+    'True mastery requires patience AND persistence.',
+  ],
+  achievements: [
+    '*dusts trophy case* Ah, welcome to the hall of legends!',
+    'Every trophy here tells a story of perseverance.',
+    'I\'ve been saving a special shelf for YOUR trophies.',
+    '*adjusts display* Some achievements are still hidden...',
+    'History remembers those who push beyond their limits.',
+    'Your achievement count grows impressively, {name}!',
+  ],
+  settings: [
+    '*wipes counter* Welcome! Pull up a chair, {name}.',
+    'The Inn is quiet today. Perfect for reflection.',
+    'I just brewed a fresh pot. Rest a while.',
+    '*yawns* Even heroes need to recharge.',
+    'Your usual table is waiting for you, {name}.',
+    'A warm hearth and good company — what more do you need?',
+  ],
+};
+
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
+function getDailyFlavor(buildingId) {
+  const flavors = NPC_DAILY_FLAVORS[buildingId] || [];
+  if (!flavors.length) return '';
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  return flavors[dayOfYear % flavors.length];
+}
+
 const NPC_DEFS = {
   dashboard: {
     name: 'Sage Ori', title: 'Growth Guide', portrait: '🧙',
-    greeting: 'Welcome back, <span class="highlight">{name}</span>! Your journey of growth continues. What would you like to focus on today?',
+    personality: 'wise',
+    greeting: '{dailyFlavor}<br><br>Welcome back, <span class="highlight">{name}</span>! Your journey of growth continues. What would you like to focus on today?',
     choices: [
       { text: 'View my progress & stats', icon: '📊', action: 'enter' },
       { text: 'Tell me about my growth path', icon: '🌱', action: 'dialog', next: 'growth_advice' },
+      { text: 'Any wisdom for today?', icon: '💡', action: 'dialog', next: 'daily_wisdom' },
+      { text: 'What\'s my next milestone?', icon: '🎯', action: 'dialog', next: 'next_milestone' },
       { text: 'I\'m just passing through', icon: '👋', action: 'close' },
     ],
     dialogs: {
       growth_advice: {
-        text: 'Every interaction you nurture, every skill you develop, shapes who you become. Your <span class="highlight">level {level}</span> reflects the effort you\'ve put in. Keep pushing forward — the next advancement awaits at <span class="highlight">level {nextAdvLevel}</span>!',
+        text: 'Every interaction you nurture, every skill you develop, shapes who you become. Your <span class="highlight">level {level}</span> reflects the effort you\'ve put in.',
+        choices: [
+          { text: 'How do I level up faster?', icon: '⚡', action: 'dialog', next: 'level_tips' },
+          { text: 'What happens at the next level?', icon: '🔮', action: 'dialog', next: 'next_milestone' },
+          { text: 'Thanks, Ori', icon: '👋', action: 'greeting' },
+        ],
+      },
+      level_tips: {
+        text: '*strokes beard thoughtfully*<br><br>The <span class="highlight">fastest</span> path to growth? <span class="highlight">In-person meetups</span> grant the most XP — 40 base! Calls give 20, texts only 8. But the <span class="highlight">real secret</span>?<br><br>Complete <span class="highlight">quest chains</span> for massive bonus XP. And keep your streak alive — at 30 days, everything earns <span class="highlight">2.5× bonus</span>!',
+        choices: [
+          { text: 'What about stat points?', icon: '📊', action: 'dialog', next: 'stat_tips' },
+          { text: 'Got it, thanks!', icon: '👋', action: 'greeting' },
+        ],
+      },
+      stat_tips: {
+        text: 'Ah, stats! You earn <span class="highlight">stat points</span> every level up. Here\'s my advice:<br><br>• <span class="highlight">CHA</span> — boosts relationship XP gain<br>• <span class="highlight">WIS</span> — increases all XP by a percentage<br>• <span class="highlight">EMP</span> — enhances healing from interactions<br>• <span class="highlight">INT</span> — boosts quest chain rewards<br>• <span class="highlight">CON</span> — raises max HP<br><br>Focus on what matches your <span class="highlight">social class</span> for the strongest synergy!',
+        choices: [
+          { text: 'Which class should I pick?', icon: '🎭', action: 'dialog', next: 'class_advice' },
+          { text: 'Very helpful, thanks!', icon: '👋', action: 'greeting' },
+        ],
+      },
+      class_advice: {
+        text: '*eyes sparkle with wisdom*<br><br>Your class emerges from how you <span class="highlight">naturally play</span>:<br><br>🔗 <span class="highlight">Connector</span> — You have many contacts and love meeting new people<br>💜 <span class="highlight">Empath</span> — You nurture deep bonds with a few close people<br>⚡ <span class="highlight">Initiator</span> — You take action first, always reaching out<br>🎓 <span class="highlight">Mentor</span> — You guide and support others in your network<br><br>Each path has <span class="highlight">unique abilities</span> that unlock at class advancement!',
         buttons: ['ok'],
-      }
+      },
+      daily_wisdom: {
+        text: function() {
+          const wisdoms = [
+            '*closes eyes*<br><br>"The bonds you nurture today become the strength you wield tomorrow."<br><br>Go connect with someone, {name}. Even a simple text carries power.',
+            '"A streak is not just a number — it\'s a <span class="highlight">promise to yourself</span>."<br><br>Don\'t break the chain, {name}.',
+            '"The strongest guilds aren\'t built on talent alone — they\'re built on <span class="highlight">showing up</span>."<br><br>Who needs to hear from you today?',
+            '"Every boss you fight was once an unbeatable challenge. <span class="highlight">Growth is invisible until it\'s undeniable</span>."',
+            '"I\'ve seen adventurers rise and fall. The ones who endure? They <span class="highlight">invest in people</span>, not just quests."',
+            '"Your orbit shows where your attention goes. Where attention goes, <span class="highlight">energy flows</span>."',
+          ];
+          return wisdoms[Math.floor(Date.now() / 86400000) % wisdoms.length];
+        },
+        buttons: ['ok'],
+      },
+      next_milestone: {
+        text: 'Your path ahead, <span class="highlight">{name}</span>:<br><br>• Current: <span class="highlight">Level {level}</span><br>• Next advancement: <span class="highlight">Level {nextAdvLevel}</span><br>• That unlocks: new skills, stat bonuses, and a <span class="highlight">job title upgrade</span>!<br><br>Keep completing quests and maintaining your streak. You\'re closer than you think!',
+        buttons: ['ok'],
+      },
     }
   },
   contacts: {
     name: 'Guildmaster Rex', title: 'Party & Guild Hall', portrait: '⚔️',
-    greeting: 'The Guild Hall bustles with life! You have <span class="highlight">{contactCount} allies</span> in your network. What brings you here?',
+    personality: 'boisterous',
+    greeting: '{dailyFlavor}<br><br>The Guild Hall bustles with life! You have <span class="highlight">{contactCount} allies</span> in your network. What brings you here, warrior?',
     choices: [
       { text: 'Manage my party members', icon: '👥', action: 'enter' },
-      { text: 'How do I strengthen bonds?', icon: '💡', action: 'dialog', next: 'bond_tips' },
+      { text: 'How do I strengthen bonds?', icon: '💪', action: 'dialog', next: 'bond_tips' },
+      { text: 'Tell me about circles', icon: '⭕', action: 'dialog', next: 'circles_info' },
+      { text: 'What are party quests?', icon: '🎉', action: 'dialog', next: 'party_quests' },
       { text: 'Leave the Guild Hall', icon: '🚪', action: 'close' },
     ],
     dialogs: {
       bond_tips: {
-        text: 'Strong bonds are forged through <span class="highlight">consistent interaction</span>. Log calls, meetups, and messages to keep relationships healthy. Each interaction earns you <span class="highlight">XP</span> and strengthens your social skill tree. Neglected bonds will decay over time — don\'t let them fade!',
+        text: '*slams fist on table*<br><br>Listen up! Strong bonds are forged in the <span class="highlight">fire of consistency</span>! Log calls, meetups, messages — EVERYTHING. Each interaction earns XP and stops bonds from <span class="highlight">decaying</span>.',
+        choices: [
+          { text: 'What happens if bonds decay?', icon: '💔', action: 'dialog', next: 'decay_warning' },
+          { text: 'How do I track bond health?', icon: '❤️', action: 'dialog', next: 'health_tracking' },
+          { text: 'Got it, chief!', icon: '💪', action: 'greeting' },
+        ],
+      },
+      decay_warning: {
+        text: '*voice drops to serious tone*<br><br>Neglected bonds <span class="highlight">decay over time</span>. Contacts drift from your Inner Circle to your Outer Orbit. Their health bars drop. At zero health, they become <span class="highlight">Shadow Contacts</span> — and you\'ll need special quests to reclaim them.<br><br>Don\'t let your allies fade, {name}. A 2-minute call can save a 2-year friendship.',
         buttons: ['ok'],
-      }
+      },
+      health_tracking: {
+        text: 'Check the <span class="highlight">Orbit View</span> — Stargazer Luna can show you who\'s closest and who\'s drifting. Or visit any contact card to see their <span class="highlight">relationship health bar</span>.<br><br>Green = strong, Yellow = needs attention, Red = critical!',
+        buttons: ['ok'],
+      },
+      circles_info: {
+        text: '*leans forward*<br><br>Circles are your <span class="highlight">inner guilds</span>! Group your allies by connection type: Family, Gym Crew, Work Friends, etc.<br><br>Each circle earns <span class="highlight">Guild Points (GP)</span> when you interact with its members. Level up your circles for bonus XP multipliers and exclusive circle quests!',
+        choices: [
+          { text: 'How do circle quests work?', icon: '🔗', action: 'dialog', next: 'circle_quests' },
+          { text: 'Interesting, thanks!', icon: '👋', action: 'greeting' },
+        ],
+      },
+      circle_quests: {
+        text: 'Circle quests are <span class="highlight">group challenges</span> where ALL members contribute! Example: "Connect with every member of Gym Crew this week."<br><br>Completing a circle quest grants <span class="highlight">GP to the entire circle</span> and XP to you. Higher-level circles unlock harder but more rewarding quests!',
+        buttons: ['ok'],
+      },
+      party_quests: {
+        text: '*gestures excitedly*<br><br>Party quests are <span class="highlight">social adventures</span>! Create a party, invite allies, and complete activities together.<br><br>Stages: <span class="highlight">Gather → Ready → Go!</span><br><br>When everyone completes the party quest, ALL members earn XP! Parties are the fastest way to level up <span class="highlight">together</span>.',
+        buttons: ['ok'],
+      },
     }
   },
   quests: {
     name: 'Quest Master Finn', title: 'Daily Quests & Chains', portrait: '📜',
-    greeting: 'Adventurer! I have tasks that will push your growth. Completing quests earns <span class="highlight">XP, skills, and achievements</span>. Ready?',
+    personality: 'enthusiastic',
+    greeting: '{dailyFlavor}<br><br>Adventurer! I have tasks that will push your growth. Completing quests earns <span class="highlight">XP, skills, and achievements</span>. Ready to hear what\'s available?',
     choices: [
       { text: 'Show me today\'s quests', icon: '⚡', action: 'enter' },
       { text: 'View my quest chains', icon: '🔗', action: 'enter_section', section: 'questChainsSection' },
       { text: 'What are quest requirements?', icon: '❓', action: 'dialog', next: 'quest_info' },
+      { text: 'Tell me about quest types', icon: '📋', action: 'dialog', next: 'quest_types' },
+      { text: 'Any secret quests?', icon: '🤫', action: 'dialog', next: 'secret_quests' },
       { text: 'Not right now', icon: '👋', action: 'close' },
     ],
     dialogs: {
       quest_info: {
-        text: 'Quests have <span class="highlight">requirements</span> you must meet: minimum level, completed prerequisite quests, or specific skills unlocked. <span class="highlight">Quest chains</span> tell a story — completing one chapter unlocks the next. Daily quests reset every 24 hours for steady XP gains.',
+        text: '*unrolls ancient parchment*<br><br>Quests have <span class="highlight">requirements</span> you must meet! Higher difficulty means more XP but tougher gates:<br><br>⭐ <span class="highlight">Easy</span> — No requirements, 3-day limit<br>⭐⭐ <span class="highlight">Medium</span> — Level 3+, 7-day limit<br>⭐⭐⭐ <span class="highlight">Hard</span> — Level 5+ & 3 contacts, 14-day limit<br>👑 <span class="highlight">Epic</span> — Level 10+ & quest chain completion',
+        choices: [
+          { text: 'What are quest chains?', icon: '🔗', action: 'dialog', next: 'chains_info' },
+          { text: 'How is XP calculated?', icon: '📊', action: 'dialog', next: 'xp_calc' },
+          { text: 'Thanks, Finn!', icon: '👋', action: 'greeting' },
+        ],
+      },
+      chains_info: {
+        text: '*eyes light up*<br><br>Quest chains are <span class="highlight">multi-chapter stories</span>! Complete one step to unlock the next. We have 5 epic chains:<br><br>🔗 <span class="highlight">Reconnection Saga</span> — Rebuild a fading bond (5 steps)<br>🎉 <span class="highlight">Party Animal</span> — Become the ultimate host (4 steps)<br>🏃 <span class="highlight">The Marathon</span> — Build an unstoppable streak (3 steps)<br>👻 <span class="highlight">Shadow Hunter</span> — Rescue neglected friends (4 steps)<br>🚪 <span class="highlight">Gate Crawler</span> — Conquer every gate rank (4 steps)<br><br>Each chain has a <span class="highlight">unique ending reward</span>!',
         buttons: ['ok'],
-      }
+      },
+      xp_calc: {
+        text: '*pulls out calculator*<br><br>Base XP by activity:<br>• 🤝 In-person: <span class="highlight">40 XP</span><br>• 📹 Video call: <span class="highlight">25 XP</span><br>• 📞 Call: <span class="highlight">20 XP</span><br>• ✉️ Email: <span class="highlight">10 XP</span><br>• 💬 Text: <span class="highlight">8 XP</span><br><br>Multipliers:<br>• +0.5 XP per minute of interaction<br>• Wisdom stat: +% to all XP<br>• Streak bonus: up to 2.5× at 30 days!',
+        buttons: ['ok'],
+      },
+      quest_types: {
+        text: 'There are several quest types, each testing different skills:<br><br>☕ <span class="highlight">Social</span> — Meet, call, or text someone<br>🏃 <span class="highlight">Activity</span> — Exercise, dine, or explore together<br>🔗 <span class="highlight">Reconnection</span> — Reach out to someone you\'ve lost touch with<br>🎯 <span class="highlight">Challenge</span> — Compete with a friend<br>📋 <span class="highlight">Streak</span> — Maintain daily consistency<br><br>Each type trains different stats!',
+        buttons: ['ok'],
+      },
+      secret_quests: {
+        text: '*leans in conspiratorially*<br><br>Psst... I probably shouldn\'t tell you this, but...<br><br>There are <span class="highlight">hidden achievements</span> that trigger special quests. Try doing things like:<br>• Interacting with <span class="highlight">5 different people in one day</span><br>• Completing a quest <span class="highlight">within 1 hour</span> of receiving it<br>• Maintaining a <span class="highlight">perfect week</span> (interact every day)<br><br>*winks* I didn\'t tell you anything, though.',
+        buttons: ['ok'],
+      },
     }
   },
   gates: {
     name: 'Gate Warden Kira', title: 'Dungeon Gates', portrait: '🏰',
-    greeting: 'The gates shimmer with challenge! Each gate tests your <span class="highlight">dedication and consistency</span>. Clear them to prove your worth.',
+    personality: 'stern',
+    greeting: '{dailyFlavor}<br><br>The gates shimmer with challenge! Each gate tests your <span class="highlight">dedication and consistency</span>. Do you dare enter?',
     choices: [
       { text: 'Enter the dungeon gates', icon: '⚔️', action: 'enter' },
       { text: 'How do gates work?', icon: '❓', action: 'dialog', next: 'gate_info' },
-      { text: 'I\'ll come back later', icon: '🚪', action: 'close' },
+      { text: 'What rank gates can I attempt?', icon: '🏅', action: 'dialog', next: 'gate_ranks' },
+      { text: 'Tell me about boss raids', icon: '👹', action: 'dialog', next: 'boss_info' },
+      { text: 'I\'ll come back when I\'m ready', icon: '🚪', action: 'close' },
     ],
     dialogs: {
       gate_info: {
-        text: 'Gates are <span class="highlight">timed challenges</span> that require specific actions to clear. Each gate has a rank — higher ranks mean tougher requirements but better rewards. Clear gates to earn <span class="highlight">bonus XP</span> and unlock exclusive achievements. Some gates require a <span class="highlight">party</span> to attempt!',
+        text: '*crosses arms*<br><br>Gates are <span class="highlight">timed challenges</span> that test your commitment. Each gate has a rank — higher ranks mean tougher requirements but better rewards.',
+        choices: [
+          { text: 'What are the gate ranks?', icon: '🏅', action: 'dialog', next: 'gate_ranks' },
+          { text: 'Do some gates need a party?', icon: '👥', action: 'dialog', next: 'party_gates' },
+          { text: 'Understood, Warden', icon: '👋', action: 'greeting' },
+        ],
+      },
+      gate_ranks: {
+        text: '*draws symbols in the air*<br><br>Gate ranks from weakest to strongest:<br><br><span class="highlight">D-Rank</span> — Simple tasks, good for beginners<br><span class="highlight">C-Rank</span> — Requires consistent effort<br><span class="highlight">B-Rank</span> — Multi-day commitment needed<br><span class="highlight">A-Rank</span> — Only for dedicated hunters<br><span class="highlight">S-Rank</span> — Legendary difficulty. Few have cleared these.<br><br>Your current level determines which gates you can <span class="highlight">safely attempt</span>.',
         buttons: ['ok'],
-      }
+      },
+      party_gates: {
+        text: 'Some S-Rank gates require a <span class="highlight">full party</span> to attempt! You\'ll need to coordinate with allies, each contributing their own interactions.<br><br>Party gates grant <span class="highlight">shared rewards</span> — everyone in the party earns XP and achievements upon clearing!',
+        buttons: ['ok'],
+      },
+      boss_info: {
+        text: '*voice drops to a whisper*<br><br>Beyond the gates lurk <span class="highlight">Boss Raids</span> — powerful enemies that require sustained effort to defeat.<br><br>Each boss has a <span class="highlight">unique mechanic</span>:<br>• 🐉 <span class="highlight">Social Hydra</span> — Hit with call + text + in-person within 24h<br>• 🌊 <span class="highlight">The Drifter</span> — Use 3+ different interaction types<br>• 👑 <span class="highlight">The Monarch</span> — Damage scales with your streak<br>• 👹 <span class="highlight">Shadow Beast</span> — Any interaction deals damage<br><br>Clear bosses for <span class="highlight">massive XP and stat points</span>!',
+        buttons: ['ok'],
+      },
     }
   },
   orbit: {
     name: 'Stargazer Luna', title: 'Observatory Guide', portrait: '🔭',
-    greeting: 'From the observatory, you can see the <span class="highlight">constellation of your relationships</span> — who\'s close, who\'s drifting away.',
+    personality: 'mystical',
+    greeting: '{dailyFlavor}<br><br>From the observatory, you can see the <span class="highlight">constellation of your relationships</span> — who\'s close, who\'s drifting away...',
     choices: [
       { text: 'View my orbit map', icon: '🌐', action: 'enter' },
-      { text: 'Explain the orbit view', icon: '❓', action: 'dialog', next: 'orbit_info' },
+      { text: 'Explain the orbit view', icon: '🔮', action: 'dialog', next: 'orbit_info' },
+      { text: 'Who needs attention?', icon: '⚠️', action: 'dialog', next: 'attention_needed' },
       { text: 'Return to town', icon: '🚪', action: 'close' },
     ],
     dialogs: {
       orbit_info: {
-        text: 'Your orbit shows <span class="highlight">relationship distances</span>. Inner circle contacts are your closest bonds. The further out someone drifts, the more attention they need. Regular interactions pull people closer — neglect pushes them away.',
+        text: '*gestures at the stars*<br><br>Your orbit shows <span class="highlight">relationship distances</span>. Each person is a star in your constellation.',
+        choices: [
+          { text: 'How do the rings work?', icon: '⭕', action: 'dialog', next: 'rings_info' },
+          { text: 'Why do stars drift?', icon: '🌌', action: 'dialog', next: 'drift_info' },
+          { text: 'Beautiful. Thanks, Luna', icon: '✨', action: 'greeting' },
+        ],
+      },
+      rings_info: {
+        text: '*traces circles in the air*<br><br>Four rings orbit around you:<br><br>💜 <span class="highlight">Inner Circle</span> — Your closest bonds (1000+ XP)<br>💙 <span class="highlight">Close Friends</span> — Strong connections (500+ XP)<br>💚 <span class="highlight">Friends</span> — Growing bonds (200+ XP)<br>🤍 <span class="highlight">Acquaintances</span> — New or fading contacts (50+ XP)<br><br>As you interact more, contacts <span class="highlight">move inward</span>. Neglect pulls them outward.',
         buttons: ['ok'],
-      }
+      },
+      drift_info: {
+        text: '*looks melancholy*<br><br>Stars drift because <span class="highlight">relationships need energy</span>. Without regular interaction, a contact\'s health decays and they begin to fade...<br><br>The good news? Even a simple text message can <span class="highlight">stop the drift</span>. And a call or meetup can pull them back in. No bond is ever truly lost — you just have to reach out.',
+        buttons: ['ok'],
+      },
+      attention_needed: {
+        text: function() {
+          const contacts = window._cachedContacts || [];
+          const declining = contacts.filter(c => (c.health || 100) < 50).slice(0, 3);
+          if (declining.length > 0) {
+            const names = declining.map(c => '<span class="highlight">' + c.name + '</span>').join(', ');
+            return '*peers through telescope*<br><br>I see fading light from: ' + names + '<br><br>Their bonds are weakening. A call or message could <span class="highlight">reignite their star</span>. Don\'t let them become shadows, {name}.';
+          }
+          return '*peers through telescope*<br><br>Your constellation looks healthy! All your stars are shining brightly. Keep up the excellent work, {name}. 🌟';
+        },
+        buttons: ['ok'],
+      },
     }
   },
   skills: {
     name: 'Master Yuki', title: 'Training Grounds Instructor', portrait: '🥋',
-    greeting: 'Welcome to the training grounds! Here you develop your <span class="highlight">skill tree</span> — each skill represents a dimension of personal growth.',
+    personality: 'disciplined',
+    greeting: '{dailyFlavor}<br><br>Welcome to the training grounds, <span class="highlight">{name}</span>! Here you develop your <span class="highlight">skill tree</span> — each skill represents a dimension of personal growth.',
     choices: [
       { text: 'View my skill tree', icon: '🌳', action: 'enter' },
       { text: 'How does advancement work?', icon: '🎯', action: 'dialog', next: 'advancement_info' },
+      { text: 'What skills can I learn?', icon: '📚', action: 'dialog', next: 'skill_list' },
+      { text: 'Am I ready for job advancement?', icon: '⬆️', action: 'dialog', next: 'job_check' },
       { text: 'Leave training grounds', icon: '🚪', action: 'close' },
     ],
     dialogs: {
       advancement_info: {
-        text: 'Your <span class="highlight">class</span> evolves as you grow. Starting as a <span class="highlight">Social Novice</span>, you\'ll branch into specializations based on your strongest skills: Connector, Empath, Initiator, or Mentor. Each path unlocks unique abilities and stat bonuses. Advance by reaching level milestones and meeting skill requirements!',
+        text: '*strikes a pose*<br><br>Your <span class="highlight">class</span> evolves as you grow! The path:<br><br>Social Novice → <span class="highlight">1st Job</span> (Lv.5) → <span class="highlight">2nd Job</span> (Lv.15) → <span class="highlight">3rd Job</span> (Lv.30) → <span class="highlight">4th Job</span> (Lv.50)<br><br>Each advancement unlocks new abilities and higher stat bonuses!',
+        choices: [
+          { text: 'What are the classes?', icon: '🎭', action: 'dialog', next: 'class_list' },
+          { text: 'What skills can I learn?', icon: '📚', action: 'dialog', next: 'skill_list' },
+          { text: 'Understood, Master', icon: '🙏', action: 'greeting' },
+        ],
+      },
+      class_list: {
+        text: '*pulls out training scroll*<br><br>Four paths of mastery:<br><br>🔗 <span class="highlight">Connector Path</span>: Social Novice → Networker → Social Catalyst → Connector → Grand Connector<br>💜 <span class="highlight">Empath Path</span>: Social Novice → Listener → Counselor → Empath → Grand Empath<br>⚡ <span class="highlight">Initiator Path</span>: Social Novice → Starter → Motivator → Initiator → Grand Initiator<br>🎓 <span class="highlight">Mentor Path</span>: Social Novice → Guide → Teacher → Mentor → Grand Mentor<br><br>Your path is determined by your <span class="highlight">dominant stat</span>!',
         buttons: ['ok'],
-      }
+      },
+      skill_list: {
+        text: 'Skills you can unlock in the training grounds:<br><br>💗 <span class="highlight">Healing Touch</span> — +HP from interactions<br>🔥 <span class="highlight">Burning Spirit</span> — +XP during streaks<br>🛡️ <span class="highlight">Resilience</span> — Slower HP decay<br>⚡ <span class="highlight">Quick Connect</span> — Faster quest completion<br>🌟 <span class="highlight">Inspiration</span> — Chance for double XP<br>🔗 <span class="highlight">Chain Master</span> — Quest chain bonus XP<br><br>Spend <span class="highlight">skill points</span> earned at each level up!',
+        buttons: ['ok'],
+      },
+      job_check: {
+        text: function() {
+          const level = dashboardData?.gamification?.level || 1;
+          const nextAdv = getNextAdvancementLevel(level);
+          if (level >= nextAdv) {
+            return '*eyes widen*<br><br>You\'re <span class="highlight">READY</span>, {name}! You\'ve reached the requirements for your next job advancement! Visit your skill tree and click the <span class="highlight">Advance</span> button to evolve your class!<br><br>Don\'t delay — advancement unlocks new abilities immediately!';
+          }
+          return `*evaluates your stance*<br><br>Not yet, {name}. You're <span class="highlight">Level ${level}</span>. You need to reach <span class="highlight">Level ${nextAdv}</span> for your next advancement.<br><br>That's ${nextAdv - level} more levels. Keep training!`;
+        },
+        buttons: ['ok'],
+      },
     }
   },
   achievements: {
     name: 'Historian Milo', title: 'Trophy Hall Keeper', portrait: '🏆',
-    greeting: 'Every milestone deserves recognition! Your achievements tell the story of your <span class="highlight">personal growth journey</span>.',
+    personality: 'proud',
+    greeting: '{dailyFlavor}<br><br>Every milestone deserves recognition! Your achievements tell the story of your <span class="highlight">personal growth journey</span>, {name}.',
     choices: [
       { text: 'View my achievements', icon: '🏅', action: 'enter' },
       { text: 'What achievements can I earn?', icon: '❓', action: 'dialog', next: 'ach_info' },
+      { text: 'Any hidden achievements?', icon: '🤫', action: 'dialog', next: 'hidden_ach' },
+      { text: 'How do titles work?', icon: '👑', action: 'dialog', next: 'title_info' },
       { text: 'Just browsing', icon: '👋', action: 'close' },
     ],
     dialogs: {
       ach_info: {
-        text: 'Achievements are earned by reaching milestones: <span class="highlight">interaction counts, streak days, quest completions, level thresholds</span>, and more. Some achievements are hidden — discovered only through exploration. Each achievement grants <span class="highlight">XP and titles</span> you can display!',
+        text: '*adjusts spectacles proudly*<br><br>We have <span class="highlight">36 achievements</span> across many categories:<br><br>👥 Contact milestones (1, 5, 10 contacts)<br>💬 Interaction milestones (1, 10, 50 interactions)<br>🔥 Streak achievements (3, 7, 30 days)<br>📜 Quest completions<br>⚔️ Boss raid clears<br>🎉 Party completions<br>🏰 Gate clearings<br><br>Each grants <span class="highlight">XP bonus</span> from 15 to 500!',
+        choices: [
+          { text: 'Any hidden ones?', icon: '🤫', action: 'dialog', next: 'hidden_ach' },
+          { text: 'Impressive collection!', icon: '👋', action: 'greeting' },
+        ],
+      },
+      hidden_ach: {
+        text: '*looks around nervously*<br><br>Hidden achievements... yes, they exist. I\'m not supposed to give hints, but...<br><br>🕵️ Try interacting with <span class="highlight">many different people</span> in one day...<br>📅 See what happens during a <span class="highlight">perfect week</span>...<br>🏆 Some unlock only through <span class="highlight">circle activities</span>...<br>🧩 And some require <span class="highlight">specific skill combinations</span>...<br><br>*straightens up* That\'s all I can say!',
         buttons: ['ok'],
-      }
+      },
+      title_info: {
+        text: 'Titles are <span class="highlight">earned through achievements</span> and displayed next to your name! They show the world what you\'ve accomplished.<br><br>Examples: "Streak Master", "Social Butterfly", "Gate Crusher", "Quest Legend"<br><br>Equip your favorite title from the <span class="highlight">settings page</span>!',
+        buttons: ['ok'],
+      },
     }
   },
   settings: {
     name: 'Innkeeper Rose', title: 'The Cozy Inn', portrait: '🏨',
-    greeting: 'Welcome to the Inn! Take a rest, adjust your settings, or review your profile.',
+    personality: 'warm',
+    greeting: '{dailyFlavor}<br><br>Welcome to the Inn, <span class="highlight">{name}</span>! Pull up a chair and rest a while.',
     choices: [
       { text: 'Open settings', icon: '⚙️', action: 'enter' },
+      { text: 'Tell me about the Inn', icon: '🏠', action: 'dialog', next: 'inn_lore' },
+      { text: 'Got any news?', icon: '📰', action: 'dialog', next: 'town_news' },
       { text: 'Just resting', icon: '😴', action: 'close' },
     ],
+    dialogs: {
+      inn_lore: {
+        text: '*smiles warmly*<br><br>The Cozy Inn has been the heart of Orbit Town since the beginning. Every adventurer who walks through that door has a story to tell.<br><br>Here you can adjust your <span class="highlight">settings</span>, manage your <span class="highlight">profile</span>, and take a moment to <span class="highlight">reflect</span> on your journey. Sometimes the most important thing a hero can do is... rest.',
+        buttons: ['ok'],
+      },
+      town_news: {
+        text: function() {
+          const streak = dashboardData?.gamification?.streak_days || 0;
+          const level = dashboardData?.gamification?.level || 1;
+          const contacts = (window._cachedContacts || []).length;
+          let news = '*leans in*<br><br>Here\'s what I\'ve heard around town:<br><br>';
+          if (streak >= 7) news += '🔥 The whole town is talking about your <span class="highlight">' + streak + '-day streak</span>! Keep it going!<br>';
+          else if (streak > 0) news += '🔥 Your streak is at ' + streak + ' day' + (streak > 1 ? 's' : '') + '. The townsfolk are watching!<br>';
+          else news += '💤 No active streak. The town feels... quiet. Time to change that?<br>';
+          if (contacts >= 10) news += '👥 With ' + contacts + ' allies, the Guild Hall has never been livelier!<br>';
+          if (level >= 5) news += '⬆️ Level ' + level + '! Master Yuki says you might be ready for advancement...<br>';
+          news += '<br>*wipes counter* That\'s all I\'ve heard today!';
+          return news;
+        },
+        buttons: ['ok'],
+      },
+    }
   },
 };
 
-let npcDialogState = { building: null, step: 'greeting', dialogKey: null };
+let npcDialogState = { building: null, step: 'greeting', dialogKey: null, history: [] };
 
 function openNpcDialog(buildingId) {
   const npc = NPC_DEFS[buildingId];
   if (!npc) { enterBuildingDirect(buildingId); return; }
 
-  npcDialogState = { building: buildingId, step: 'greeting', dialogKey: null };
+  npcDialogState = { building: buildingId, step: 'greeting', dialogKey: null, history: [] };
   const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
 
   document.getElementById('npcPortrait').textContent = npc.portrait;
   document.getElementById('npcName').textContent = npc.name;
   document.getElementById('npcTitle').textContent = npc.title;
 
+  playSound('click');
   renderNpcStep(npc, user);
   document.getElementById('npcDialogOverlay').classList.add('active');
 }
@@ -9030,25 +9356,51 @@ function renderNpcStep(npc, user) {
 
   if (npcDialogState.step === 'greeting') {
     textEl.innerHTML = fillNpcTemplate(npc.greeting, user);
+    // Typewriter effect for greeting
+    typewriteNpcText(textEl);
     if (npc.choices) {
       npc.choices.forEach((c, i) => {
         const btn = document.createElement('button');
         btn.className = 'npc-choice-btn';
+        btn.style.animationDelay = (i * 0.08) + 's';
         btn.innerHTML = '<span class="choice-arrow">▶</span> ' + c.icon + ' ' + c.text;
-        btn.onclick = () => handleNpcChoice(c, npc, user);
+        btn.onclick = () => { playSound('click'); handleNpcChoice(c, npc, user); };
         choicesEl.appendChild(btn);
       });
     }
   } else if (npcDialogState.step === 'dialog' && npcDialogState.dialogKey) {
     const dialog = npc.dialogs[npcDialogState.dialogKey];
     if (dialog) {
-      textEl.innerHTML = fillNpcTemplate(dialog.text, user);
-      if (dialog.buttons.includes('ok')) {
+      // Support function-based dynamic text
+      const dialogText = typeof dialog.text === 'function' ? dialog.text() : dialog.text;
+      textEl.innerHTML = fillNpcTemplate(dialogText, user);
+      typewriteNpcText(textEl);
+
+      // Multi-turn: if dialog has choices, render them
+      if (dialog.choices) {
+        dialog.choices.forEach((c, i) => {
+          const btn = document.createElement('button');
+          btn.className = 'npc-choice-btn';
+          btn.style.animationDelay = (i * 0.08) + 's';
+          btn.innerHTML = '<span class="choice-arrow">▶</span> ' + c.icon + ' ' + c.text;
+          btn.onclick = () => { playSound('click'); handleNpcChoice(c, npc, user); };
+          choicesEl.appendChild(btn);
+        });
+      } else if (dialog.buttons && dialog.buttons.includes('ok')) {
+        // Simple OK button — go back to greeting or previous
         const btn = document.createElement('button');
         btn.className = 'npc-btn primary';
         btn.textContent = 'OK';
         btn.onclick = () => {
-          npcDialogState.step = 'greeting';
+          playSound('click');
+          // Return to previous dialog or greeting
+          if (npcDialogState.history.length > 0) {
+            const prev = npcDialogState.history.pop();
+            npcDialogState.step = prev.step;
+            npcDialogState.dialogKey = prev.dialogKey;
+          } else {
+            npcDialogState.step = 'greeting';
+          }
           renderNpcStep(npc, user);
         };
         footerEl.appendChild(btn);
@@ -9057,21 +9409,36 @@ function renderNpcStep(npc, user) {
   }
 }
 
+// Typewriter-style text reveal for NPC dialog
+function typewriteNpcText(el) {
+  const fullHtml = el.innerHTML;
+  el.style.opacity = '0';
+  setTimeout(() => {
+    el.style.opacity = '1';
+    el.style.animation = 'npcTextFade 0.3s ease';
+  }, 50);
+}
+
 function handleNpcChoice(choice, npc, user) {
   if (choice.action === 'enter') {
     closeNpcDialog();
     enterBuildingDirect(npcDialogState.building);
   } else if (choice.action === 'enter_section') {
     closeNpcDialog();
-    const b = npcDialogState.building;
     enterBuildingDirect('dashboard');
     setTimeout(() => {
       const sec = document.getElementById(choice.section);
       if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 400);
   } else if (choice.action === 'dialog') {
+    // Save current state to history for back-navigation
+    npcDialogState.history.push({ step: npcDialogState.step, dialogKey: npcDialogState.dialogKey });
     npcDialogState.step = 'dialog';
     npcDialogState.dialogKey = choice.next;
+    renderNpcStep(npc, user);
+  } else if (choice.action === 'greeting') {
+    npcDialogState.step = 'greeting';
+    npcDialogState.history = [];
     renderNpcStep(npc, user);
   } else if (choice.action === 'close') {
     closeNpcDialog();
@@ -9080,21 +9447,22 @@ function handleNpcChoice(choice, npc, user) {
 
 function closeNpcDialog() {
   document.getElementById('npcDialogOverlay').classList.remove('active');
-  // Return to overworld if we came from it
   OW.active = true;
   OW.enterCooldown = 30;
 }
 
 function fillNpcTemplate(text, user) {
-  const level = user.level || 1;
+  const level = dashboardData?.gamification?.level || user.level || 1;
   const contactCount = window._cachedContacts ? window._cachedContacts.length : '?';
   const nextAdvLevel = getNextAdvancementLevel(level);
+  const dailyFlavor = getDailyFlavor(npcDialogState.building);
   return text
     .replace(/{name}/g, user.name || 'Adventurer')
     .replace(/{level}/g, level)
-    .replace(/{xp}/g, user.xp || 0)
+    .replace(/{xp}/g, dashboardData?.gamification?.xp || user.xp || 0)
     .replace(/{contactCount}/g, contactCount)
-    .replace(/{nextAdvLevel}/g, nextAdvLevel);
+    .replace(/{nextAdvLevel}/g, nextAdvLevel)
+    .replace(/{dailyFlavor}/g, dailyFlavor ? '<em style="color:#a29bfe">' + fillNpcTemplate(dailyFlavor, user).replace(/{dailyFlavor}/g, '') + '</em>' : '');
 }
 
 function getNextAdvancementLevel(level) {
@@ -9103,6 +9471,51 @@ function getNextAdvancementLevel(level) {
     if (level < m) return m;
   }
   return level + 10;
+}
+
+// ═══════════════════════════════════════════════════
+// RANDOM TOWN EVENTS — Surprise encounters in the overworld
+// ═══════════════════════════════════════════════════
+const TOWN_EVENTS = [
+  { emoji: '💫', title: 'Wandering Spirit', message: 'A mysterious orb drifts by... it grants you a small blessing!', xp: 5 },
+  { emoji: '🍀', title: 'Lucky Find!', message: 'You stumble upon a lucky clover in the grass. Good fortune awaits!', xp: 3 },
+  { emoji: '📦', title: 'Lost Package', message: 'Someone left a package near the path. Inside: a motivation scroll!', xp: 8 },
+  { emoji: '🐱', title: 'Town Cat', message: 'A friendly cat rubs against your leg. You feel oddly refreshed.', xp: 2 },
+  { emoji: '🌠', title: 'Shooting Star!', message: 'A star streaks across the sky! Make a wish... (+XP bonus)', xp: 10 },
+  { emoji: '🎵', title: 'Street Musician', message: 'A bard plays a soothing melody. Your spirits are lifted.', xp: 4 },
+  { emoji: '🗝️', title: 'Ancient Key', message: 'A strange key glimmers in the dirt. Who knows what it might unlock...', xp: 6 },
+  { emoji: '🦋', title: 'Golden Butterfly', message: 'A rare golden butterfly lands on your shoulder. A sign of growth!', xp: 7 },
+  { emoji: '📜', title: 'Sage\'s Note', message: 'A scroll blows past: "The strongest bonds are forged in consistency."', xp: 3 },
+  { emoji: '🎁', title: 'NPC Gift!', message: 'An NPC waves you over with a small gift. "For a loyal adventurer!"', xp: 12 },
+];
+
+let lastEventTime = 0;
+function checkRandomEvent() {
+  const now = Date.now();
+  if (now - lastEventTime < 120000) return; // Max once per 2 minutes
+  if (!OW.walking) return;
+  if (Math.random() > 0.003) return; // ~0.3% chance per frame while walking
+
+  lastEventTime = now;
+  const event = TOWN_EVENTS[Math.floor(Math.random() * TOWN_EVENTS.length)];
+  showTownEvent(event);
+}
+
+function showTownEvent(event) {
+  playSound('reward');
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:250;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);animation:npcTextFade 0.3s ease';
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(180deg,rgba(20,20,50,0.98),rgba(10,10,30,0.98));border:2px solid #ffd740;border-radius:8px;padding:24px 32px;text-align:center;max-width:320px;box-shadow:0 0 40px rgba(255,215,64,0.2)">
+      <div style="font-size:48px;margin-bottom:12px;filter:drop-shadow(0 0 8px rgba(255,215,64,0.5))">${event.emoji}</div>
+      <div style="font-family:var(--pixel-font);font-size:12px;color:#ffd740;margin-bottom:8px">${event.title}</div>
+      <div style="font-family:var(--font);font-size:13px;color:#ccc;margin-bottom:16px;line-height:1.5">${event.message}</div>
+      <div style="font-family:var(--pixel-font);font-size:10px;color:#00c896;margin-bottom:16px">+${event.xp} XP</div>
+      <button onclick="this.closest('div[style]').parentElement.remove()" style="font-family:var(--pixel-font);font-size:10px;background:#ffd740;color:#1a1a2e;border:none;padding:8px 24px;cursor:pointer;border-radius:3px">NICE!</button>
+    </div>
+  `;
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
 }
 
 // ═══════════════════════════════════════════════════
@@ -9473,6 +9886,7 @@ function renderOverworldLoop() {
   if (!OW.ctx) return;
   OW.animFrame++;
   updateCharMovement();
+  checkRandomEvent();
   drawOverworld();
   requestAnimationFrame(renderOverworldLoop);
 }
@@ -9482,12 +9896,28 @@ function drawOverworld() {
   const W = OW.w, H = OW.h;
   ctx.clearRect(0, 0, W, H);
 
-  // ── Sky gradient ──
+  // ── Sky gradient (time-of-day aware) ──
+  const hour = new Date().getHours();
+  let skyColors;
+  if (hour >= 6 && hour < 10) {
+    // Morning — warm sunrise
+    skyColors = ['#1a0830', '#2a1050', '#4a2060', '#8a4060', '#cc7040'];
+  } else if (hour >= 10 && hour < 16) {
+    // Day — bright blue
+    skyColors = ['#0a1040', '#1a2060', '#2a4080', '#3a60a0', '#5080c0'];
+  } else if (hour >= 16 && hour < 20) {
+    // Sunset — warm orange/purple
+    skyColors = ['#1a0830', '#3a1050', '#6a2060', '#aa4040', '#dd7020'];
+  } else {
+    // Night — deep dark
+    skyColors = ['#020010', '#060030', '#120850', '#1a1060', '#1a1060'];
+  }
   const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.7);
-  skyGrad.addColorStop(0, '#020010');
-  skyGrad.addColorStop(0.3, '#060030');
-  skyGrad.addColorStop(0.6, '#120850');
-  skyGrad.addColorStop(1, '#1a1060');
+  skyGrad.addColorStop(0, skyColors[0]);
+  skyGrad.addColorStop(0.25, skyColors[1]);
+  skyGrad.addColorStop(0.5, skyColors[2]);
+  skyGrad.addColorStop(0.75, skyColors[3]);
+  skyGrad.addColorStop(1, skyColors[4]);
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, W, H * 0.7);
 
@@ -9547,65 +9977,217 @@ function drawOverworld() {
     ctx.fillRect(px + 4, groundY + 4, 8, 2);
   }
 
-  // ── Trees (background) ──
-  const trees = [0.02, 0.18, 0.38, 0.58, 0.88, 0.95];
+  // ── Trees (background) — more detailed with leaf layers ──
+  const trees = [0.02, 0.14, 0.34, 0.46, 0.62, 0.76, 0.88, 0.96];
   trees.forEach((tx, i) => {
     const treeX = Math.round(tx * W);
-    const treeY = groundY - 20 - (i % 2) * 10;
+    const treeY = groundY - 24 - (i % 3) * 8;
+    const treeType = i % 3; // variety
     // Trunk
     ctx.fillStyle = '#4a3020';
-    ctx.fillRect(treeX + 8, treeY + 16, 8, 20);
-    // Canopy
-    ctx.fillStyle = '#1a5a2a';
-    ctx.fillRect(treeX, treeY, 24, 12);
-    ctx.fillRect(treeX + 4, treeY - 8, 16, 10);
-    ctx.fillStyle = '#228836';
-    ctx.fillRect(treeX + 2, treeY + 2, 20, 4);
+    ctx.fillRect(treeX + 10, treeY + 20, 6, 24);
+    ctx.fillStyle = '#3a2518';
+    ctx.fillRect(treeX + 12, treeY + 20, 2, 24);
+    if (treeType === 0) {
+      // Round bushy tree
+      ctx.fillStyle = '#0d4a1a';
+      ctx.fillRect(treeX - 2, treeY + 4, 30, 16);
+      ctx.fillRect(treeX + 2, treeY - 4, 22, 12);
+      ctx.fillStyle = '#1a6a2a';
+      ctx.fillRect(treeX, treeY + 6, 26, 10);
+      ctx.fillRect(treeX + 4, treeY - 2, 18, 8);
+      ctx.fillStyle = '#228836';
+      ctx.fillRect(treeX + 4, treeY + 8, 18, 4);
+      ctx.fillRect(treeX + 6, treeY, 14, 4);
+    } else if (treeType === 1) {
+      // Pine/conifer tree
+      ctx.fillStyle = '#0d3a1a';
+      ctx.fillRect(treeX + 4, treeY - 4, 18, 8);
+      ctx.fillRect(treeX + 2, treeY + 2, 22, 8);
+      ctx.fillRect(treeX - 2, treeY + 8, 30, 8);
+      ctx.fillRect(treeX, treeY + 14, 26, 6);
+      ctx.fillStyle = '#1a5a26';
+      ctx.fillRect(treeX + 6, treeY - 2, 14, 6);
+      ctx.fillRect(treeX + 4, treeY + 4, 18, 6);
+      ctx.fillRect(treeX, treeY + 10, 26, 6);
+    } else {
+      // Weeping/droopy tree
+      ctx.fillStyle = '#1a5a2a';
+      ctx.fillRect(treeX, treeY, 26, 14);
+      ctx.fillRect(treeX + 4, treeY - 6, 18, 10);
+      ctx.fillStyle = '#228836';
+      ctx.fillRect(treeX + 2, treeY + 2, 22, 8);
+      // Drooping branches
+      ctx.fillStyle = '#1a6a2a';
+      ctx.fillRect(treeX - 4, treeY + 12, 6, 10);
+      ctx.fillRect(treeX + 24, treeY + 12, 6, 10);
+    }
   });
 
-  // ── Buildings ──
+  // ── Environmental particles (fireflies / floating motes) ──
+  if (!OW.particles) {
+    OW.particles = Array.from({length: 18}, (_, i) => ({
+      x: Math.random(), y: 0.6 + Math.random() * 0.35,
+      speed: 0.0003 + Math.random() * 0.0005,
+      phase: Math.random() * Math.PI * 2,
+      size: 1 + Math.random() * 2,
+      color: i % 3 === 0 ? '#ffd740' : i % 3 === 1 ? '#a29bfe' : '#55efc4',
+    }));
+  }
+  OW.particles.forEach(p => {
+    p.phase += 0.02;
+    const px = (p.x + Math.sin(p.phase * 0.7) * 0.02) * W;
+    const py = (p.y + Math.sin(p.phase) * 0.015) * H;
+    const alpha = Math.sin(p.phase) * 0.3 + 0.5;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(Math.round(px), Math.round(py), p.size, p.size);
+    // Glow
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, p.size + 2, p.size + 2);
+  });
+  ctx.globalAlpha = 1;
+
+  // ── NPC mini-sprites near buildings ──
+  const NPC_SPRITES = {
+    dashboard: { emoji: '🧙', offsetX: -16, offsetY: 8 },
+    contacts:  { emoji: '⚔️', offsetX: -18, offsetY: 6 },
+    quests:    { emoji: '📜', offsetX: 12, offsetY: 10 },
+    gates:     { emoji: '🏰', offsetX: -14, offsetY: 4 },
+    orbit:     { emoji: '🔭', offsetX: 10, offsetY: 8 },
+    skills:    { emoji: '🥋', offsetX: -16, offsetY: 6 },
+    achievements: { emoji: '🏆', offsetX: 12, offsetY: 8 },
+    settings:  { emoji: '🏨', offsetX: -12, offsetY: 10 },
+  };
+
+  // ── Buildings — detailed with chimneys, signs, awnings ──
   OW.buildings.forEach(b => {
     const hovered = OW.hoveredBuilding === b;
     const bounce = hovered ? Math.sin(OW.animFrame * 0.1) * 2 : 0;
     const bx = b.px, by = b.py + bounce;
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(bx + 4, by + b.bh - 4, b.bw, 6);
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(bx + b.bw / 2, by + b.bh + 2, b.bw * 0.55, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Building body
+    // Building body — two-tone walls
     ctx.fillStyle = hovered ? lightenColor(b.color, 20) : darkenColor(b.color, 30);
     ctx.fillRect(bx, by + 14, b.bw, b.bh - 14);
-    // Building front highlight
     ctx.fillStyle = hovered ? lightenColor(b.color, 10) : darkenColor(b.color, 10);
     ctx.fillRect(bx + 2, by + 16, b.bw - 4, b.bh - 18);
+    // Side shadow (depth effect)
+    ctx.fillStyle = darkenColor(b.color, 50);
+    ctx.fillRect(bx, by + 14, 3, b.bh - 14);
 
-    // Roof
+    // Roof — peaked style with overhang
     ctx.fillStyle = b.roofColor;
-    ctx.fillRect(bx - 4, by + 8, b.bw + 8, 10);
-    ctx.fillRect(bx + 4, by, b.bw - 8, 12);
+    ctx.fillRect(bx - 6, by + 6, b.bw + 12, 12);
+    ctx.fillRect(bx - 2, by, b.bw + 4, 10);
+    ctx.fillRect(bx + 6, by - 6, b.bw - 12, 10);
     // Roof highlight
     ctx.fillStyle = lightenColor(b.roofColor, 30);
-    ctx.fillRect(bx - 2, by + 9, b.bw + 4, 2);
+    ctx.fillRect(bx - 4, by + 7, b.bw + 8, 2);
+    ctx.fillRect(bx, by + 1, b.bw, 2);
 
-    // Door
+    // Chimney (on some buildings)
+    if (['dashboard', 'settings', 'contacts'].includes(b.id)) {
+      ctx.fillStyle = '#4a3a3a';
+      ctx.fillRect(bx + b.bw - 16, by - 14, 8, 14);
+      ctx.fillStyle = '#5a4a4a';
+      ctx.fillRect(bx + b.bw - 15, by - 12, 6, 12);
+      // Smoke particles
+      const smokePhase = OW.animFrame * 0.02;
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#aaaacc';
+      ctx.fillRect(bx + b.bw - 14 + Math.sin(smokePhase) * 3, by - 18 - Math.sin(smokePhase * 0.7) * 4, 4, 4);
+      ctx.fillRect(bx + b.bw - 12 + Math.sin(smokePhase + 1) * 4, by - 24 - Math.sin(smokePhase * 0.5) * 3, 3, 3);
+      ctx.globalAlpha = 1;
+    }
+
+    // Awning over door
+    ctx.fillStyle = darkenColor(b.color, 15);
+    const awningY = by + b.bh - 22;
+    ctx.fillRect(bx + b.bw / 2 - 14, awningY, 28, 4);
+    ctx.fillStyle = lightenColor(b.color, 20);
+    // Awning stripes
+    for (let stripe = 0; stripe < 4; stripe++) {
+      ctx.fillRect(bx + b.bw / 2 - 14 + stripe * 14, awningY, 7, 3);
+    }
+
+    // Door — arched top
     ctx.fillStyle = '#1a0a0a';
-    const doorW = 12, doorH = 18;
-    ctx.fillRect(bx + b.bw / 2 - doorW / 2, by + b.bh - doorH, doorW, doorH);
+    const doorW = 14, doorH = 20;
+    const doorX = bx + b.bw / 2 - doorW / 2;
+    const doorY = by + b.bh - doorH;
+    ctx.fillRect(doorX, doorY + 4, doorW, doorH - 4);
+    ctx.beginPath();
+    ctx.arc(doorX + doorW / 2, doorY + 4, doorW / 2, Math.PI, 0);
+    ctx.fill();
+    // Door frame
+    ctx.fillStyle = '#332211';
+    ctx.fillRect(doorX - 1, doorY + 3, 1, doorH - 3);
+    ctx.fillRect(doorX + doorW, doorY + 3, 1, doorH - 3);
     // Door knob
     ctx.fillStyle = '#ffd740';
-    ctx.fillRect(bx + b.bw / 2 + 3, by + b.bh - 10, 2, 2);
+    ctx.fillRect(doorX + doorW - 4, doorY + doorH / 2 + 2, 2, 2);
+    // Welcome mat
+    ctx.fillStyle = hovered ? '#dd8833' : '#885522';
+    ctx.fillRect(doorX - 2, by + b.bh - 2, doorW + 4, 3);
 
-    // Windows
-    ctx.fillStyle = hovered ? '#ffeebb' : '#aaaa66';
-    const winY = by + 22;
-    ctx.fillRect(bx + 8, winY, 10, 8);
-    ctx.fillRect(bx + b.bw - 18, winY, 10, 8);
-    // Window glow when hovered
+    // Windows — with frames and curtains
+    const winColor = hovered ? '#ffeebb' : '#aaaa66';
+    const winY = by + 24;
+    // Left window
+    ctx.fillStyle = '#332211';
+    ctx.fillRect(bx + 6, winY - 1, 14, 12);
+    ctx.fillStyle = winColor;
+    ctx.fillRect(bx + 7, winY, 12, 10);
+    ctx.fillStyle = '#332211';
+    ctx.fillRect(bx + 12, winY, 1, 10);  // cross bar
+    ctx.fillRect(bx + 7, winY + 4, 12, 1);
+    // Right window
+    ctx.fillStyle = '#332211';
+    ctx.fillRect(bx + b.bw - 20, winY - 1, 14, 12);
+    ctx.fillStyle = winColor;
+    ctx.fillRect(bx + b.bw - 19, winY, 12, 10);
+    ctx.fillStyle = '#332211';
+    ctx.fillRect(bx + b.bw - 14, winY, 1, 10);
+    ctx.fillRect(bx + b.bw - 19, winY + 4, 12, 1);
+    // Window glow
     if (hovered) {
-      ctx.fillStyle = 'rgba(255,238,187,0.2)';
-      ctx.fillRect(bx + 5, winY - 3, 16, 14);
-      ctx.fillRect(bx + b.bw - 21, winY - 3, 16, 14);
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = '#ffeebb';
+      ctx.fillRect(bx + 4, winY - 4, 18, 18);
+      ctx.fillRect(bx + b.bw - 22, winY - 4, 18, 18);
+      ctx.globalAlpha = 1;
+    }
+
+    // Flower box (decorative, on some buildings)
+    if (['settings', 'orbit', 'achievements'].includes(b.id)) {
+      ctx.fillStyle = '#553322';
+      ctx.fillRect(bx + 7, winY + 10, 12, 4);
+      ctx.fillStyle = '#ee4444';
+      ctx.fillRect(bx + 8, winY + 8, 3, 3);
+      ctx.fillStyle = '#ffaa00';
+      ctx.fillRect(bx + 12, winY + 8, 3, 3);
+      ctx.fillStyle = '#ee4466';
+      ctx.fillRect(bx + 16, winY + 8, 3, 3);
+    }
+
+    // Sign board (hanging)
+    if (['quests', 'gates', 'skills'].includes(b.id)) {
+      ctx.fillStyle = '#553322';
+      ctx.fillRect(bx + b.bw + 2, by + 18, 2, 16);
+      ctx.fillStyle = '#ddcc88';
+      ctx.fillRect(bx + b.bw - 2, by + 22, 10, 10);
+      ctx.fillStyle = '#886622';
+      ctx.fillRect(bx + b.bw - 1, by + 23, 8, 8);
+      ctx.fillStyle = '#ffd740';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.id === 'quests' ? '!' : b.id === 'gates' ? '⚡' : '★', bx + b.bw + 3, by + 30);
     }
 
     // Label below building
@@ -9614,11 +10196,37 @@ function drawOverworld() {
     ctx.textAlign = 'center';
     ctx.fillText(b.label, bx + b.bw / 2, by + b.bh + 14);
 
-    // Hover glow
+    // Hover glow — pulsing outline
     if (hovered) {
-      ctx.strokeStyle = '#ffffff88';
+      const glowAlpha = Math.sin(OW.animFrame * 0.08) * 0.2 + 0.5;
+      ctx.strokeStyle = `rgba(255,255,255,${glowAlpha})`;
       ctx.lineWidth = 2;
-      ctx.strokeRect(bx - 2, by - 2, b.bw + 4, b.bh + 4);
+      ctx.strokeRect(bx - 3, by - 3, b.bw + 6, b.bh + 6);
+      // "ENTER" prompt
+      ctx.fillStyle = `rgba(255,215,64,${glowAlpha + 0.3})`;
+      ctx.font = '6px "Press Start 2P"';
+      ctx.fillText('▶ ENTER', bx + b.bw / 2, by + b.bh + 24);
+    }
+
+    // NPC sprite near building
+    const npcSprite = NPC_SPRITES[b.id];
+    if (npcSprite) {
+      const npcX = bx + (npcSprite.offsetX > 0 ? b.bw + npcSprite.offsetX : npcSprite.offsetX);
+      const npcY = by + b.bh - 16 + npcSprite.offsetY;
+      // NPC idle animation
+      const npcBob = Math.sin(OW.animFrame * 0.05 + b.x * 10) * 2;
+      ctx.font = '14px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(npcSprite.emoji, npcX + 8, npcY + npcBob);
+      // Exclamation mark if has quest/new content
+      if (['quests', 'dashboard'].includes(b.id)) {
+        const exAlpha = Math.sin(OW.animFrame * 0.1) * 0.3 + 0.7;
+        ctx.globalAlpha = exAlpha;
+        ctx.fillStyle = '#ffd740';
+        ctx.font = '8px "Press Start 2P"';
+        ctx.fillText('!', npcX + 8, npcY - 8 + npcBob);
+        ctx.globalAlpha = 1;
+      }
     }
   });
 
@@ -9642,74 +10250,118 @@ function drawOverworld() {
 }
 
 function drawCharSprite(ctx, cx, cy) {
-  const s = 4; // pixel size
-  const walkCycle = Math.floor(OW.walkFrame / 8) % 4; // 0,1,2,3
+  const s = 3; // pixel size (3px per pixel for 16-wide = 48px on screen)
+  const walkCycle = Math.floor(OW.walkFrame / 8) % 4;
 
-  // Direction-aware sprites (down, up, left, right)
+  // 16×24 detailed sprites with hair, face, shirt, belt, pants, boots
+  // Colors: 0=hair-dark, 1=skin, 2=hair-mid, 3=shirt, 4=pants, 5=boots, 6=skin-shadow, 7=shirt-highlight, 8=belt, 9=hair-highlight, A=eye, B=mouth/blush
   const sprites = {
     down: [
-      '..0220..',
-      '.022220.',
-      '.021120.',
-      '.022220.',
-      '..3333..',
-      '.333333.',
-      '3.3333.3',
-      '..3333..',
-      '..4444..',
-      '..44.44.',
-      '..44.44.',
-      '..55.55.',
+      '....09920....',  // hair top highlight
+      '...099920....',  // hair top
+      '..0099920...',  // hair sides
+      '.002222900..',  // hair + forehead
+      '.022222290..',  // face top
+      '.02A11A290..',  // eyes
+      '.0211B1290..',  // nose + mouth
+      '..2111120...',  // chin
+      '...7333....',   // collar
+      '..733337...',   // shirt top highlight
+      '..333333...',   // shirt mid
+      '.3333333.3.',   // shirt + arms
+      '.3.33333.3.',   // shirt arms out
+      '..333333...',   // shirt bottom
+      '...8888....',   // belt
+      '..444444...',   // pants top
+      '..444.444..',   // pants mid
+      '..444.444..',   // pants legs
+      '..444.444..',   // pants lower
+      '..555.555..',   // boots
     ],
     up: [
-      '..0220..',
-      '.022220.',
-      '.022220.',
-      '.022220.',
-      '..3333..',
-      '.333333.',
-      '3.3333.3',
-      '..3333..',
-      '..4444..',
-      '..44.44.',
-      '..44.44.',
-      '..55.55.',
+      '....0220....',
+      '...022220...',
+      '..0022220..',
+      '.002222200..',
+      '.022222220..',
+      '.022222220..',
+      '.022222220..',
+      '..2222220...',
+      '...3333....',
+      '..333333...',
+      '..333333...',
+      '.3333333.3.',
+      '.3.33333.3.',
+      '..333333...',
+      '...8888....',
+      '..444444...',
+      '..444.444..',
+      '..444.444..',
+      '..444.444..',
+      '..555.555..',
     ],
     left: [
-      '..0220..',
-      '.022220.',
-      '.012220.',
-      '.022220.',
-      '..3333..',
-      '.33333..',
-      '3.3333..',
-      '..3333..',
-      '..4444..',
-      '.44.44..',
-      '.44.44..',
-      '.55.55..',
+      '...0220.....',
+      '..022220....',
+      '.0022220....',
+      '.02222200...',
+      '.022222200..',
+      '.0A11220....',
+      '.0211120....',
+      '..21112.....',
+      '..33337.....',
+      '..33333.....',
+      '.333333.....',
+      '.333333.....',
+      '3.33333.....',
+      '..33333.....',
+      '..8888......',
+      '..44444.....',
+      '.444.44.....',
+      '.444.44.....',
+      '.444.44.....',
+      '.555.55.....',
     ],
     right: [
-      '..0220..',
-      '.022220.',
-      '.022210.',
-      '.022220.',
-      '..3333..',
-      '..33333.',
-      '..3333.3',
-      '..3333..',
-      '..4444..',
-      '..44.44.',
-      '..44.44.',
-      '..55.55.',
+      '.....0220...',
+      '....022220..',
+      '....022220..',
+      '...00222220.',
+      '..002222220.',
+      '....02211A0.',
+      '....0211120.',
+      '.....21112..',
+      '.....73333..',
+      '.....33333..',
+      '.....333333.',
+      '.....333333.',
+      '.....33333.3',
+      '.....33333..',
+      '......8888..',
+      '.....44444..',
+      '.....44.444.',
+      '.....44.444.',
+      '.....44.444.',
+      '.....55.555.',
     ],
   };
 
-  const sprite = sprites[OW.facing] || sprites.down;
-  const colors = { '0': '#3322aa', '1': '#eeddcc', '2': '#6655cc', '3': '#dd6644', '4': '#4444aa', '5': '#553322' };
-  const ox = cx - 4 * s, oy = cy - 12 * s;
+  // Class-based color schemes
+  const classColors = {
+    connector: { '0': '#1a1a6b', '1': '#f5deb3', '2': '#3333aa', '3': '#cc4444', '4': '#2244aa', '5': '#442211', '6': '#d4b896', '7': '#dd5555', '8': '#886622', '9': '#4444cc', 'A': '#112244', 'B': '#cc6666' },
+    empath:    { '0': '#4a1a5a', '1': '#f5deb3', '2': '#7733aa', '3': '#44aa88', '4': '#334466', '5': '#442211', '6': '#d4b896', '7': '#55bb99', '8': '#886622', '9': '#9944cc', 'A': '#112244', 'B': '#cc6666' },
+    initiator: { '0': '#6b3300', '1': '#f5deb3', '2': '#aa5500', '3': '#dd8833', '4': '#333333', '5': '#442211', '6': '#d4b896', '7': '#ee9944', '8': '#886622', '9': '#cc7711', 'A': '#112244', 'B': '#cc6666' },
+    mentor:    { '0': '#2a4a2a', '1': '#f5deb3', '2': '#336633', '3': '#ffffff', '4': '#222244', '5': '#442211', '6': '#d4b896', '7': '#eeeeff', '8': '#886622', '9': '#448844', 'A': '#112244', 'B': '#cc6666' },
+  };
+  const defaultColors = { '0': '#1a1a6b', '1': '#f5deb3', '2': '#3333aa', '3': '#cc4444', '4': '#2244aa', '5': '#442211', '6': '#d4b896', '7': '#dd5555', '8': '#886622', '9': '#4444cc', 'A': '#112244', 'B': '#cc6666' };
 
-  // Walk animation: leg movement
+  const socialClass = (dashboardData?.gamification?.social_class || '').toLowerCase();
+  const colors = classColors[socialClass] || defaultColors;
+  const sprite = sprites[OW.facing] || sprites.down;
+  const spriteW = sprite[0].length;
+  const ox = cx - (spriteW / 2) * s;
+  const oy = cy - sprite.length * s;
+
   const legOffset = OW.walking ? [0, -s, 0, s][walkCycle] : 0;
 
   sprite.forEach((row, ry) => {
@@ -9717,12 +10369,9 @@ function drawCharSprite(ctx, cx, cy) {
       if (c !== '.') {
         ctx.fillStyle = colors[c] || '#fff';
         let yOff = 0;
-        // Animate legs (rows 9-11) and add a subtle bob (row 0-7)
-        if (OW.walking && ry >= 9) {
-          // Left leg (rx < 4) vs right leg (rx >= 4) offset
-          yOff = rx < 4 ? legOffset : -legOffset;
-        } else if (OW.walking && ry <= 7) {
-          // Subtle body bob
+        if (OW.walking && ry >= 16) {
+          yOff = rx < spriteW / 2 ? legOffset : -legOffset;
+        } else if (OW.walking && ry <= 13) {
           yOff = [0, -1, 0, -1][walkCycle];
         }
         ctx.fillRect(ox + rx * s, oy + ry * s + yOff, s, s);
@@ -9730,12 +10379,32 @@ function drawCharSprite(ctx, cx, cy) {
     });
   });
 
-  // Character name
-  ctx.fillStyle = '#ffffff';
+  // Shadow under character
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 4, 14, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Level badge above character
+  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
+  const level = dashboardData?.gamification?.level || 1;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  const nameW = ctx.measureText(user.name || 'You').width;
+
+  // Name plate
   ctx.font = '7px "Press Start 2P"';
   ctx.textAlign = 'center';
-  const user = JSON.parse(localStorage.getItem('orbit_user') || '{}');
-  ctx.fillText(user.name || 'You', cx, oy - 6);
+  const nameText = user.name || 'You';
+  const textW = ctx.measureText(nameText).width;
+  ctx.fillStyle = 'rgba(10,10,40,0.7)';
+  ctx.fillRect(cx - textW / 2 - 4, oy - 18, textW + 8, 14);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(nameText, cx, oy - 8);
+
+  // Lv. badge
+  ctx.fillStyle = '#ffd740';
+  ctx.font = '6px "Press Start 2P"';
+  ctx.fillText('Lv.' + level, cx, oy - 22);
 }
 
 function lightenColor(hex, amt) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'orbit-v10';
+const CACHE_NAME = 'orbit-v11';
 const SHELL_ASSETS = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-180.png'];
 
 // ── Install: cache the app shell ──
