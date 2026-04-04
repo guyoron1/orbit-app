@@ -248,6 +248,40 @@ textarea.form-input { resize:none; height:80px; }
 .empty-title { font-family:var(--font-display); font-size:20px; font-weight:700; margin-bottom:8px; }
 .empty-desc { font-size:14px; color:var(--text3); line-height:1.6; margin-bottom:24px; }
 
+/* Share Card Canvas */
+.share-card-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:250; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(12px); animation:fadeIn 0.3s ease; }
+.share-card-overlay canvas { border-radius:20px; max-width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+.share-card-actions { display:flex; gap:12px; margin-top:20px; }
+
+/* Invite Banner */
+.invite-banner { background:linear-gradient(135deg,var(--accent4) 0%,var(--neon-blue) 100%); border-radius:var(--radius); padding:20px; margin-bottom:16px; position:relative; overflow:hidden; cursor:pointer; }
+.invite-banner::before { content:''; position:absolute; top:-40%; right:-10%; width:200px; height:200px; background:rgba(255,255,255,0.08); border-radius:50%; }
+.invite-banner-title { font-family:var(--font-display); font-size:16px; font-weight:700; margin-bottom:4px; }
+.invite-banner-desc { font-size:12px; opacity:0.8; }
+
+/* Weekly Event */
+.weekly-event { background:linear-gradient(135deg,#1a1a3e 0%,#0d0d2b 100%); border:1px solid rgba(255,215,64,0.2); border-radius:var(--radius); padding:20px; margin-bottom:16px; position:relative; overflow:hidden; }
+.weekly-event::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--gold),var(--accent),var(--gold)); background-size:200% auto; animation:cardTopGlow 3s linear infinite; }
+.event-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1.5px; padding:4px 10px; border-radius:12px; background:rgba(255,215,64,0.15); color:var(--gold); border:1px solid rgba(255,215,64,0.2); margin-bottom:10px; }
+.event-title { font-family:var(--font-display); font-size:18px; font-weight:700; margin-bottom:4px; }
+.event-desc { font-size:13px; color:var(--text2); margin-bottom:12px; }
+.event-bonus { font-size:13px; font-weight:700; color:var(--accent3); }
+
+/* Group challenge badge */
+.group-badge { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:800; color:var(--neon-blue); background:rgba(0,180,255,0.1); padding:3px 8px; border-radius:8px; }
+.opponent-stack { display:flex; margin-left:-8px; }
+.opponent-stack .opponent-avatar { margin-left:-8px; border:2px solid var(--bg2); }
+.opponent-stack .opponent-avatar:first-child { margin-left:0; }
+
+/* Story card */
+.story-card { background:var(--surface); border-radius:var(--radius); padding:20px; margin-bottom:16px; border:1px solid var(--border); position:relative; overflow:hidden; }
+.story-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--accent3),var(--accent),var(--accent2),var(--accent4)); }
+.story-title { font-family:var(--font-display); font-size:16px; font-weight:700; margin-bottom:12px; }
+.story-stats { display:flex; gap:16px; margin-bottom:12px; }
+.story-stat { text-align:center; }
+.story-stat-value { font-family:var(--font-display); font-size:22px; font-weight:700; }
+.story-stat-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; }
+
 /* Check-in Overlay */
 .checkin-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:200; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(12px); animation:fadeIn 0.3s ease; }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
@@ -329,11 +363,21 @@ textarea.form-input { resize:none; height:80px; }
           </div>
         </div>
       </div>
+      <div class="weekly-event" id="weeklyEvent">
+        <div class="event-badge">⭐ Weekly Event</div>
+        <div class="event-title" id="eventTitle">Loading...</div>
+        <div class="event-desc" id="eventDesc"></div>
+        <div class="event-bonus" id="eventBonus">2x XP on all challenges</div>
+      </div>
+      <div class="invite-banner" onclick="showInviteSheet()">
+        <div class="invite-banner-title">🎁 Invite Friends, Earn Rewards</div>
+        <div class="invite-banner-desc">Get 50 XP for every friend who joins. They get 100 XP too!</div>
+      </div>
       <div class="taunt-banner" id="tauntBanner" onclick="showPage('streaks')">
         <div class="taunt-emoji">🐔</div>
         <div class="taunt-text" id="tauntText">Loading taunts...</div>
       </div>
-      <div class="section-header"><div class="section-title">Active Challenges</div><div class="section-action" onclick="openSendChallenge()">+ New</div></div>
+      <div class="section-header"><div class="section-title">Active Challenges</div><div style="display:flex;gap:6px"><div class="section-action" onclick="openGroupChallenge()">👥 Group</div><div class="section-action" onclick="openSendChallenge()">+ New</div></div></div>
       <div id="activeChallenges" class="stagger"></div>
       <div class="section-header" id="incomingHeader" style="display:none"><div class="section-title">🔥 Incoming</div></div>
       <div id="incomingChallenges" class="stagger"></div>
@@ -402,6 +446,16 @@ textarea.form-input { resize:none; height:80px; }
       </div>
       <div class="section-header"><div class="section-title">🏅 Achievements</div></div>
       <div id="achievementsGrid" class="achievement-grid"></div>
+      <div class="section-header"><div class="section-title">📊 Your Challenge Story</div><div class="section-action" onclick="shareStoryCard()">Share</div></div>
+      <div class="story-card" id="storyCard">
+        <div class="story-stats">
+          <div class="story-stat"><div class="story-stat-value accent" id="storyTotal">0</div><div class="story-stat-label">Challenges</div></div>
+          <div class="story-stat"><div class="story-stat-value green" id="storyWon">0</div><div class="story-stat-label">Won</div></div>
+          <div class="story-stat"><div class="story-stat-value fire" id="storyStreak">0</div><div class="story-stat-label">Best Streak</div></div>
+          <div class="story-stat"><div class="story-stat-value" style="color:var(--gold)" id="storyLevel">1</div><div class="story-stat-label">Level</div></div>
+        </div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.5" id="storyText">Loading your story...</div>
+      </div>
       <div class="section-header"><div class="section-title">Favorite Categories</div></div>
       <div id="profileCategories" class="category-scroll"></div>
       <div class="section-header"><div class="section-title">Recent Activity</div></div>
@@ -459,6 +513,48 @@ textarea.form-input { resize:none; height:80px; }
       </div>
       <button class="btn btn-primary btn-glow" onclick="submitProof()" style="width:100%" id="proofSubmitBtn">Complete Challenge ✅</button>
       <button class="btn btn-secondary" onclick="submitProofSkip()" style="width:100%;margin-top:8px;font-size:12px;text-transform:none;letter-spacing:0">Skip proof (no photo)</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVITE MODAL -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">Invite Friends</div><button class="modal-close" onclick="closeInvite()">&times;</button></div>
+    <div class="modal-body" style="text-align:center">
+      <div style="font-size:56px;margin-bottom:12px">🎁</div>
+      <div style="font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:8px">Share the Challenge</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5">When friends join with your link, you both get bonus XP. The more friends, the more rewards!</div>
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <div class="stat-box" style="flex:1"><div class="stat-value accent">50</div><div class="stat-label">XP per invite</div></div>
+        <div class="stat-box" style="flex:1"><div class="stat-value green">100</div><div class="stat-label">Friend gets</div></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;font-size:13px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="inviteLink">Loading...</div>
+        <button class="btn btn-primary btn-sm" onclick="copyInviteLink()">Copy</button>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="shareInvite('whatsapp')" style="flex:1;font-size:20px">💬</button>
+        <button class="btn btn-secondary" onclick="shareInvite('twitter')" style="flex:1;font-size:20px">𝕏</button>
+        <button class="btn btn-secondary" onclick="shareInvite('sms')" style="flex:1;font-size:20px">📱</button>
+        <button class="btn btn-secondary" onclick="shareInvite('native')" style="flex:1;font-size:20px">📤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP CHALLENGE MODAL -->
+<div class="modal-overlay" id="groupModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header"><div class="modal-title">Group Challenge</div><button class="modal-close" onclick="closeGroupModal()">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Challenge</label><input type="text" class="form-input" id="groupTitle" placeholder="e.g. Who can run 5K the fastest?"></div>
+      <div class="form-group"><label class="form-label">Category</label><div class="category-scroll" id="groupCategories"></div></div>
+      <div class="form-group"><label class="form-label">Select Challengers (pick 2+)</label><div id="groupContactList" class="stagger"></div></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px"><span id="groupSelectedCount">0</span> selected</div>
+      <button class="btn btn-primary btn-glow" onclick="sendGroupChallenge()" style="width:100%">⚡ Launch Group Challenge</button>
     </div>
   </div>
 </div>
@@ -561,7 +657,7 @@ async function initApp(){
   document.getElementById('authScreen').style.display='none';
   document.getElementById('mainApp').style.display='';
   await Promise.all([loadContacts(),loadChallenges(),loadDashboard(),loadAchievements(),loadLeaderboard()]);
-  renderFeed();renderProfile();renderStreaks();renderCotd();renderTaunt();renderXpBar();renderAchievements();renderLeaderboard();
+  renderFeed();renderProfile();renderStreaks();renderCotd();renderTaunt();renderXpBar();renderAchievements();renderLeaderboard();renderWeeklyEvent();renderStory();
   doDailyCheckIn();
 }
 async function loadContacts(){try{contacts=await api('/contacts');}catch(e){contacts=[];}}
@@ -648,6 +744,8 @@ function renderFeed(){
 function renderChallengeCard(c,type){
   const category=guessCat(c.activity_type), badgeClass='badge-'+category;
   const catLabel=CATEGORIES.find(cat=>cat.id===category)?.label||'✨ Custom';
+  const isGroup=c.title?.startsWith('[GROUP]');
+  if(isGroup)c.title=c.title.replace('[GROUP] ','');
   let timerHtml='';
   if(c.expires_at){const rem=new Date(c.expires_at)-Date.now();if(rem>0){const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000);timerHtml=`<div class="challenge-timer ${h<6?'urgent':''}">⏰ ${h}h ${m}m</div>`;}}
   const opName=c.contact_name||'Someone', opInit=opName.charAt(0).toUpperCase(), myInit=(currentUser?.name||'?').charAt(0).toUpperCase();
@@ -656,11 +754,11 @@ function renderChallengeCard(c,type){
   let actionsHtml='';
   if(type==='incoming'){actionsHtml=`<div class="challenge-card-actions"><button class="btn btn-accept" onclick="acceptChallenge(${c.id})">Accept 🔥</button><button class="btn btn-decline" onclick="declineChallenge(${c.id})">Pass</button></div>`;}
   else if(type==='active'){actionsHtml=`<div class="challenge-card-actions"><button class="btn btn-primary btn-glow" onclick="startCompleteChallenge(${c.id})">Done! ✅</button><button class="btn btn-share" onclick="shareChallenge(${c.id})">📤</button></div>`;}
-  else if(type==='completed'){actionsHtml=`<div class="challenge-card-actions"><button class="btn btn-share" onclick="shareChallenge(${c.id})" style="flex:1">📤 Share</button></div>`;}
+  else if(type==='completed'){actionsHtml=`<div class="challenge-card-actions"><button class="btn btn-primary btn-sm" onclick="showShareCard(${c.id})" style="flex:1">🎨 Share Card</button><button class="btn btn-share" onclick="shareChallenge(${c.id})">📤</button></div>`;}
   else{actionsHtml=`<div class="challenge-card-actions"><button class="btn btn-secondary" style="font-size:12px;text-transform:none;letter-spacing:0">Waiting for response...</button><button class="btn btn-share" onclick="shareChallenge(${c.id})">📤</button></div>`;}
 
   return `<div class="challenge-card">
-    <div class="challenge-card-header"><span class="challenge-type-badge ${badgeClass}">${catLabel}</span>${timerHtml}</div>
+    <div class="challenge-card-header"><span class="challenge-type-badge ${badgeClass}">${catLabel}</span>${isGroup?'<span class="group-badge">👥 Group</span>':''}${timerHtml}</div>
     <div class="challenge-card-body">
       <div class="challenge-title">${escHtml(c.title)}</div>
       ${c.description?`<div class="challenge-desc">${escHtml(c.description)}</div>`:''}
@@ -680,18 +778,6 @@ function toggleCompleted(){
   const btn=document.querySelector('#completedHeader .section-action');
   if(el.style.display==='none'){el.style.display='';btn.textContent='Hide';}
   else{el.style.display='none';btn.textContent='Show';}
-}
-
-// ═══ SHARE ═══
-async function shareChallenge(id){
-  const c=challenges.find(ch=>ch.id===id);
-  const shareUrl=`${BASE}/challenges/${id}/share`;
-  const shareText=c?`${c.title} — I challenge you! 🔥`:'Check out this challenge! 🔥';
-  if(navigator.share){
-    try{await navigator.share({title:'Challenge',text:shareText,url:shareUrl});}catch(e){}
-  } else {
-    try{await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);showToast('Link copied! 📋','success');}catch(e){showToast('Could not copy link','error');}
-  }
 }
 
 // ═══ COTD ═══
@@ -886,6 +972,223 @@ function showToast(msg,type){
 }
 function escHtml(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 function escAttr(s){return(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+// ═══ WEEKLY EVENT ═══
+const WEEKLY_EVENTS=[
+  {title:"Fitness Frenzy Week",desc:"All fitness challenges give 2x XP this week!",bonus:"2x XP on fitness",icon:"💪"},
+  {title:"Social Butterfly Week",desc:"Connect with 5 different people to earn a bonus reward.",bonus:"Bonus 200 XP at 5 connections",icon:"🦋"},
+  {title:"Adventure Quest",desc:"Try something new! Adventure challenges give 2x XP.",bonus:"2x XP on adventure",icon:"🌍"},
+  {title:"Knowledge Bowl",desc:"Learn something new every day this week.",bonus:"2x XP on knowledge",icon:"🧠"},
+  {title:"Creative Sprint",desc:"Express yourself! Creative challenges are worth double.",bonus:"2x XP on creative",icon:"🎨"},
+  {title:"Streak Masters",desc:"Maintain a 7-day streak for a massive XP bonus.",bonus:"+500 XP at 7-day streak",icon:"🔥"},
+];
+function renderWeeklyEvent(){
+  const weekNum=Math.floor(Date.now()/(7*86400000))%WEEKLY_EVENTS.length;
+  const ev=WEEKLY_EVENTS[weekNum];
+  document.getElementById('eventTitle').textContent=ev.icon+' '+ev.title;
+  document.getElementById('eventDesc').textContent=ev.desc;
+  document.getElementById('eventBonus').textContent=ev.bonus;
+}
+
+// ═══ INVITE / REFERRAL ═══
+function showInviteSheet(){
+  const code=currentUser?.name?.toLowerCase().replace(/\s+/g,'')||'friend';
+  document.getElementById('inviteLink').textContent=`${BASE}?ref=${code}`;
+  document.getElementById('inviteModal').classList.add('active');
+}
+function closeInvite(){document.getElementById('inviteModal').classList.remove('active');}
+async function copyInviteLink(){
+  const link=document.getElementById('inviteLink').textContent;
+  try{await navigator.clipboard.writeText(link);showToast('Invite link copied! 📋','success');}catch(e){showToast('Could not copy','error');}
+}
+function shareInvite(platform){
+  const link=document.getElementById('inviteLink').textContent;
+  const text="I'm using Challenge to dare my friends! Join me 🔥";
+  if(platform==='native'&&navigator.share){navigator.share({title:'Join Challenge',text,url:link}).catch(()=>{});return;}
+  const urls={whatsapp:`https://wa.me/?text=${encodeURIComponent(text+' '+link)}`,twitter:`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`,sms:`sms:?body=${encodeURIComponent(text+' '+link)}`};
+  if(urls[platform])window.open(urls[platform],'_blank');
+  else{copyInviteLink();}
+}
+
+// ═══ SHARE CARD (Canvas) ═══
+function generateShareCard(challenge){
+  return new Promise(resolve=>{
+    const w=600,h=400;
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    // Background gradient
+    const grad=ctx.createLinearGradient(0,0,w,h);
+    grad.addColorStop(0,'#1a0a2e');grad.addColorStop(0.4,'#16213e');grad.addColorStop(1,'#0a0a0f');
+    ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+    // Accent line top
+    const topGrad=ctx.createLinearGradient(0,0,w,0);
+    topGrad.addColorStop(0,'#ff6b35');topGrad.addColorStop(0.5,'#ff2d78');topGrad.addColorStop(1,'#7c5cff');
+    ctx.fillStyle=topGrad;ctx.fillRect(0,0,w,5);
+    // Glow circles
+    ctx.globalAlpha=0.06;ctx.fillStyle='#ff6b35';ctx.beginPath();ctx.arc(w*0.8,h*0.2,200,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#7c5cff';ctx.beginPath();ctx.arc(w*0.2,h*0.8,150,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;
+    // "CHALLENGE COMPLETED" badge
+    ctx.fillStyle='rgba(0,229,160,0.15)';roundRect(ctx,30,30,220,32,16);ctx.fill();
+    ctx.fillStyle='#00e5a0';ctx.font='bold 11px Inter,sans-serif';ctx.letterSpacing='2px';
+    ctx.fillText('✅ CHALLENGE COMPLETED',44,52);
+    // Challenge title
+    ctx.fillStyle='#f0f0ff';ctx.font='bold 28px "Space Grotesk",sans-serif';
+    wrapText(ctx,challenge.title||'Challenge',30,100,w-60,34);
+    // VS section
+    const myName=(currentUser?.name||'You'), opName=(challenge.contact_name||'Opponent');
+    const myInit=myName.charAt(0).toUpperCase(), opInit=opName.charAt(0).toUpperCase();
+    // My avatar
+    const avatarGrad1=ctx.createLinearGradient(30,180,70,220);
+    avatarGrad1.addColorStop(0,'#ff6b35');avatarGrad1.addColorStop(1,'#ff2d78');
+    ctx.fillStyle=avatarGrad1;ctx.beginPath();ctx.arc(58,210,28,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 20px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(myInit,58,217);
+    ctx.textAlign='left';
+    ctx.fillStyle='#f0f0ff';ctx.font='bold 15px Inter,sans-serif';ctx.fillText(myName,95,207);
+    ctx.fillStyle='#888';ctx.font='12px Inter,sans-serif';ctx.fillText('Challenger',95,224);
+    // VS badge
+    ctx.fillStyle='rgba(255,107,53,0.1)';roundRect(ctx,260,196,40,28,8);ctx.fill();
+    ctx.fillStyle='#ff6b35';ctx.font='bold 12px "Space Grotesk",sans-serif';ctx.textAlign='center';ctx.fillText('VS',280,215);ctx.textAlign='left';
+    // Opponent avatar
+    const avatarGrad2=ctx.createLinearGradient(310,180,350,220);
+    avatarGrad2.addColorStop(0,'#7c5cff');avatarGrad2.addColorStop(1,'#00b4ff');
+    ctx.fillStyle=avatarGrad2;ctx.beginPath();ctx.arc(338,210,28,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 20px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(opInit,338,217);ctx.textAlign='left';
+    ctx.fillStyle='#f0f0ff';ctx.font='bold 15px Inter,sans-serif';ctx.fillText(opName,375,207);
+    ctx.fillStyle='#888';ctx.font='12px Inter,sans-serif';ctx.fillText('Challenged',375,224);
+    // Stats bar
+    const stats=[
+      {label:'XP EARNED',value:'+'+(challenge.xp_reward||60),color:'#00e5a0'},
+      {label:'STREAK',value:(dashData?.gamification?.streak_days||0)+'d',color:'#ff4444'},
+      {label:'LEVEL',value:'Lv '+(dashData?.gamification?.level_progress?.level||1),color:'#ffd740'},
+    ];
+    stats.forEach((s,i)=>{
+      const x=30+i*190;
+      ctx.fillStyle='rgba(255,255,255,0.04)';roundRect(ctx,x,270,170,50,12);ctx.fill();
+      ctx.fillStyle=s.color;ctx.font='bold 22px "Space Grotesk",sans-serif';ctx.fillText(s.value,x+12,300);
+      ctx.fillStyle='#555';ctx.font='bold 9px Inter,sans-serif';ctx.fillText(s.label,x+12,316);
+    });
+    // Footer branding
+    ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(0,h-50,w,50);
+    ctx.fillStyle='#555';ctx.font='bold 11px "Space Grotesk",sans-serif';ctx.textAlign='center';
+    ctx.fillText('Challenge — Dare Your Friends 🔥',w/2,h-22);ctx.textAlign='left';
+    resolve(canvas);
+  });
+}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);}
+function wrapText(ctx,text,x,y,maxW,lineH){const words=text.split(' ');let line='';for(const w of words){const test=line+w+' ';if(ctx.measureText(test).width>maxW&&line!==''){ctx.fillText(line.trim(),x,y);y+=lineH;line=w+' ';}else{line=test;}}ctx.fillText(line.trim(),x,y);}
+
+async function showShareCard(challengeId){
+  const c=challenges.find(ch=>ch.id===challengeId);
+  if(!c)return;
+  const canvas=await generateShareCard(c);
+  const overlay=document.createElement('div');overlay.className='share-card-overlay';overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  const actions=document.createElement('div');actions.className='share-card-actions';
+  const saveBtn=document.createElement('button');saveBtn.className='btn btn-primary btn-sm';saveBtn.textContent='📥 Save Image';
+  saveBtn.onclick=()=>{const a=document.createElement('a');a.download='challenge-card.png';a.href=canvas.toDataURL();a.click();};
+  const shareBtn=document.createElement('button');shareBtn.className='btn btn-secondary btn-sm';shareBtn.textContent='📤 Share';
+  shareBtn.onclick=async()=>{
+    try{const blob=await new Promise(r=>canvas.toBlob(r));
+    if(navigator.share&&navigator.canShare){const file=new File([blob],'challenge.png',{type:'image/png'});
+    await navigator.share({files:[file],title:'Challenge',text:c.title+' 🔥'});}
+    else{saveBtn.click();}}catch(e){saveBtn.click();}
+  };
+  const closeBtn=document.createElement('button');closeBtn.className='btn btn-secondary btn-sm';closeBtn.textContent='✕ Close';closeBtn.onclick=()=>overlay.remove();
+  actions.append(saveBtn,shareBtn,closeBtn);
+  overlay.append(canvas,actions);document.body.appendChild(overlay);
+}
+
+// Update shareChallenge to offer card option for completed
+async function shareChallenge(id){
+  const c=challenges.find(ch=>ch.id===id);
+  if(c&&c.status==='completed'){showShareCard(id);return;}
+  const shareUrl=`${BASE}/challenges/${id}/share`;
+  const shareText=c?`${c.title} — I challenge you! 🔥`:'Check out this challenge! 🔥';
+  if(navigator.share){try{await navigator.share({title:'Challenge',text:shareText,url:shareUrl});}catch(e){}}
+  else{try{await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);showToast('Link copied! 📋','success');}catch(e){showToast('Could not copy link','error');}}
+}
+
+// ═══ STORY CARD ═══
+function renderStory(){
+  const total=challenges.length, won=challenges.filter(c=>c.status==='completed').length;
+  const streak=dashData?.gamification?.streak_days||0;
+  const level=dashData?.gamification?.level_progress?.level||1;
+  document.getElementById('storyTotal').textContent=total;
+  document.getElementById('storyWon').textContent=won;
+  document.getElementById('storyStreak').textContent=streak;
+  document.getElementById('storyLevel').textContent=level;
+  // Generate narrative
+  let story='';
+  if(total===0) story="Your challenge journey starts now. Send your first dare!";
+  else if(won===0) story=`You've sent ${total} challenge${total>1?'s':''} but haven't completed any yet. Time to step up!`;
+  else if(won>=10) story=`🏆 Legendary! ${won} challenges conquered out of ${total}. ${streak>3?`Your ${streak}-day streak is on fire!`:'Keep the momentum going!'}`;
+  else if(won>=5) story=`💪 Rising star! ${won} wins from ${total} challenges. ${streak>1?`${streak}-day streak and counting!`:'Start a streak to boost your XP!'}`;
+  else story=`🌟 ${won} challenge${won>1?'s':''} down, many more to go! Level ${level} and climbing.`;
+  document.getElementById('storyText').textContent=story;
+}
+
+async function shareStoryCard(){
+  const w=600,h=350;const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  const grad=ctx.createLinearGradient(0,0,w,h);grad.addColorStop(0,'#0a0a2e');grad.addColorStop(1,'#16062e');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+  const topGrad=ctx.createLinearGradient(0,0,w,0);topGrad.addColorStop(0,'#00e5a0');topGrad.addColorStop(0.5,'#ff6b35');topGrad.addColorStop(1,'#ff2d78');
+  ctx.fillStyle=topGrad;ctx.fillRect(0,0,w,4);
+  ctx.globalAlpha=0.05;ctx.fillStyle='#00e5a0';ctx.beginPath();ctx.arc(500,80,180,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  ctx.fillStyle='#f0f0ff';ctx.font='bold 13px "Space Grotesk",sans-serif';ctx.fillText((currentUser?.name||'Challenger')+"'s Journey",30,45);
+  const total=challenges.length,won=challenges.filter(c=>c.status==='completed').length;
+  const streak=dashData?.gamification?.streak_days||0,level=dashData?.gamification?.level_progress?.level||1;
+  const stats=[{v:total,l:'CHALLENGES',c:'#ff6b35'},{v:won,l:'WON',c:'#00e5a0'},{v:streak+'d',l:'STREAK',c:'#ff4444'},{v:'Lv'+level,l:'LEVEL',c:'#ffd740'}];
+  stats.forEach((s,i)=>{const x=30+i*140;ctx.fillStyle='rgba(255,255,255,0.04)';roundRect(ctx,x,70,125,80,14);ctx.fill();
+    ctx.fillStyle=s.c;ctx.font='bold 32px "Space Grotesk",sans-serif';ctx.fillText(String(s.v),x+14,115);
+    ctx.fillStyle='#555';ctx.font='bold 9px Inter,sans-serif';ctx.fillText(s.l,x+14,140);});
+  // Earned achievements
+  const earned=achievements.filter(a=>a.earned);
+  if(earned.length){ctx.fillStyle='#888';ctx.font='bold 10px Inter,sans-serif';ctx.fillText('ACHIEVEMENTS UNLOCKED',30,195);
+    earned.slice(0,6).forEach((a,i)=>{ctx.font='24px sans-serif';ctx.fillText(a.icon,30+i*45,225);});}
+  ctx.fillStyle='#555';ctx.font='bold 11px "Space Grotesk",sans-serif';ctx.textAlign='center';
+  ctx.fillText('Challenge — Dare Your Friends 🔥',w/2,h-20);ctx.textAlign='left';
+  // Show it
+  const overlay=document.createElement('div');overlay.className='share-card-overlay';overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  const actions=document.createElement('div');actions.className='share-card-actions';
+  const saveBtn=document.createElement('button');saveBtn.className='btn btn-primary btn-sm';saveBtn.textContent='📥 Save';
+  saveBtn.onclick=()=>{const a=document.createElement('a');a.download='my-challenge-story.png';a.href=canvas.toDataURL();a.click();};
+  const closeBtn=document.createElement('button');closeBtn.className='btn btn-secondary btn-sm';closeBtn.textContent='✕ Close';closeBtn.onclick=()=>overlay.remove();
+  actions.append(saveBtn,closeBtn);overlay.append(canvas,actions);document.body.appendChild(overlay);
+}
+
+// ═══ GROUP CHALLENGE ═══
+let groupSelectedContacts=[], groupCategory='fitness';
+function openGroupChallenge(){
+  groupSelectedContacts=[];groupCategory='fitness';renderGroupModal();
+  document.getElementById('groupModal').classList.add('active');
+}
+function closeGroupModal(){document.getElementById('groupModal').classList.remove('active');}
+function renderGroupModal(){
+  document.getElementById('groupCategories').innerHTML=CATEGORIES.map(c=>`<div class="category-pill ${groupCategory===c.id?'active':''}" onclick="groupCategory='${c.id}';renderGroupModal()">${c.label}</div>`).join('');
+  document.getElementById('groupSelectedCount').textContent=groupSelectedContacts.length;
+  document.getElementById('groupContactList').innerHTML=contacts.slice(0,10).map(c=>{
+    const sel=groupSelectedContacts.includes(c.id);
+    return `<div class="person-row" style="${sel?'border:1px solid var(--accent3)':''}" onclick="toggleGroupContact(${c.id})"><div class="person-avatar">${c.name.charAt(0)}</div><div class="person-info"><div class="person-name">${escHtml(c.name)}</div></div><div style="font-size:18px">${sel?'✅':'○'}</div></div>`;
+  }).join('');
+}
+function toggleGroupContact(id){
+  const idx=groupSelectedContacts.indexOf(id);
+  if(idx>=0)groupSelectedContacts.splice(idx,1);else groupSelectedContacts.push(id);
+  renderGroupModal();
+}
+async function sendGroupChallenge(){
+  const title=document.getElementById('groupTitle').value.trim();
+  if(!title)return showToast('Name your challenge!','error');
+  if(groupSelectedContacts.length<2)return showToast('Pick at least 2 challengers!','error');
+  let successCount=0;
+  for(const cid of groupSelectedContacts){
+    try{await api('/challenges',{method:'POST',body:JSON.stringify({contact_id:cid,title:'[GROUP] '+title,description:`Group challenge with ${groupSelectedContacts.length} people!`,activity_type:CATEGORY_TO_ACTIVITY[groupCategory]||'custom'})});successCount++;}catch(e){}
+  }
+  if(successCount>0){fireConfetti();showToast(`Group challenge sent to ${successCount} people! 🔥`,'success');closeGroupModal();
+    await loadChallenges();renderFeed();renderStreaks();}
+  else showToast('Failed to send challenges','error');
+}
 
 // ═══ BOOT ═══
 initApp();
