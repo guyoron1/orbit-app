@@ -412,6 +412,7 @@ class Challenge(Base):
     activity_type = Column(Enum(ActivityType), nullable=False)
     xp_reward = Column(Integer, default=40)
     status = Column(Enum(ChallengeStatus), default=ChallengeStatus.pending)
+    proof_url = Column(Text, default="")  # base64 data URL or external URL of proof photo
     expires_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

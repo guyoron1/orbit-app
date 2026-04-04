@@ -445,6 +445,10 @@ class ChallengeCreate(BaseModel):
     activity_type: ActivityType
 
 
+class ChallengeCompleteRequest(BaseModel):
+    proof_url: str = ""
+
+
 class ChallengeOut(BaseModel):
     id: int
     challenger_id: int
@@ -455,6 +459,7 @@ class ChallengeOut(BaseModel):
     activity_type: ActivityType
     xp_reward: int
     status: ChallengeStatus
+    proof_url: str = ""
     expires_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime

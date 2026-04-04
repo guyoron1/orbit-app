@@ -1329,7 +1329,8 @@ def create_challenge(
         contact_id=challenge.contact_id, contact_name=contact.name,
         title=challenge.title, description=challenge.description,
         activity_type=challenge.activity_type, xp_reward=challenge.xp_reward,
-        status=challenge.status, expires_at=challenge.expires_at,
+        status=challenge.status, proof_url=challenge.proof_url or "",
+        expires_at=challenge.expires_at,
         completed_at=challenge.completed_at, created_at=challenge.created_at,
     )
 
@@ -1380,6 +1381,7 @@ def accept_challenge(
 @app.post("/challenges/{challenge_id}/complete")
 def complete_challenge(
     challenge_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1389,6 +1391,16 @@ def complete_challenge(
     ).first()
     if not challenge:
         raise HTTPException(404, "Challenge not found or already completed")
+
+    # Accept optional proof URL from body
+    try:
+        import json
+        body = json.loads(request._body.decode()) if hasattr(request, '_body') else {}
+    except Exception:
+        body = {}
+    proof_url = body.get("proof_url", "")
+    if proof_url and len(proof_url) < 5_000_000:  # limit ~5MB base64
+        challenge.proof_url = proof_url
 
     challenge.status = ChallengeStatus.completed
     challenge.completed_at = datetime.utcnow()
@@ -1417,6 +1429,39 @@ def decline_challenge(
     challenge.status = ChallengeStatus.declined
     db.commit()
     return {"status": "declined", "challenge_id": challenge_id}
+
+
+# ══════════════════════════════════════════════
+# CHALLENGE SHARE (public, no auth)
+# ══════════════════════════════════════════════
+
+@app.get("/challenges/{challenge_id}/share")
+def get_challenge_share(
+    challenge_id: int,
+    db: Session = Depends(get_db),
+):
+    """Public endpoint: returns challenge info for shared links."""
+    challenge = db.query(Challenge).filter(Challenge.id == challenge_id).first()
+    if not challenge:
+        raise HTTPException(404, "Challenge not found")
+
+    challenger = db.query(User).filter(User.id == challenge.challenger_id).first()
+    contact = db.query(Contact).filter(Contact.id == challenge.contact_id).first()
+
+    return {
+        "id": challenge.id,
+        "title": challenge.title,
+        "description": challenge.description,
+        "activity_type": challenge.activity_type.value,
+        "status": challenge.status.value,
+        "xp_reward": challenge.xp_reward,
+        "proof_url": challenge.proof_url or "",
+        "challenger_name": challenger.name if challenger else "Someone",
+        "contact_name": contact.name if contact else "Someone",
+        "created_at": challenge.created_at.isoformat() if challenge.created_at else "",
+        "completed_at": challenge.completed_at.isoformat() if challenge.completed_at else "",
+        "expires_at": challenge.expires_at.isoformat() if challenge.expires_at else "",
+    }
 
 
 # ══════════════════════════════════════════════
