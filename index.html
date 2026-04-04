@@ -823,6 +823,7 @@ function showPage(pageId) {
   const nav = document.getElementById('nav-' + pageId);
   if (page) page.classList.add('active');
   if (nav) nav.classList.add('active');
+  if (pageId === 'activity') renderActivity();
 }
 
 // ═══ RENDER: FEED ═══
@@ -1220,6 +1221,48 @@ function renderNearby(people) {
         <button class="btn btn-primary btn-sm" onclick="openSendChallengeTo(${p.contact_id || p.id}, '${escAttr(p.name)}')">⚡</button>
       </div>
     `).join('');
+}
+
+// ═══ ACTIVITY FEED ═══
+async function renderActivity() {
+  const el = document.getElementById('activityFeed');
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">Loading...</div>';
+  try {
+    const feed = await api('/feed?limit=30');
+    if (!feed || feed.length === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">📭</div><div style="color:var(--text3)">No activity yet. Send your first challenge!</div></div>';
+      return;
+    }
+    el.innerHTML = feed.map(item => {
+      const ago = timeAgo(item.timestamp);
+      const xpBadge = item.xp ? `<span style="color:var(--accent3);font-size:11px;font-weight:700">+${item.xp} XP</span>` : '';
+      return `<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="font-size:24px;width:36px;text-align:center">${item.icon || '⚡'}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">${escHtml(item.title)}</div>
+          <div style="font-size:12px;color:var(--text3)">${escHtml(item.description || '')}</div>
+        </div>
+        <div style="text-align:right">
+          ${xpBadge}
+          <div style="font-size:11px;color:var(--text3)">${ago}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">Could not load activity</div>';
+  }
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return mins + 'm';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h';
+  const days = Math.floor(hrs / 24);
+  return days + 'd';
 }
 
 // ═══ UTILITIES ═══
