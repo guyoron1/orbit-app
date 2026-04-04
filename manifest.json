@@ -1,13 +1,13 @@
 {
-  "name": "Orbit - Relationship Intelligence",
-  "short_name": "Orbit",
+  "name": "Challenge - Dare Your Friends",
+  "short_name": "Challenge",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
-  "description": "AI-powered relationship intelligence. Smart nudges, health tracking, and gamified social engagement to help you nurture the connections that matter most.",
-  "categories": ["social", "lifestyle", "productivity"],
+  "description": "Send challenges to friends and nearby strangers. Build streaks, earn bragging rights, and expand your social circle through dares and adventures.",
+  "categories": ["social", "lifestyle", "games"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -25,15 +25,15 @@
   "screenshots": [],
   "shortcuts": [
     {
-      "name": "Add Interaction",
-      "short_name": "Log",
-      "url": "/?action=add-interaction",
+      "name": "Send Challenge",
+      "short_name": "Challenge",
+      "url": "/?action=send-challenge",
       "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
     },
     {
-      "name": "View Contacts",
-      "short_name": "People",
-      "url": "/?page=contacts",
+      "name": "My Streaks",
+      "short_name": "Streaks",
+      "url": "/?page=streaks",
       "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
     }
   ]
