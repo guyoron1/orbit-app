@@ -9,28 +9,32 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0a0a0f;
-  --bg2: #12121a;
-  --bg3: #1a1a28;
-  --surface: #1e1e2e;
-  --surface2: #252538;
-  --border: #2a2a40;
-  --text: #ffffff;
-  --text2: #a0a0b8;
-  --text3: #666680;
+  --bg: #06060c;
+  --bg2: #0e0e18;
+  --bg3: #16162a;
+  --surface: rgba(22,22,42,0.7);
+  --surface2: rgba(30,30,55,0.8);
+  --surface-solid: #16162a;
+  --border: rgba(255,255,255,0.06);
+  --border-glow: rgba(255,107,53,0.3);
+  --text: #f0f0ff;
+  --text2: #8888aa;
+  --text3: #555570;
   --accent: #ff6b35;
-  --accent2: #ff3366;
-  --accent3: #00d4aa;
-  --accent4: #6c5ce7;
+  --accent2: #ff2d78;
+  --accent3: #00e5a0;
+  --accent4: #7c5cff;
   --fire: #ff4444;
   --gold: #ffd740;
   --neon-blue: #00b4ff;
+  --neon-pink: #ff00aa;
   --font: 'Inter', -apple-system, sans-serif;
-  --radius: 16px;
-  --radius-sm: 10px;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --radius: 20px;
+  --radius-sm: 14px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -41,369 +45,622 @@ html, body {
   height: 100%; overflow: hidden; -webkit-font-smoothing: antialiased;
 }
 
+/* ─── Animated BG ─── */
+.bg-glow {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 600px 400px at 20% 10%, rgba(255,107,53,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 500px at 80% 80%, rgba(124,92,255,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 300px at 50% 50%, rgba(0,229,160,0.04) 0%, transparent 70%);
+  animation: glowShift 12s ease-in-out infinite alternate;
+}
+@keyframes glowShift {
+  0% { opacity: 1; filter: hue-rotate(0deg); }
+  100% { opacity: 0.7; filter: hue-rotate(20deg); }
+}
+
+/* ─── Floating Particles ─── */
+.particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.particle {
+  position: absolute; border-radius: 50%; opacity: 0;
+  animation: floatUp linear infinite;
+}
+@keyframes floatUp {
+  0% { transform: translateY(100vh) scale(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.3; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+}
+
 /* ─── App Shell ─── */
-.app { display: flex; flex-direction: column; height: 100%; padding-top: var(--safe-top); }
+.app { display: flex; flex-direction: column; height: 100%; padding-top: var(--safe-top); position: relative; z-index: 1; }
 .app-header {
   padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg); border-bottom: 1px solid var(--border); z-index: 10;
-  min-height: 56px;
+  background: rgba(6,6,12,0.85); backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border); z-index: 10; min-height: 56px;
 }
-.app-logo { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
-.app-logo span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.app-logo { font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: -1px; }
+.app-logo span {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent4) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: logoShimmer 3s ease infinite;
+}
+@keyframes logoShimmer {
+  0%,100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
 .header-actions { display: flex; gap: 8px; align-items: center; }
 .header-btn {
-  width: 40px; height: 40px; border-radius: 50%; background: var(--surface);
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--surface); backdrop-filter: blur(10px);
   border: 1px solid var(--border); color: var(--text2); font-size: 18px;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
-.header-btn:hover { background: var(--surface2); color: var(--text); }
+.header-btn:active { transform: scale(0.85); }
 .header-btn.has-badge { position: relative; }
 .header-btn.has-badge::after {
-  content: ''; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px;
+  content: ''; position: absolute; top: 5px; right: 5px; width: 10px; height: 10px;
   background: var(--fire); border-radius: 50%; border: 2px solid var(--bg);
+  animation: badgePulse 2s ease infinite;
 }
+@keyframes badgePulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.3); } }
 
 /* ─── Main Content ─── */
 .app-content { flex: 1; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
-.page { display: none; padding: 0 16px 100px; }
-.page.active { display: block; }
+.page { display: none; padding: 0 16px 110px; }
+.page.active { display: block; animation: pageIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes pageIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ─── Bottom Nav ─── */
 .bottom-nav {
   display: flex; justify-content: space-around; align-items: center;
-  padding: 8px 0 calc(8px + var(--safe-bottom)); background: var(--bg2);
+  padding: 6px 0 calc(6px + var(--safe-bottom));
+  background: rgba(10,10,20,0.92); backdrop-filter: blur(24px) saturate(180%);
   border-top: 1px solid var(--border); z-index: 20;
 }
 .nav-item {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 16px; cursor: pointer; transition: all 0.2s; border-radius: 12px;
-  color: var(--text3); font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 14px; cursor: pointer; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  border-radius: 14px; color: var(--text3); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.5px; position: relative;
 }
-.nav-item .nav-icon { font-size: 22px; transition: transform 0.2s; }
+.nav-item .nav-icon { font-size: 24px; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
 .nav-item.active { color: var(--accent); }
-.nav-item.active .nav-icon { transform: scale(1.15); }
-.nav-item:hover { color: var(--text2); }
-.nav-center {
-  width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; color: white; cursor: pointer; margin-top: -20px;
-  box-shadow: 0 4px 20px rgba(255,107,53,0.4); transition: transform 0.2s;
-  border: 3px solid var(--bg2);
+.nav-item.active .nav-icon { transform: scale(1.2) translateY(-2px); }
+.nav-item.active::after {
+  content: ''; position: absolute; bottom: 0; width: 20px; height: 3px;
+  background: var(--accent); border-radius: 3px;
+  animation: navDotIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
-.nav-center:hover { transform: scale(1.1); }
-.nav-center:active { transform: scale(0.95); }
+@keyframes navDotIn { from { width: 0; opacity: 0; } to { width: 20px; opacity: 1; } }
+.nav-item:active .nav-icon { transform: scale(0.8); }
+.nav-center {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent4));
+  background-size: 200% 200%;
+  animation: centerBtnGlow 4s ease infinite;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 300; color: white; cursor: pointer; margin-top: -24px;
+  box-shadow: 0 4px 25px rgba(255,107,53,0.4), 0 0 60px rgba(255,107,53,0.15);
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  border: 3px solid rgba(255,255,255,0.1);
+}
+@keyframes centerBtnGlow {
+  0%,100% { background-position: 0% 50%; box-shadow: 0 4px 25px rgba(255,107,53,0.4), 0 0 60px rgba(255,107,53,0.15); }
+  50% { background-position: 100% 50%; box-shadow: 0 4px 25px rgba(124,92,255,0.4), 0 0 60px rgba(124,92,255,0.15); }
+}
+.nav-center:active { transform: scale(0.88) rotate(90deg); }
 
 /* ─── Cards ─── */
 .card {
-  background: var(--surface); border-radius: var(--radius); padding: 16px;
-  margin-bottom: 12px; border: 1px solid var(--border); transition: transform 0.2s;
+  background: var(--surface); backdrop-filter: blur(16px);
+  border-radius: var(--radius); padding: 16px;
+  margin-bottom: 10px; border: 1px solid var(--border);
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
-.card:active { transform: scale(0.98); }
+.card:active { transform: scale(0.97); }
+
+/* ─── Stagger Animation ─── */
+.stagger > * { opacity: 0; animation: staggerIn 0.5s forwards; }
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger > *:nth-child(8) { animation-delay: 0.4s; }
+.stagger > *:nth-child(9) { animation-delay: 0.45s; }
+.stagger > *:nth-child(10) { animation-delay: 0.5s; }
+@keyframes staggerIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ─── Challenge Card ─── */
 .challenge-card {
-  background: var(--surface); border-radius: var(--radius); padding: 0;
+  background: var(--surface); backdrop-filter: blur(16px);
+  border-radius: var(--radius); padding: 0;
   margin-bottom: 16px; border: 1px solid var(--border); overflow: hidden;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  position: relative;
 }
-.challenge-card:active { transform: scale(0.98); }
+.challenge-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent4));
+  background-size: 200% auto;
+  animation: cardTopGlow 3s linear infinite;
+}
+@keyframes cardTopGlow { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
+.challenge-card:active { transform: scale(0.97); }
 .challenge-card-header {
-  padding: 16px 16px 12px; display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 18px 18px 10px; display: flex; justify-content: space-between; align-items: flex-start;
 }
 .challenge-type-badge {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-  padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px;
+  padding: 5px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;
+  position: relative; overflow: hidden;
 }
-.badge-fitness { background: rgba(0,212,170,0.15); color: var(--accent3); }
-.badge-knowledge { background: rgba(108,92,231,0.15); color: var(--accent4); }
-.badge-creative { background: rgba(255,51,102,0.15); color: var(--accent2); }
-.badge-adventure { background: rgba(255,107,53,0.15); color: var(--accent); }
-.badge-social { background: rgba(0,180,255,0.15); color: var(--neon-blue); }
-.badge-custom { background: rgba(255,215,64,0.15); color: var(--gold); }
-.badge-daily { background: rgba(255,68,68,0.15); color: var(--fire); }
+.challenge-type-badge::after {
+  content: ''; position: absolute; inset: 0; border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+}
+.badge-fitness { background: rgba(0,229,160,0.15); color: var(--accent3); border: 1px solid rgba(0,229,160,0.2); }
+.badge-knowledge { background: rgba(124,92,255,0.15); color: var(--accent4); border: 1px solid rgba(124,92,255,0.2); }
+.badge-creative { background: rgba(255,45,120,0.15); color: var(--accent2); border: 1px solid rgba(255,45,120,0.2); }
+.badge-adventure { background: rgba(255,107,53,0.15); color: var(--accent); border: 1px solid rgba(255,107,53,0.2); }
+.badge-social { background: rgba(0,180,255,0.15); color: var(--neon-blue); border: 1px solid rgba(0,180,255,0.2); }
+.badge-custom { background: rgba(255,215,64,0.15); color: var(--gold); border: 1px solid rgba(255,215,64,0.2); }
 
 .challenge-timer {
-  font-size: 12px; font-weight: 700; color: var(--accent);
+  font-size: 12px; font-weight: 800; color: var(--accent);
   display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; background: rgba(255,107,53,0.08); border-radius: 12px;
 }
-.challenge-timer.urgent { color: var(--fire); animation: pulse 1s infinite; }
-@keyframes pulse { 50% { opacity: 0.6; } }
+.challenge-timer.urgent { color: var(--fire); background: rgba(255,68,68,0.1); animation: urgentPulse 1.5s ease infinite; }
+@keyframes urgentPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-.challenge-card-body { padding: 0 16px 16px; }
-.challenge-title { font-size: 18px; font-weight: 800; line-height: 1.3; margin-bottom: 6px; }
-.challenge-desc { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }
+.challenge-card-body { padding: 0 18px 14px; }
+.challenge-title {
+  font-family: var(--font-display); font-size: 20px; font-weight: 700;
+  line-height: 1.3; margin-bottom: 6px; letter-spacing: -0.3px;
+}
+.challenge-desc { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 14px; }
 
 .challenge-opponents {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
 }
 .opponent-avatar {
-  width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+  width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 700; border: 2px solid var(--border);
+  font-size: 15px; font-weight: 800; color: white;
+  border: 2px solid rgba(255,255,255,0.1); position: relative;
 }
-.opponent-name { font-size: 13px; font-weight: 600; }
+.opponent-avatar.you { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.opponent-avatar.them { background: linear-gradient(135deg, var(--accent4), var(--neon-blue)); }
+.opponent-name { font-size: 14px; font-weight: 700; }
 .opponent-record { font-size: 11px; color: var(--text3); }
 .vs-badge {
-  font-size: 10px; font-weight: 900; color: var(--accent); letter-spacing: 1px;
-  padding: 2px 8px; background: rgba(255,107,53,0.1); border-radius: 4px;
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  color: var(--accent); letter-spacing: 2px;
+  padding: 4px 10px; background: rgba(255,107,53,0.08); border-radius: 8px;
+  border: 1px solid rgba(255,107,53,0.15);
+  animation: vsGlow 2s ease infinite;
 }
+@keyframes vsGlow { 0%,100% { box-shadow: 0 0 0 rgba(255,107,53,0); } 50% { box-shadow: 0 0 12px rgba(255,107,53,0.2); } }
 
-.challenge-card-actions {
-  display: flex; gap: 8px; padding: 0 16px 16px;
-}
+.challenge-card-actions { display: flex; gap: 8px; padding: 0 18px 18px; }
+
+/* ─── Buttons ─── */
 .btn {
-  flex: 1; padding: 12px; border: none; border-radius: var(--radius-sm);
-  font-family: var(--font); font-size: 14px; font-weight: 700;
-  cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+  flex: 1; padding: 14px; border: none; border-radius: var(--radius-sm);
+  font-family: var(--font-display); font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  text-transform: uppercase; letter-spacing: 1px; position: relative; overflow: hidden;
 }
-.btn:active { transform: scale(0.97); }
+.btn::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.btn:active { transform: scale(0.94); }
+.btn:active::after { opacity: 1; }
 .btn-primary {
   background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: white; box-shadow: 0 4px 15px rgba(255,107,53,0.3);
+  color: white; box-shadow: 0 4px 20px rgba(255,107,53,0.3);
 }
-.btn-primary:hover { box-shadow: 0 6px 25px rgba(255,107,53,0.5); }
+.btn-primary:active { box-shadow: 0 2px 10px rgba(255,107,53,0.5); }
 .btn-secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
-.btn-accept { background: var(--accent3); color: #0a0a0f; }
-.btn-decline { background: transparent; color: var(--text3); border: 1px solid var(--border); }
-.btn-sm { padding: 8px 16px; font-size: 12px; flex: unset; }
-
-/* ─── Streak Badge ─── */
-.streak-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 13px; font-weight: 700; color: var(--fire);
-  padding: 4px 10px; background: rgba(255,68,68,0.1); border-radius: 20px;
+.btn-accept {
+  background: linear-gradient(135deg, var(--accent3), #00b87a);
+  color: #0a0a0f; box-shadow: 0 4px 20px rgba(0,229,160,0.3);
 }
-.streak-badge.big { font-size: 28px; padding: 8px 20px; }
+.btn-decline { background: transparent; color: var(--text3); border: 1px solid var(--border); }
+.btn-sm { padding: 10px 18px; font-size: 12px; flex: unset; }
+.btn-glow {
+  animation: btnGlow 2s ease infinite;
+}
+@keyframes btnGlow {
+  0%,100% { box-shadow: 0 4px 20px rgba(255,107,53,0.3); }
+  50% { box-shadow: 0 4px 30px rgba(255,107,53,0.6), 0 0 40px rgba(255,107,53,0.2); }
+}
+
+/* ─── XP Bar ─── */
+.xp-bar-wrap {
+  background: rgba(255,255,255,0.05); border-radius: 20px; height: 8px;
+  overflow: hidden; margin: 8px 0;
+}
+.xp-bar-fill {
+  height: 100%; border-radius: 20px;
+  background: linear-gradient(90deg, var(--accent3), var(--accent), var(--accent2));
+  background-size: 200% auto;
+  animation: xpShimmer 2s linear infinite;
+  transition: width 1s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes xpShimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
 
 /* ─── Section Headers ─── */
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 20px 0 12px;
+  padding: 24px 0 14px;
 }
-.section-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
-.section-action { font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.section-title {
+  font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -0.5px;
+}
+.section-action {
+  font-size: 13px; font-weight: 700; color: var(--accent); cursor: pointer;
+  transition: all 0.2s; padding: 4px 12px; border-radius: 12px;
+  background: rgba(255,107,53,0.08);
+}
+.section-action:active { transform: scale(0.92); }
 
 /* ─── Person Row ─── */
 .person-row {
-  display: flex; align-items: center; gap: 12px; padding: 12px;
-  background: var(--surface); border-radius: var(--radius-sm); margin-bottom: 8px;
-  cursor: pointer; transition: all 0.2s; border: 1px solid transparent;
+  display: flex; align-items: center; gap: 14px; padding: 14px;
+  background: var(--surface); backdrop-filter: blur(10px);
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+  cursor: pointer; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  border: 1px solid var(--border);
 }
-.person-row:hover { border-color: var(--border); background: var(--surface2); }
+.person-row:active { transform: scale(0.97); border-color: var(--border-glow); }
 .person-avatar {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; font-weight: 800; color: white; flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(255,107,53,0.2);
 }
 .person-info { flex: 1; min-width: 0; }
 .person-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.person-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.person-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
 .person-streak { text-align: right; }
+
+/* ─── Streak Badge ─── */
+.streak-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 800; color: var(--fire);
+  padding: 4px 12px; background: rgba(255,68,68,0.1); border-radius: 20px;
+  border: 1px solid rgba(255,68,68,0.15);
+}
+.streak-badge.big { font-size: 28px; padding: 10px 24px; }
 
 /* ─── Taunt Banner ─── */
 .taunt-banner {
-  background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(255,51,102,0.1));
-  border: 1px solid rgba(255,107,53,0.2); border-radius: var(--radius);
-  padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
-  cursor: pointer; transition: all 0.3s;
+  background: var(--surface); backdrop-filter: blur(16px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 14px;
+  cursor: pointer; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  position: relative; overflow: hidden;
 }
-.taunt-banner:hover { border-color: var(--accent); }
-.taunt-emoji { font-size: 28px; }
-.taunt-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; }
-.taunt-text span { color: var(--accent); }
+.taunt-banner::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+}
+.taunt-banner:active { transform: scale(0.97); }
+.taunt-emoji { font-size: 32px; animation: tauntBounce 2s ease infinite; }
+@keyframes tauntBounce {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-4px) rotate(-5deg); }
+  75% { transform: translateY(-2px) rotate(5deg); }
+}
+.taunt-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.taunt-text span { color: var(--accent); font-weight: 800; }
 
 /* ─── Stats Row ─── */
-.stats-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
 .stat-box {
-  flex: 1; background: var(--surface); border-radius: var(--radius-sm);
-  padding: 14px 12px; text-align: center; border: 1px solid var(--border);
+  flex: 1; background: var(--surface); backdrop-filter: blur(10px);
+  border-radius: var(--radius-sm); padding: 18px 12px; text-align: center;
+  border: 1px solid var(--border); transition: all 0.3s;
+  position: relative; overflow: hidden;
 }
-.stat-value { font-size: 24px; font-weight: 900; }
+.stat-box::before {
+  content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 40px; height: 2px; border-radius: 2px;
+}
+.stat-box:nth-child(1)::before { background: var(--fire); }
+.stat-box:nth-child(2)::before { background: var(--accent); }
+.stat-box:nth-child(3)::before { background: var(--accent3); }
+.stat-box:active { transform: scale(0.95); }
+.stat-value {
+  font-family: var(--font-display); font-size: 28px; font-weight: 700;
+}
 .stat-value.accent { color: var(--accent); }
 .stat-value.green { color: var(--accent3); }
 .stat-value.fire { color: var(--fire); }
-.stat-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+.stat-label { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
 
 /* ─── Category Pills ─── */
 .category-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 16px; -webkit-overflow-scrolling: touch; }
 .category-scroll::-webkit-scrollbar { display: none; }
 .category-pill {
-  flex-shrink: 0; padding: 8px 16px; border-radius: 20px;
-  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  flex-shrink: 0; padding: 10px 18px; border-radius: 24px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
   background: var(--surface); color: var(--text2); border: 1px solid var(--border);
   white-space: nowrap;
 }
-.category-pill.active { background: var(--accent); color: white; border-color: var(--accent); }
-.category-pill:hover { border-color: var(--accent); }
+.category-pill.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white; border-color: transparent;
+  box-shadow: 0 4px 20px rgba(255,107,53,0.3);
+}
+.category-pill:active { transform: scale(0.92); }
 
 /* ─── Challenge of the Day ─── */
 .cotd {
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border-radius: var(--radius); padding: 20px; margin-bottom: 20px;
-  position: relative; overflow: hidden;
+  border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+  position: relative; overflow: hidden; border: 0;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff2d78 40%, #7c5cff 100%);
+  background-size: 200% 200%;
+  animation: cotdGradient 6s ease infinite;
+}
+@keyframes cotdGradient {
+  0%,100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 .cotd::before {
-  content: ''; position: absolute; top: -50%; right: -30%; width: 200px; height: 200px;
+  content: ''; position: absolute; top: -60%; right: -20%; width: 300px; height: 300px;
   background: rgba(255,255,255,0.08); border-radius: 50%;
+  animation: cotdBubble 8s ease infinite;
 }
-.cotd-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 8px; }
-.cotd-title { font-size: 20px; font-weight: 900; line-height: 1.3; margin-bottom: 6px; }
-.cotd-desc { font-size: 13px; opacity: 0.85; line-height: 1.4; margin-bottom: 14px; }
-.cotd-meta { display: flex; gap: 16px; align-items: center; }
-.cotd-participants { font-size: 12px; font-weight: 600; opacity: 0.8; }
+@keyframes cotdBubble { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-20px,20px) scale(1.1); } }
+.cotd::after {
+  content: ''; position: absolute; bottom: -40%; left: -10%; width: 200px; height: 200px;
+  background: rgba(255,255,255,0.05); border-radius: 50%;
+}
+.cotd-label {
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 2px; opacity: 0.85; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.cotd-label .spark { display: inline-block; animation: sparkle 1s ease infinite; }
+@keyframes sparkle { 0%,100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.3) rotate(15deg); } }
+.cotd-title {
+  font-family: var(--font-display); font-size: 24px; font-weight: 700;
+  line-height: 1.2; margin-bottom: 8px; letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.cotd-desc { font-size: 14px; opacity: 0.85; line-height: 1.5; margin-bottom: 18px; }
+.cotd-meta { display: flex; gap: 16px; align-items: center; position: relative; z-index: 1; }
+.cotd-participants {
+  font-size: 12px; font-weight: 700; opacity: 0.85;
+  display: flex; align-items: center; gap: 6px;
+}
+.cotd-live-dot {
+  width: 6px; height: 6px; background: #fff; border-radius: 50%;
+  animation: livePulse 1.5s ease infinite;
+}
+@keyframes livePulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,255,255,0.4); } 50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(255,255,255,0); } }
 .cotd-btn {
-  padding: 10px 24px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
-  border-radius: var(--radius-sm); color: white; font-family: var(--font);
-  font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s;
-  text-transform: uppercase; letter-spacing: 0.5px; backdrop-filter: blur(10px);
+  padding: 12px 28px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+  border-radius: var(--radius-sm); color: white; font-family: var(--font-display);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  text-transform: uppercase; letter-spacing: 1px; backdrop-filter: blur(10px);
 }
-.cotd-btn:hover { background: rgba(255,255,255,0.3); }
+.cotd-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.35); }
 
 /* ─── Nearby Radar ─── */
+.radar-container { padding: 20px 0; text-align: center; }
 .radar-visual {
-  width: 200px; height: 200px; margin: 20px auto; border-radius: 50%;
-  background: radial-gradient(circle, rgba(0,212,170,0.1) 0%, transparent 70%);
-  border: 2px solid rgba(0,212,170,0.2); position: relative;
+  width: 220px; height: 220px; margin: 24px auto; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, transparent 70%);
+  border: 2px solid rgba(0,229,160,0.15); position: relative;
   display: flex; align-items: center; justify-content: center;
 }
 .radar-ping {
   position: absolute; width: 100%; height: 100%; border-radius: 50%;
-  border: 1px solid rgba(0,212,170,0.3); animation: radarPing 3s infinite;
+  border: 1px solid rgba(0,229,160,0.2);
+  animation: radarPing 3s cubic-bezier(0,0,0.2,1) infinite;
 }
 @keyframes radarPing {
-  0% { transform: scale(0.3); opacity: 0.8; }
-  100% { transform: scale(1); opacity: 0; }
+  0% { transform: scale(0.3); opacity: 0.6; }
+  100% { transform: scale(1.1); opacity: 0; }
 }
-.radar-center { font-size: 24px; font-weight: 900; color: var(--accent3); z-index: 1; }
-.radar-dot {
-  position: absolute; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--accent3); box-shadow: 0 0 10px var(--accent3);
+.radar-center { font-size: 28px; z-index: 1; animation: radarSpin 8s linear infinite; }
+@keyframes radarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.radar-line {
+  position: absolute; width: 50%; height: 2px; top: 50%;
+  background: linear-gradient(90deg, transparent, rgba(0,229,160,0.4));
+  transform-origin: left center; animation: radarSweep 3s linear infinite;
 }
+@keyframes radarSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 /* ─── Profile ─── */
-.profile-header {
-  text-align: center; padding: 24px 0 20px;
+.profile-header { text-align: center; padding: 30px 0 24px; }
+.profile-avatar-ring {
+  width: 96px; height: 96px; border-radius: 50%; margin: 0 auto 16px;
+  padding: 3px; background: conic-gradient(var(--accent), var(--accent2), var(--accent4), var(--accent3), var(--accent));
+  animation: ringRotate 4s linear infinite;
 }
+@keyframes ringRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .profile-avatar {
-  width: 80px; height: 80px; border-radius: 50%;
+  width: 100%; height: 100%; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   display: flex; align-items: center; justify-content: center;
-  font-size: 32px; font-weight: 900; color: white; margin: 0 auto 12px;
-  border: 3px solid var(--border);
+  font-size: 36px; font-weight: 900; color: white;
+  border: 3px solid var(--bg);
 }
-.profile-name { font-size: 22px; font-weight: 900; }
-.profile-handle { font-size: 13px; color: var(--text3); margin-top: 2px; }
+.profile-name { font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+.profile-handle { font-size: 13px; color: var(--text3); margin-top: 4px; }
 .profile-level {
-  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px;
-  padding: 4px 12px; background: var(--surface); border-radius: 20px;
-  font-size: 12px; font-weight: 700; color: var(--gold);
-  border: 1px solid rgba(255,215,64,0.2);
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+  padding: 6px 16px; background: var(--surface); border-radius: 24px;
+  font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--gold);
+  border: 1px solid rgba(255,215,64,0.15);
 }
 
 /* ─── Send Challenge Modal ─── */
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.7); z-index: 100; display: none;
+  background: rgba(0,0,0,0.75); z-index: 100; display: none;
   align-items: flex-end; justify-content: center;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
 }
 .modal-overlay.active { display: flex; }
 .modal-sheet {
-  background: var(--bg2); border-radius: 20px 20px 0 0; width: 100%; max-width: 500px;
-  max-height: 90vh; overflow-y: auto; padding: 0; animation: slideUp 0.3s ease;
+  background: var(--bg2); border-radius: 24px 24px 0 0; width: 100%; max-width: 500px;
+  max-height: 90vh; overflow-y: auto; padding: 0;
+  animation: sheetUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  border-top: 1px solid rgba(255,255,255,0.06);
 }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .modal-handle {
-  width: 40px; height: 4px; background: var(--border); border-radius: 2px;
-  margin: 12px auto;
+  width: 44px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px;
+  margin: 14px auto;
 }
 .modal-header {
-  padding: 8px 20px 16px; display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 24px 18px; display: flex; justify-content: space-between; align-items: center;
   border-bottom: 1px solid var(--border);
 }
-.modal-title { font-size: 18px; font-weight: 800; }
-.modal-close { font-size: 24px; color: var(--text3); cursor: pointer; background: none; border: none; }
-.modal-body { padding: 20px; }
+.modal-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+.modal-close {
+  font-size: 26px; color: var(--text3); cursor: pointer; background: none; border: none;
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.modal-close:active { background: var(--surface); transform: scale(0.9); }
+.modal-body { padding: 24px; }
 
 /* ─── Form Elements ─── */
-.form-group { margin-bottom: 16px; }
-.form-label { font-size: 12px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
-.form-input {
-  width: 100%; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); color: var(--text); font-family: var(--font); font-size: 15px;
-  outline: none; transition: border-color 0.2s;
+.form-group { margin-bottom: 20px; }
+.form-label {
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 8px; display: block;
 }
-.form-input:focus { border-color: var(--accent); }
+.form-input {
+  width: 100%; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-family: var(--font); font-size: 15px;
+  outline: none; transition: all 0.3s;
+}
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,107,53,0.1); }
 .form-input::placeholder { color: var(--text3); }
 textarea.form-input { resize: none; height: 80px; }
 
 /* ─── Taunt Select ─── */
 .taunt-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .taunt-option {
-  padding: 8px 14px; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.2s; color: var(--text2);
+  padding: 8px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 24px; font-size: 13px; cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); color: var(--text2);
 }
-.taunt-option.selected { border-color: var(--accent); background: rgba(255,107,53,0.1); color: var(--accent); }
-.taunt-option:hover { border-color: var(--accent); }
+.taunt-option.selected {
+  border-color: var(--accent); background: rgba(255,107,53,0.1); color: var(--accent);
+  box-shadow: 0 0 12px rgba(255,107,53,0.15);
+}
+.taunt-option:active { transform: scale(0.93); }
 
 /* ─── Toast ─── */
 .toast {
-  position: fixed; top: calc(20px + var(--safe-top)); left: 50%; transform: translateX(-50%);
-  padding: 12px 24px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
-  z-index: 300; animation: toastIn 0.3s ease;
-  background: var(--surface); border: 1px solid var(--border); color: var(--text);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  position: fixed; top: calc(24px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  padding: 14px 28px; border-radius: var(--radius-sm); font-size: 15px; font-weight: 700;
+  font-family: var(--font-display);
+  z-index: 300; animation: toastBounce 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  background: var(--surface-solid); border: 1px solid var(--border); color: var(--text);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5); backdrop-filter: blur(20px);
 }
-@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-.toast.success { border-color: var(--accent3); }
-.toast.error { border-color: var(--fire); }
+@keyframes toastBounce {
+  from { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.8); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.toast.success { border-color: var(--accent3); box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,229,160,0.1); }
+.toast.error { border-color: var(--fire); box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,68,68,0.1); }
+
+/* ─── Confetti ─── */
+.confetti-piece {
+  position: fixed; width: 10px; height: 10px; z-index: 400;
+  animation: confettiFall 1.5s ease-out forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg) scale(0.3); opacity: 0; }
+}
+
+/* ─── XP Popup ─── */
+.xp-popup {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-display); font-size: 48px; font-weight: 700;
+  color: var(--accent3); z-index: 350; pointer-events: none;
+  text-shadow: 0 0 30px rgba(0,229,160,0.5);
+  animation: xpPop 1.2s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes xpPop {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  40% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%, -80%) scale(0.8); opacity: 0; }
+}
 
 /* ─── Loading ─── */
 .loading-spinner {
-  width: 32px; height: 32px; border: 3px solid var(--border);
+  width: 36px; height: 36px; border: 3px solid var(--border);
   border-top-color: var(--accent); border-radius: 50%;
-  animation: spin 0.8s linear infinite; margin: 40px auto;
+  animation: spin 0.7s linear infinite; margin: 40px auto;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ─── Empty State ─── */
-.empty-state {
-  text-align: center; padding: 60px 20px;
-}
-.empty-emoji { font-size: 48px; margin-bottom: 16px; }
-.empty-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
-.empty-desc { font-size: 14px; color: var(--text3); line-height: 1.5; margin-bottom: 20px; }
+.empty-state { text-align: center; padding: 60px 20px; }
+.empty-emoji { font-size: 56px; margin-bottom: 16px; animation: emptyBounce 3s ease infinite; }
+@keyframes emptyBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.empty-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.empty-desc { font-size: 14px; color: var(--text3); line-height: 1.6; margin-bottom: 24px; }
 
 /* ─── Auth Screen ─── */
 .auth-screen {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: 100vh; padding: 40px 24px; text-align: center;
+  position: relative; z-index: 1;
 }
-.auth-logo { font-size: 48px; font-weight: 900; margin-bottom: 8px; }
-.auth-logo span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.auth-tagline { font-size: 16px; color: var(--text2); margin-bottom: 40px; }
+.auth-logo {
+  font-family: var(--font-display); font-size: 56px; font-weight: 700;
+  margin-bottom: 8px; letter-spacing: -2px;
+}
+.auth-logo span {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent4) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: logoShimmer 3s ease infinite;
+}
+.auth-tagline { font-size: 16px; color: var(--text2); margin-bottom: 48px; line-height: 1.5; }
 .auth-form { width: 100%; max-width: 360px; }
-.auth-form .form-input { margin-bottom: 12px; }
+.auth-form .form-input { margin-bottom: 14px; }
 .auth-btn {
-  width: 100%; padding: 14px; border: none; border-radius: var(--radius-sm);
+  width: 100%; padding: 16px; border: none; border-radius: var(--radius-sm);
   background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: white; font-family: var(--font); font-size: 16px; font-weight: 700;
-  cursor: pointer; margin-top: 8px; transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px;
+  color: white; font-family: var(--font-display); font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-top: 8px; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  text-transform: uppercase; letter-spacing: 1.5px;
+  box-shadow: 0 4px 25px rgba(255,107,53,0.3);
 }
-.auth-btn:hover { box-shadow: 0 6px 25px rgba(255,107,53,0.4); }
-.auth-switch { margin-top: 20px; font-size: 14px; color: var(--text3); }
-.auth-switch a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: none; }
+.auth-btn:active { transform: scale(0.96); box-shadow: 0 2px 15px rgba(255,107,53,0.5); }
+.auth-switch { margin-top: 24px; font-size: 14px; color: var(--text3); }
+.auth-switch a { color: var(--accent); cursor: pointer; font-weight: 700; text-decoration: none; }
 
-/* ─── 1v1 Profile Modal ─── */
+/* ─── Matchup ─── */
 .matchup-header {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  padding: 24px 0;
+  display: flex; align-items: center; justify-content: center; gap: 16px; padding: 24px 0;
 }
-.matchup-vs { font-size: 20px; font-weight: 900; color: var(--accent); }
-.matchup-score { font-size: 14px; color: var(--text2); margin-top: 4px; }
+.matchup-vs { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--accent); }
 
 /* ─── Responsive ─── */
 @media (min-width: 500px) {
@@ -413,10 +670,14 @@ textarea.form-input { resize: none; height: 80px; }
 </head>
 <body>
 
-<!-- ═══ AUTH SCREEN ═══ -->
+<!-- Animated Background -->
+<div class="bg-glow"></div>
+<div class="particles" id="particles"></div>
+
+<!-- AUTH SCREEN -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-logo"><span>Challenge</span></div>
-  <div class="auth-tagline">Dare your friends. Challenge strangers. Stay connected.</div>
+  <div class="auth-tagline">Dare your friends. Challenge strangers.<br>Stay connected.</div>
   <div class="auth-form" id="loginForm">
     <input type="email" class="form-input" id="authEmail" placeholder="Email" autocomplete="email">
     <input type="password" class="form-input" id="authPass" placeholder="Password" autocomplete="current-password">
@@ -432,9 +693,8 @@ textarea.form-input { resize: none; height: 80px; }
   </div>
 </div>
 
-<!-- ═══ MAIN APP ═══ -->
+<!-- MAIN APP -->
 <div class="app" id="mainApp" style="display:none">
-  <!-- Header -->
   <div class="app-header">
     <div class="app-logo"><span>Challenge</span></div>
     <div class="header-actions">
@@ -443,19 +703,27 @@ textarea.form-input { resize: none; height: 80px; }
     </div>
   </div>
 
-  <!-- Content Pages -->
   <div class="app-content">
 
-    <!-- ═══ FEED PAGE ═══ -->
+    <!-- FEED PAGE -->
     <div class="page active" id="page-feed">
-      <!-- Challenge of the Day -->
       <div style="padding-top:16px">
+        <!-- XP progress -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--gold)">Lv <span id="feedLevel">1</span></div>
+          <div class="xp-bar-wrap" style="flex:1">
+            <div class="xp-bar-fill" id="feedXpBar" style="width:10%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text3)" id="feedXpText">0 / 100 XP</div>
+        </div>
+
+        <!-- COTD -->
         <div class="cotd" id="cotdCard">
-          <div class="cotd-label">⚡ Challenge of the Day</div>
+          <div class="cotd-label"><span class="spark">⚡</span> Challenge of the Day</div>
           <div class="cotd-title" id="cotdTitle">Loading...</div>
           <div class="cotd-desc" id="cotdDesc"></div>
           <div class="cotd-meta">
-            <span class="cotd-participants" id="cotdParticipants"></span>
+            <span class="cotd-participants"><span class="cotd-live-dot"></span> <span id="cotdParticipants">...</span></span>
             <button class="cotd-btn" onclick="acceptCotd()">I'm In!</button>
           </div>
         </div>
@@ -472,42 +740,47 @@ textarea.form-input { resize: none; height: 80px; }
         <div class="section-title">Active Challenges</div>
         <div class="section-action" onclick="openSendChallenge()">+ New</div>
       </div>
-      <div id="activeChallenges"></div>
+      <div id="activeChallenges" class="stagger"></div>
 
-      <!-- Incoming Challenges -->
+      <!-- Incoming -->
       <div class="section-header" id="incomingHeader" style="display:none">
         <div class="section-title">🔥 Incoming</div>
       </div>
-      <div id="incomingChallenges"></div>
+      <div id="incomingChallenges" class="stagger"></div>
+
+      <!-- Pending / Sent -->
+      <div class="section-header" id="pendingHeader" style="display:none">
+        <div class="section-title">📤 Sent</div>
+      </div>
+      <div id="pendingChallenges" class="stagger"></div>
     </div>
 
-    <!-- ═══ NEARBY PAGE ═══ -->
+    <!-- NEARBY PAGE -->
     <div class="page" id="page-nearby">
-      <div style="padding-top:16px">
-        <div style="text-align:center;margin-bottom:20px">
-          <div style="font-size:24px;font-weight:900;margin-bottom:4px">Nearby</div>
-          <div style="font-size:13px;color:var(--text3)">Challenge people around you</div>
-        </div>
+      <div class="radar-container" style="padding-top:16px">
+        <div style="font-family:var(--font-display);font-size:26px;font-weight:700;margin-bottom:4px;letter-spacing:-0.5px">Nearby</div>
+        <div style="font-size:13px;color:var(--text3)">Challenge people around you</div>
 
         <div class="radar-visual">
+          <div class="radar-line"></div>
           <div class="radar-ping"></div>
           <div class="radar-ping" style="animation-delay:1s"></div>
           <div class="radar-ping" style="animation-delay:2s"></div>
           <div class="radar-center">📡</div>
         </div>
 
-        <div id="nearbyPeople"></div>
+        <div id="nearbyPeople" class="stagger"></div>
 
         <div class="empty-state" id="nearbyEmpty">
           <div class="empty-emoji">🌍</div>
           <div class="empty-title">Scanning for challengers...</div>
           <div class="empty-desc">Enable location to discover people nearby who are ready for a challenge</div>
-          <button class="btn btn-primary btn-sm" onclick="enableLocation()">Enable Location</button>
+          <button class="btn btn-primary btn-sm btn-glow" onclick="enableLocation()">Enable Location</button>
         </div>
       </div>
     </div>
 
-    <!-- ═══ STREAKS PAGE ═══ -->
+    <!-- STREAKS PAGE -->
     <div class="page" id="page-streaks">
       <div style="padding-top:16px">
         <div class="stats-row">
@@ -528,20 +801,22 @@ textarea.form-input { resize: none; height: 80px; }
         <div class="section-header">
           <div class="section-title">Challenge Streaks</div>
         </div>
-        <div id="streaksList"></div>
+        <div id="streaksList" class="stagger"></div>
 
         <div class="section-header">
           <div class="section-title">Rivals</div>
           <div class="section-action">Your record</div>
         </div>
-        <div id="rivalsList"></div>
+        <div id="rivalsList" class="stagger"></div>
       </div>
     </div>
 
-    <!-- ═══ PROFILE PAGE ═══ -->
+    <!-- PROFILE PAGE -->
     <div class="page" id="page-profile">
       <div class="profile-header">
-        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-avatar-ring">
+          <div class="profile-avatar" id="profileAvatar">?</div>
+        </div>
         <div class="profile-name" id="profileName">Loading...</div>
         <div class="profile-handle" id="profileHandle">@user</div>
         <div class="profile-level" id="profileLevel">⚡ Level 1</div>
@@ -562,6 +837,17 @@ textarea.form-input { resize: none; height: 80px; }
         </div>
       </div>
 
+      <!-- XP Progress -->
+      <div style="padding:0 4px 8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:4px">
+          <span id="profileXpLabel">Level 1</span>
+          <span id="profileXpCount">0 / 100 XP</span>
+        </div>
+        <div class="xp-bar-wrap">
+          <div class="xp-bar-fill" id="profileXpBar" style="width:10%"></div>
+        </div>
+      </div>
+
       <div class="section-header">
         <div class="section-title">Favorite Categories</div>
       </div>
@@ -570,20 +856,20 @@ textarea.form-input { resize: none; height: 80px; }
       <div class="section-header">
         <div class="section-title">Recent Activity</div>
       </div>
-      <div id="profileActivity"></div>
+      <div id="profileActivity" class="stagger"></div>
 
-      <div style="padding:20px 0;text-align:center">
+      <div style="padding:24px 0;text-align:center">
         <button class="btn btn-secondary btn-sm" onclick="doLogout()" style="color:var(--fire)">Log Out</button>
       </div>
     </div>
 
-    <!-- ═══ ACTIVITY PAGE ═══ -->
+    <!-- ACTIVITY PAGE -->
     <div class="page" id="page-activity">
       <div style="padding-top:16px">
         <div class="section-header">
           <div class="section-title">Activity</div>
         </div>
-        <div id="activityFeed"></div>
+        <div id="activityFeed" class="stagger"></div>
       </div>
     </div>
   </div>
@@ -610,7 +896,7 @@ textarea.form-input { resize: none; height: 80px; }
   </div>
 </div>
 
-<!-- ═══ SEND CHALLENGE MODAL ═══ -->
+<!-- SEND CHALLENGE MODAL -->
 <div class="modal-overlay" id="sendModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -619,40 +905,28 @@ textarea.form-input { resize: none; height: 80px; }
       <button class="modal-close" onclick="closeSendChallenge()">&times;</button>
     </div>
     <div class="modal-body">
-      <!-- Category -->
       <div class="form-group">
         <label class="form-label">Category</label>
         <div class="category-scroll" id="sendCategories"></div>
       </div>
-
-      <!-- Challenge Title -->
       <div class="form-group">
         <label class="form-label">Challenge</label>
         <input type="text" class="form-input" id="sendTitle" placeholder="e.g. 50 pushups before midnight">
       </div>
-
-      <!-- Quick templates -->
       <div class="form-group" id="quickTemplates"></div>
-
-      <!-- Description -->
       <div class="form-group">
         <label class="form-label">Details (optional)</label>
         <textarea class="form-input" id="sendDesc" placeholder="Rules, proof required, etc."></textarea>
       </div>
-
-      <!-- Pick a taunt -->
       <div class="form-group">
         <label class="form-label">Add a taunt 🐔</label>
         <div class="taunt-options" id="tauntOptions"></div>
       </div>
-
-      <!-- Send to -->
       <div class="form-group">
         <label class="form-label">Send to</label>
-        <div id="sendToList"></div>
+        <div id="sendToList" class="stagger"></div>
       </div>
-
-      <button class="btn btn-primary" onclick="sendChallenge()" style="width:100%;margin-top:8px">
+      <button class="btn btn-primary btn-glow" onclick="sendChallenge()" style="width:100%;margin-top:8px">
         🔥 Send Challenge
       </button>
     </div>
@@ -673,6 +947,54 @@ let dashData = null;
 let selectedCategory = 'fitness';
 let selectedTaunt = '';
 let selectedContact = null;
+
+// ── Floating Particles ──
+function initParticles() {
+  const container = document.getElementById('particles');
+  const colors = ['#ff6b35','#ff2d78','#7c5cff','#00e5a0','#00b4ff','#ffd740'];
+  for (let i = 0; i < 25; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 4 + 2;
+    p.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${Math.random()*12+8}s;
+      animation-delay:${Math.random()*8}s;
+    `;
+    container.appendChild(p);
+  }
+}
+initParticles();
+
+// ── Confetti System ──
+function fireConfetti() {
+  const colors = ['#ff6b35','#ff2d78','#7c5cff','#00e5a0','#ffd740','#00b4ff'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    const shapes = ['50%', '0', '4px'];
+    piece.style.cssText = `
+      left:${Math.random()*100}%; top:${Math.random()*30-10}%;
+      background:${color}; border-radius:${shapes[Math.floor(Math.random()*shapes.length)]};
+      width:${Math.random()*8+6}px; height:${Math.random()*8+6}px;
+      animation-duration:${Math.random()*1+1}s;
+      animation-delay:${Math.random()*0.3}s;
+    `;
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 2000);
+  }
+}
+
+function showXpPopup(xp) {
+  const el = document.createElement('div');
+  el.className = 'xp-popup';
+  el.textContent = `+${xp} XP`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
 
 // ── Categories ──
 const CATEGORIES = [
@@ -794,13 +1116,13 @@ async function initApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = '';
 
-  // Load data
   await Promise.all([loadContacts(), loadChallenges(), loadDashboard()]);
   renderFeed();
   renderProfile();
   renderStreaks();
   renderCotd();
   renderTaunt();
+  renderXpBar();
 }
 
 async function loadContacts() {
@@ -813,6 +1135,30 @@ async function loadChallenges() {
 
 async function loadDashboard() {
   try { dashData = await api('/dashboard'); } catch (e) { dashData = null; }
+}
+
+// ═══ XP BAR ═══
+function renderXpBar() {
+  const xp = dashData?.gamification?.xp || 0;
+  const level = dashData?.gamification?.level || 1;
+  const thresholds = [0,100,250,500,1000,1750,2750,4000,5500,7500,10000];
+  const currentThreshold = thresholds[level-1] || 0;
+  const nextThreshold = thresholds[level] || thresholds[thresholds.length-1];
+  const progress = Math.min(((xp - currentThreshold) / (nextThreshold - currentThreshold)) * 100, 100);
+
+  const barEl = document.getElementById('feedXpBar');
+  const textEl = document.getElementById('feedXpText');
+  const levelEl = document.getElementById('feedLevel');
+  if (barEl) barEl.style.width = Math.max(progress, 3) + '%';
+  if (textEl) textEl.textContent = `${xp} / ${nextThreshold} XP`;
+  if (levelEl) levelEl.textContent = level;
+
+  const pBarEl = document.getElementById('profileXpBar');
+  const pLabelEl = document.getElementById('profileXpLabel');
+  const pCountEl = document.getElementById('profileXpCount');
+  if (pBarEl) pBarEl.style.width = Math.max(progress, 3) + '%';
+  if (pLabelEl) pLabelEl.textContent = `Level ${level}`;
+  if (pCountEl) pCountEl.textContent = `${xp} / ${nextThreshold} XP`;
 }
 
 // ═══ NAVIGATION ═══
@@ -831,31 +1177,40 @@ function renderFeed() {
   const activeEl = document.getElementById('activeChallenges');
   const incomingEl = document.getElementById('incomingChallenges');
   const incomingHeader = document.getElementById('incomingHeader');
+  const pendingEl = document.getElementById('pendingChallenges');
+  const pendingHeader = document.getElementById('pendingHeader');
 
   const active = challenges.filter(c => c.status === 'accepted' || c.status === 'active');
   const incoming = challenges.filter(c => c.status === 'pending' && c.challenger_id !== currentUser?.id);
+  const pending = challenges.filter(c => c.status === 'pending' && c.challenger_id === currentUser?.id);
 
-  // Active
-  if (active.length === 0 && incoming.length === 0) {
+  if (active.length === 0 && incoming.length === 0 && pending.length === 0) {
     activeEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-emoji">⚡</div>
         <div class="empty-title">No active challenges</div>
         <div class="empty-desc">Send your first challenge and get the competition started!</div>
-        <button class="btn btn-primary btn-sm" onclick="openSendChallenge()">Send a Challenge</button>
+        <button class="btn btn-primary btn-sm btn-glow" onclick="openSendChallenge()">Send a Challenge</button>
       </div>
     `;
   } else {
     activeEl.innerHTML = active.map(c => renderChallengeCard(c, 'active')).join('');
   }
 
-  // Incoming
   if (incoming.length > 0) {
     incomingHeader.style.display = '';
     incomingEl.innerHTML = incoming.map(c => renderChallengeCard(c, 'incoming')).join('');
   } else {
     incomingHeader.style.display = 'none';
     incomingEl.innerHTML = '';
+  }
+
+  if (pending.length > 0) {
+    pendingHeader.style.display = '';
+    pendingEl.innerHTML = pending.map(c => renderChallengeCard(c, 'pending')).join('');
+  } else {
+    pendingHeader.style.display = 'none';
+    pendingEl.innerHTML = '';
   }
 }
 
@@ -864,7 +1219,6 @@ function renderChallengeCard(c, type) {
   const badgeClass = 'badge-' + category;
   const categoryLabel = CATEGORIES.find(cat => cat.id === category)?.label || '✨ Custom';
 
-  // Timer
   let timerHtml = '';
   if (c.expires_at) {
     const remaining = new Date(c.expires_at) - Date.now();
@@ -876,25 +1230,27 @@ function renderChallengeCard(c, type) {
     }
   }
 
-  // Opponent
   const opponentName = c.contact_name || 'Someone';
   const opponentInitial = opponentName.charAt(0).toUpperCase();
+  const myInitial = (currentUser?.name || '?').charAt(0).toUpperCase();
 
-  // Actions
   let actionsHtml = '';
   if (type === 'incoming') {
     actionsHtml = `
       <div class="challenge-card-actions">
         <button class="btn btn-accept" onclick="acceptChallenge(${c.id})">Accept 🔥</button>
         <button class="btn btn-decline" onclick="declineChallenge(${c.id})">Pass</button>
-      </div>
-    `;
+      </div>`;
+  } else if (type === 'active') {
+    actionsHtml = `
+      <div class="challenge-card-actions">
+        <button class="btn btn-primary btn-glow" onclick="completeChallenge(${c.id})">Done! ✅</button>
+      </div>`;
   } else {
     actionsHtml = `
       <div class="challenge-card-actions">
-        <button class="btn btn-primary" onclick="completeChallenge(${c.id})">Done! ✅</button>
-      </div>
-    `;
+        <button class="btn btn-secondary" style="font-size:12px;text-transform:none;letter-spacing:0">Waiting for response...</button>
+      </div>`;
   }
 
   return `
@@ -907,17 +1263,17 @@ function renderChallengeCard(c, type) {
         <div class="challenge-title">${escHtml(c.title)}</div>
         ${c.description ? `<div class="challenge-desc">${escHtml(c.description)}</div>` : ''}
         <div class="challenge-opponents">
-          <div class="opponent-avatar">${opponentInitial}</div>
-          <div>
-            <div class="opponent-name">${escHtml(opponentName)}</div>
-            <div class="opponent-record">${type === 'incoming' ? 'challenged you!' : 'in progress'}</div>
-          </div>
+          <div class="opponent-avatar you">${myInitial}</div>
           <div class="vs-badge">VS</div>
+          <div class="opponent-avatar them">${opponentInitial}</div>
+          <div style="margin-left:4px">
+            <div class="opponent-name">${escHtml(opponentName)}</div>
+            <div class="opponent-record">${type === 'incoming' ? 'challenged you!' : type === 'pending' ? 'pending...' : 'in progress'}</div>
+          </div>
         </div>
       </div>
       ${actionsHtml}
-    </div>
-  `;
+    </div>`;
 }
 
 function guessCategoryFromActivity(actType) {
@@ -927,18 +1283,17 @@ function guessCategoryFromActivity(actType) {
   return map[actType] || 'custom';
 }
 
-// ═══ RENDER: Challenge of the Day ═══
+// ═══ RENDER: COTD ═══
 function renderCotd() {
   const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_CHALLENGES.length;
   const cotd = DAILY_CHALLENGES[dayIndex];
   document.getElementById('cotdTitle').textContent = cotd.title;
   document.getElementById('cotdDesc').textContent = cotd.desc;
-  document.getElementById('cotdParticipants').textContent = `${Math.floor(Math.random() * 200 + 50)} people joined today`;
+  document.getElementById('cotdParticipants').textContent = `${Math.floor(Math.random() * 200 + 80)} people joined today`;
 }
 
 function acceptCotd() {
-  const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_CHALLENGES.length;
-  const cotd = DAILY_CHALLENGES[dayIndex];
+  fireConfetti();
   showToast("You're in! Complete it before midnight 🔥", 'success');
 }
 
@@ -949,12 +1304,11 @@ function renderTaunt() {
     tauntEl.innerHTML = 'Add friends to start challenging them! <span>Get started →</span>';
     return;
   }
-  // Find someone to taunt about
   const randomContact = contacts[Math.floor(Math.random() * contacts.length)];
   const taunts = [
     `<span>${randomContact.name}</span> hasn't been challenged in a while. Getting too comfortable? 😏`,
     `Your streak with <span>${randomContact.name}</span> is fading. Do something about it.`,
-    `<span>${randomContact.name}</span> is probably getting soft without you challenging them...`,
+    `<span>${randomContact.name}</span> is probably getting soft without you pushing them...`,
     `When's the last time you pushed <span>${randomContact.name}</span> out of their comfort zone?`,
     `<span>${randomContact.name}</span> thinks they can beat you. Prove them wrong.`,
   ];
@@ -971,9 +1325,8 @@ function renderStreaks() {
   document.getElementById('statSent').textContent = sent;
   document.getElementById('statWon').textContent = won;
 
-  // Streaks with contacts
   const streakEl = document.getElementById('streaksList');
-  const contactStreaks = contacts.slice(0, 5).map(c => {
+  const contactStreaks = contacts.slice(0, 6).map(c => {
     const mutual = challenges.filter(ch => ch.contact_name === c.name && ch.status === 'completed').length;
     return { ...c, challengeCount: mutual };
   }).sort((a, b) => b.challengeCount - a.challengeCount);
@@ -989,13 +1342,12 @@ function renderStreaks() {
           <div class="person-sub">${c.challengeCount} challenges completed</div>
         </div>
         <div class="person-streak">
-          ${c.challengeCount > 0 ? `<span class="streak-badge">🔥 ${c.challengeCount}</span>` : ''}
+          ${c.challengeCount > 0 ? `<span class="streak-badge">🔥 ${c.challengeCount}</span>` : '<span style="font-size:11px;color:var(--text3)">Start!</span>'}
         </div>
       </div>
     `).join('');
   }
 
-  // Rivals
   const rivalsEl = document.getElementById('rivalsList');
   rivalsEl.innerHTML = contactStreaks.slice(0, 3).map(c => `
     <div class="person-row">
@@ -1026,11 +1378,9 @@ function renderProfile() {
   document.getElementById('profileWins').textContent = wins;
   document.getElementById('profileStreak').textContent = streak;
 
-  // Categories
   const catEl = document.getElementById('profileCategories');
   catEl.innerHTML = CATEGORIES.map(c => `<div class="category-pill">${c.label}</div>`).join('');
 
-  // Activity
   const actEl = document.getElementById('profileActivity');
   const recent = challenges.slice(0, 5);
   if (recent.length === 0) {
@@ -1038,12 +1388,12 @@ function renderProfile() {
   } else {
     actEl.innerHTML = recent.map(c => `
       <div class="card" style="display:flex;align-items:center;gap:12px">
-        <div style="font-size:20px">${c.status === 'completed' ? '✅' : c.status === 'pending' ? '⏳' : '⚡'}</div>
+        <div style="font-size:22px">${c.status === 'completed' ? '✅' : c.status === 'pending' ? '⏳' : '⚡'}</div>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:600">${escHtml(c.title)}</div>
+          <div style="font-size:14px;font-weight:700">${escHtml(c.title)}</div>
           <div style="font-size:12px;color:var(--text3)">vs ${escHtml(c.contact_name || 'Someone')}</div>
         </div>
-        <div style="font-size:11px;color:var(--text3)">${c.status}</div>
+        <div style="font-size:11px;color:var(--text3);font-weight:600">${c.status}</div>
       </div>
     `).join('');
   }
@@ -1066,13 +1416,11 @@ function closeSendChallenge() {
 }
 
 function renderSendModal() {
-  // Categories
   const catEl = document.getElementById('sendCategories');
   catEl.innerHTML = CATEGORIES.map(c => `
     <div class="category-pill ${selectedCategory === c.id ? 'active' : ''}" onclick="selectCategory('${c.id}')">${c.label}</div>
   `).join('');
 
-  // Quick templates
   const templEl = document.getElementById('quickTemplates');
   const templates = TEMPLATES[selectedCategory] || [];
   templEl.innerHTML = '<div class="form-label" style="margin-bottom:8px">Quick picks</div>' +
@@ -1080,13 +1428,11 @@ function renderSendModal() {
     templates.map(t => `<div class="taunt-option" onclick="document.getElementById('sendTitle').value='${t}';this.classList.add('selected')">${t}</div>`).join('') +
     '</div>';
 
-  // Taunts
   const tauntEl = document.getElementById('tauntOptions');
   tauntEl.innerHTML = TAUNTS.map(t => `
     <div class="taunt-option ${selectedTaunt === t ? 'selected' : ''}" onclick="selectTaunt('${escAttr(t)}')">${t}</div>
   `).join('');
 
-  // Send to
   const sendToEl = document.getElementById('sendToList');
   if (selectedContact) {
     sendToEl.innerHTML = `
@@ -1094,11 +1440,10 @@ function renderSendModal() {
         <div class="person-avatar">${selectedContact.name.charAt(0)}</div>
         <div class="person-info">
           <div class="person-name">${escHtml(selectedContact.name)}</div>
-          <div class="person-sub">Selected</div>
+          <div class="person-sub" style="color:var(--accent)">Selected ✓</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="selectedContact=null;renderSendModal()">Change</button>
-      </div>
-    `;
+      </div>`;
   } else {
     sendToEl.innerHTML = contacts.slice(0, 8).map(c => `
       <div class="person-row" onclick="selectedContact={id:${c.id},name:'${escAttr(c.name)}'};renderSendModal()">
@@ -1141,6 +1486,7 @@ async function sendChallenge() {
       }),
     });
 
+    fireConfetti();
     showToast('Challenge sent! 🔥', 'success');
     closeSendChallenge();
     document.getElementById('sendTitle').value = '';
@@ -1158,7 +1504,8 @@ async function sendChallenge() {
 async function acceptChallenge(id) {
   try {
     await api(`/challenges/${id}/accept`, { method: 'POST' });
-    showToast('Challenge accepted! Let\'s go! 💪', 'success');
+    fireConfetti();
+    showToast("Challenge accepted! Let's go! 💪", 'success');
     await loadChallenges();
     renderFeed();
   } catch (e) { showToast(e.message || 'Failed', 'error'); }
@@ -1176,11 +1523,14 @@ async function declineChallenge(id) {
 async function completeChallenge(id) {
   try {
     const result = await api(`/challenges/${id}/complete`, { method: 'POST' });
+    fireConfetti();
+    showXpPopup(result.xp_earned || 0);
     showToast(`Challenge completed! +${result.xp_earned || 0} XP 🎉`, 'success');
     await Promise.all([loadChallenges(), loadDashboard()]);
     renderFeed();
     renderStreaks();
     renderProfile();
+    renderXpBar();
   } catch (e) { showToast(e.message || 'Failed', 'error'); }
 }
 
@@ -1226,25 +1576,25 @@ function renderNearby(people) {
 // ═══ ACTIVITY FEED ═══
 async function renderActivity() {
   const el = document.getElementById('activityFeed');
-  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">Loading...</div>';
+  el.innerHTML = '<div class="loading-spinner"></div>';
   try {
     const feed = await api('/feed?limit=30');
     if (!feed || feed.length === 0) {
-      el.innerHTML = '<div style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">📭</div><div style="color:var(--text3)">No activity yet. Send your first challenge!</div></div>';
+      el.innerHTML = '<div class="empty-state"><div class="empty-emoji">📭</div><div class="empty-title">No activity yet</div><div class="empty-desc">Send your first challenge!</div></div>';
       return;
     }
     el.innerHTML = feed.map(item => {
       const ago = timeAgo(item.timestamp);
-      const xpBadge = item.xp ? `<span style="color:var(--accent3);font-size:11px;font-weight:700">+${item.xp} XP</span>` : '';
-      return `<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-        <div style="font-size:24px;width:36px;text-align:center">${item.icon || '⚡'}</div>
+      const xpBadge = item.xp ? `<span style="color:var(--accent3);font-size:11px;font-weight:800">+${item.xp} XP</span>` : '';
+      return `<div class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:8px">
+        <div style="font-size:26px;width:38px;text-align:center">${item.icon || '⚡'}</div>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:600">${escHtml(item.title)}</div>
-          <div style="font-size:12px;color:var(--text3)">${escHtml(item.description || '')}</div>
+          <div style="font-size:14px;font-weight:700">${escHtml(item.title)}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${escHtml(item.description || '')}</div>
         </div>
         <div style="text-align:right">
           ${xpBadge}
-          <div style="font-size:11px;color:var(--text3)">${ago}</div>
+          <div style="font-size:11px;color:var(--text3);font-weight:600">${ago}</div>
         </div>
       </div>`;
     }).join('');

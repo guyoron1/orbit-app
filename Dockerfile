@@ -5,7 +5,7 @@ COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Cache bust — forces Docker to re-copy backend files
-ARG CACHE_BUST=v31-challenge-activity
+ARG CACHE_BUST=v32-challenge-redesign
 RUN echo "${CACHE_BUST}"
 
 COPY backend/ ./backend/
